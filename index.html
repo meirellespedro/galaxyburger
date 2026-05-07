@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Galaxy Burger em Campo Grande: hamburgueres artesanais com visual cinematografico, sabor intenso e entrega rapida pelo canal oficial.">
+  <meta name="theme-color" content="#05080a">
+  <meta property="og:title" content="Galaxy Burger | Hamburgueria artesanal em Campo Grande RJ">
+  <meta property="og:description" content="Hamburgueres artesanais com atmosfera sci-fi premium, combos autorais e entrega rapida em Campo Grande.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="img/orion.png">
+  <title>Galaxy Burger | Hamburgueria artesanal em Campo Grande RJ</title>
+  <link rel="icon" href="img/logotipo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Restaurant",
+      "name": "Galaxy Burger",
+      "image": "img/orion.png",
+      "telephone": "+55 21 99557-8652",
+      "servesCuisine": "Hamburgers",
+      "hasMenu": "https://www.ifood.com.br/delivery/rio-de-janeiro-rj/galaxy-burger-199-campo-grande/fe3716f9-fab7-4b6b-9e7a-09f0ccff22d1",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Rua Embaixador Muniz Gordilho, 199",
+        "addressLocality": "Campo Grande",
+        "addressRegion": "RJ",
+        "addressCountry": "BR"
+      },
+      "openingHoursSpecification": [
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": "Sunday",
+          "opens": "19:00",
+          "closes": "23:00"
+        },
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday"
+          ],
+          "opens": "19:00",
+          "closes": "23:59"
+        }
+      ]
+    }
+  </script>
+  <script src="carrinho.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#conteudo">Pular para o conteudo</a>
+
+  <div class="space-dust" aria-hidden="true"></div>
+  <div class="aurora aurora-one" aria-hidden="true"></div>
+  <div class="aurora aurora-two" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <nav class="navbar" aria-label="Principal">
+      <a class="brand" href="#inicio" aria-label="Galaxy Burger">
+        <img src="img/logotipo.png" alt="Galaxy Burger">
+      </a>
+
+      <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false" onclick="toggleMobileNav()">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+
+      <div class="nav-desktop">
+        <ul class="nav-links">
+          <li><a href="#inicio">Inicio</a></li>
+          <li><a href="#cardapio">Cardapio</a></li>
+          <li><a href="#combos">Combos</a></li>
+          <li><a href="#promocoes">Acompanhamentos</a></li>
+          <li><a href="#avaliacoes">Clientes</a></li>
+          <li><a href="#contato">Contato</a></li>
+        </ul>
+
+        <div class="nav-actions">
+          <button class="cart-link" type="button" onclick="openCartModal()">
+            Seu pedido <span id="header-cart-count">0</span>
+          </button>
+          <a class="header-cta" href="https://www.ifood.com.br/delivery/rio-de-janeiro-rj/galaxy-burger-199-campo-grande/fe3716f9-fab7-4b6b-9e7a-09f0ccff22d1" onclick="return openIfoodStore(event);">Pedir pelo iFood</a>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <div id="mobile-nav" class="mobile-nav" hidden>
+    <div class="mobile-nav-panel">
+      <div class="mobile-nav-head">
+        <img src="img/logotipo.png" alt="Galaxy Burger">
+        <button type="button" class="mobile-nav-close" aria-label="Fechar menu" onclick="closeMobileNav()">X</button>
+      </div>
+
+      <div class="mobile-nav-links">
+        <a href="#inicio" onclick="closeMobileNav()">Inicio</a>
+        <a href="#cardapio" onclick="closeMobileNav()">Cardapio</a>
+        <a href="#combos" onclick="closeMobileNav()">Combos</a>
+        <a href="#promocoes" onclick="closeMobileNav()">Acompanhamentos</a>
+        <a href="#avaliacoes" onclick="closeMobileNav()">Clientes</a>
+        <a href="#contato" onclick="closeMobileNav()">Contato</a>
+      </div>
+
+      <div class="mobile-nav-actions">
+        <button type="button" class="mobile-cart-btn" onclick="closeMobileNav(); openCartModal();">
+          Seu pedido <span id="mobile-cart-count">0</span>
+        </button>
+        <a class="mobile-order-btn" href="https://www.ifood.com.br/delivery/rio-de-janeiro-rj/galaxy-burger-199-campo-grande/fe3716f9-fab7-4b6b-9e7a-09f0ccff22d1" onclick="closeMobileNav(); return openIfoodStore(event);">Pedir pelo iFood</a>
+      </div>
+    </div>
+  </div>
+
+  <main id="conteudo">
+    <section id="inicio" class="hero-section">
+      <div class="hero-shell">
+        <div class="hero-copy">
+          <div class="hero-kickers">
+            <span class="eyebrow">Base Galaxy - Campo Grande, RJ</span>
+          </div>
+
+          <h1>Sabores de outra <span>galaxia</span> aterrissaram em Campo Grande.</h1>
+          <p>Na base Galaxy, cada burger sai com blend artesanal, montagem caprichada e aquele impacto de primeira mordida que transforma qualquer pedido em experiencia.</p>
+
+          <div class="store-status-card" id="store-status-card" aria-live="polite" data-open="false">
+            <span class="store-status-pill" id="store-status-pill">Sincronizando base</span>
+            <strong id="store-status-title">Consultando operacao...</strong>
+            <p id="store-status-message">Verificando se a Galaxy Burger esta recebendo pedidos neste momento.</p>
+          </div>
+
+          <div class="hero-actions">
+            <a class="btn-primary" href="https://www.ifood.com.br/delivery/rio-de-janeiro-rj/galaxy-burger-199-campo-grande/fe3716f9-fab7-4b6b-9e7a-09f0ccff22d1" onclick="return openIfoodStore(event);">Pedir pelo iFood</a>
+            <a class="btn-secondary" href="#cardapio">Explorar cardapio</a>
+          </div>
+
+          <div class="hero-points">
+            <div class="hero-point">
+              <strong>Receitas de outro planeta</strong>
+              <span>Burgers com identidade propria, muito queijo, camadas bem resolvidas e um visual que faz jus ao nome Galaxy.</span>
+            </div>
+            <div class="hero-point">
+              <strong>Entrega em rota de lancamento</strong>
+              <span>Seu pedido sai da base bem embalado para manter calor, crocancia e o impacto da primeira mordida ate a chegada.</span>
+            </div>
+            <div class="hero-point">
+              <strong>Pedido minimo da missao: R$ 20,00</strong>
+              <span>Os pedidos sao liberados a partir de R$ 20,00 em produtos, com entrega ou retirada em um fluxo simples, claro e confiavel.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-visual">
+          <div class="hero-orbit orbit-one" aria-hidden="true"></div>
+          <div class="hero-orbit orbit-two" aria-hidden="true"></div>
+          <div class="hero-glow" aria-hidden="true"></div>
+          <div class="hero-logo-stage">
+            <img class="hero-logo-photo" src="img/logotipo.png" alt="Logotipo da Galaxy Burger" fetchpriority="high" decoding="async">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mission-strip" aria-labelledby="trust-intro-title">
+      <div class="mission-strip-head">
+        <span class="section-kicker">Universo Galaxy</span>
+        <h2 id="trust-intro-title">Clima espacial na medida certa, operacao enxuta e foco total no sabor</h2>
+        <p>A identidade da Galaxy aparece nos nomes, no visual e na experiencia. O pedido continua rapido, claro e sem complicacao para voce pensar so no que vai comer.</p>
+      </div>
+      <div class="mission-strip-shell">
+        <article class="mission-chip">
+          <span class="mission-chip-label">Base estelar</span>
+          <strong>Uma identidade forte que transforma o pedido em experiencia sem perder clareza</strong>
+        </article>
+        <article class="mission-chip">
+          <span class="mission-chip-label">Rota quente</span>
+          <strong>Operacao pensada para o burger sair da base e chegar no ponto certo</strong>
+        </article>
+        <article class="mission-chip">
+          <span class="mission-chip-label">Painel de bordo</span>
+          <strong>Checkout claro, pagamento flexivel e taxa informada sem misterio</strong>
+        </article>
+      </div>
+    </section>
+
+    <section class="section-block feature-band featured-picks" aria-labelledby="top-picks-title">
+      <div class="feature-band-head">
+        <span class="section-kicker">Mais pedidos da constelacao</span>
+        <h2 id="top-picks-title">Os campeoes da galaxia para quem quer acertar logo na primeira escolha</h2>
+        <p>Tres burgers que concentram o melhor da base: cremosidade, bacon, queijo derretido e um visual que impoe respeito.</p>
+      </div>
+
+      <div class="top-picks-grid">
+        <article class="card top-pick-card">
+          <span class="product-badge danger">Mais pedido</span>
+          <img src="img/porocosmico.png" alt="Poró cósmico ( TOP 1, O MAIS PEDIDO ) da Galaxy Burger" loading="lazy" decoding="async">
+          <div class="card-content">
+            <h3>Poró cósmico ( TOP 1, O MAIS PEDIDO )</h3>
+            <p>Uma orbita cremosa com blend de 150g, bacon crocante, mussarela e creme de alho-poro que domina a primeira mordida.</p>
+            <span class="price">R$ 24,90</span>
+            <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse burger</button>
+          </div>
+        </article>
+        <article class="card top-pick-card top-pick-featured">
+          <span class="product-badge warning">Burger colossal</span>
+          <img src="img/saturno.png" alt="Saturno da Galaxy Burger" loading="lazy" decoding="async">
+          <div class="card-content">
+            <h3>Saturno</h3>
+            <p>Uma nave robusta com dois burgers de 150g, muito queijo, catupiry, farofa de bacon e molho Billy Jack.</p>
+            <span class="price">R$ 34,90</span>
+            <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse burger</button>
+          </div>
+        </article>
+        <article class="card top-pick-card">
+          <span class="product-badge success">Favorito da base</span>
+          <img src="img/orion.png" alt="ORION da Galaxy Burger" loading="lazy" decoding="async">
+          <div class="card-content">
+            <h3>ORION</h3>
+            <p>Um classico estelar com blend de 150g, cheddar derretido, bacon e cebola caramelizada com barbecue da casa.</p>
+            <span class="price">R$ 19,90</span>
+            <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse burger</button>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="cardapio" class="section-block">
+      <div class="section-split">
+        <div class="section-callout">
+          <span class="section-kicker">Estacao de burgers</span>
+          <h2>Receitas autorais com nome de galaxia, montagem caprichada e sabor de impacto</h2>
+          <p>Cada burger foi pensado para ter personalidade propria, leitura rapida no cardapio e resposta imediata quando chega na sua mesa.</p>
+          <a class="outline-link" href="#combos">Ver combos</a>
+        </div>
+
+        <div class="card-grid">
+          <article class="card">
+            <span class="product-badge neutral">Novidade</span>
+            <img src="img/alfatasty.png" alt="Alfa Tasty" loading="lazy" decoding="async">
+            <div class="card-content">
+              <h3>Alfa Tasty</h3>
+              <p>Um ponto de entrada na galaxia com cheddar, bacon, picles e molho tasty para uma mordida direta e marcante.</p>
+              <span class="price">R$ 19,90</span>
+              <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse burger</button>
+            </div>
+          </article>
+
+          <article class="card">
+            <span class="product-badge success">Favorito</span>
+            <img src="img/etdacasa.png" alt="ET da casa" loading="lazy" decoding="async">
+            <div class="card-content">
+              <h3>ET da casa</h3>
+              <p>O alien favorito da base, com cheddar, catupiry, bacon, picles, salada fresca e molho Billy Jack.</p>
+              <span class="price">R$ 24,90</span>
+              <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse burger</button>
+            </div>
+          </article>
+
+          <article class="card">
+            <span class="product-badge danger">Mais bacon</span>
+            <img src="img/baconstelacao.png" alt="Baconstelação" loading="lazy" decoding="async">
+            <div class="card-content">
+              <h3>Baconstelação</h3>
+              <p>Uma constelacao de bacon com mussarela, maionese de bacon, farofa crocante e cebola caramelizada com barbecue.</p>
+              <span class="price">R$ 19,90</span>
+              <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse burger</button>
+            </div>
+          </article>
+
+          <article class="card">
+            <span class="product-badge neutral">Picles em destaque</span>
+            <img src="img/piclesdasgalaxias.png" alt="Picles das galáxias" loading="lazy" decoding="async">
+            <div class="card-content">
+              <h3>Picles das galáxias</h3>
+              <p>Para quem gosta de acidez em destaque: cheddar, picles, bacon, cebola roxa e Billy Jack em equilibrio.</p>
+              <span class="price">R$ 19,90</span>
+              <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse burger</button>
+            </div>
+          </article>
+
+          <article class="card">
+            <span class="product-badge success">Classico da casa</span>
+            <img src="img/estrelaclassica.png" alt="Estrela clássica" loading="lazy" decoding="async">
+            <div class="card-content">
+              <h3>Estrela clássica</h3>
+              <p>A estrela mais familiar da casa, com mussarela, cebola roxa, picles, tomate e ketchup sem erro.</p>
+              <span class="price">R$ 19,90</span>
+              <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse burger</button>
+            </div>
+          </article>
+
+          <article class="card">
+            <span class="product-badge neutral">Mais fresco</span>
+            <img src="img/venussalada.png" alt="Vênus salada" loading="lazy" decoding="async">
+            <div class="card-content">
+              <h3>Vênus salada</h3>
+              <p>Uma leitura mais fresca da galaxia, com mussarela, bacon, tomate, alface, cebola roxa e maionese verde.</p>
+              <span class="price">R$ 19,90</span>
+              <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse burger</button>
+            </div>
+          </article>
+
+          <article class="card">
+            <span class="product-badge warning">Impacto duplo</span>
+            <img src="img/ovnismash.png" alt="Ovini Smash 2.0" loading="lazy" decoding="async">
+            <div class="card-content">
+              <h3>Ovini Smash 2.0</h3>
+              <p>Dois smash burgers em avistamento confirmado, com cheddar duplo, bacon, picles e molho Billy Jack.</p>
+              <span class="price">R$ 24,90</span>
+              <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse burger</button>
+            </div>
+          </article>
+
+          <article class="card">
+            <span class="product-badge danger">Cremoso</span>
+            <img src="img/cheddarestelar.png" alt="Cheddar Estrelar" loading="lazy" decoding="async">
+            <div class="card-content">
+              <h3>Cheddar Estrelar</h3>
+              <p>Uma explosao cremosa com blend de 150g, onion rings, cheddar em dobro e creme de cheddar com bacon.</p>
+              <span class="price">R$ 24,90</span>
+              <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse burger</button>
+            </div>
+          </article>
+
+          <article class="card">
+            <span class="product-badge warning">Picante</span>
+            <img src="img/cometadefogo.png" alt="Cometa de fogo" loading="lazy" decoding="async">
+            <div class="card-content">
+              <h3>Cometa de fogo</h3>
+              <p>Um rastro picante de cheddar, bacon e geleia de pimenta sobre blend de 150g.</p>
+              <span class="price">R$ 22,90</span>
+              <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse burger</button>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="combos" class="section-block">
+      <div class="section-split combos-layout">
+        <div class="section-callout">
+          <span class="section-kicker">Combos em orbita</span>
+          <h2>Missoes prontas para pedir rapido, comer bem e gastar menos energia escolhendo</h2>
+          <p>Os combos juntam burger, bebida e acompanhamento em combinacoes pensadas para solo, dupla, familia ou tripulacao.</p>
+          <a class="outline-link" href="#promocoes">Ver acompanhamentos</a>
+        </div>
+
+        <div class="combo-grid">
+          <article class="card combo-card" data-combo-drinks="1">
+            <span class="combo-tag">Favorito da base</span>
+            <img src="img/orion.png" alt="Combo individual Orion" loading="lazy" decoding="async">
+            <div class="card-content">
+              <h3>Combo individual Orion</h3>
+              <p>O combo de lancamento da base: Orion, batata e 1 bebida para uma refeicao redonda.</p>
+              <span class="price">R$ 26,90</span>
+              <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse combo</button>
+            </div>
+          </article>
+
+          <article class="card combo-card combo-featured" data-combo-drinks="1">
+            <span class="combo-tag">Melhor custo-beneficio</span>
+            <img src="img/saturno.png" alt="Combo individual Saturno" loading="lazy" decoding="async">
+            <div class="card-content">
+              <h3>Combo individual Saturno</h3>
+              <p>Um combo de maior propulsao, com Saturno, batata e 1 bebida para fome de outro planeta.</p>
+              <span class="price">R$ 39,90</span>
+              <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse combo</button>
+            </div>
+          </article>
+
+          <article class="card combo-card" data-combo-drinks="2">
+            <span class="combo-tag">Para casal</span>
+            <img src="img/venussalada.png" alt="Combo Vênus casal" loading="lazy" decoding="async">
+            <div class="card-content">
+              <h3>Combo Vênus casal</h3>
+              <p>Missao em dupla com 2 burgers, 2 batatas pequenas e 2 bebidas para dividir sem turbulencia.</p>
+              <span class="price">R$ 56,90</span>
+              <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse combo</button>
+            </div>
+          </article>
+
+          <article class="card combo-card" data-combo-drinks="1">
+            <span class="combo-tag">Escolha rapida</span>
+            <img src="img/estrelaclassica.png" alt="Combo clássico" loading="lazy" decoding="async">
+            <div class="card-content">
+              <h3>Combo clássico</h3>
+              <p>Escolha segura da nave: Estrela Classica, batata pequena e 1 bebida em um combo facil de decidir.</p>
+              <span class="price">R$ 26,90</span>
+              <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse combo</button>
+            </div>
+          </article>
+
+          <article class="card combo-card" data-combo-drinks="4">
+            <span class="combo-tag">Para familia</span>
+            <img src="img/orion.png" alt="Combo Orion família" loading="lazy" decoding="async">
+            <div class="card-content">
+              <h3>Combo Orion família</h3>
+              <p>Operacao familia com 4 Orions, batata grande e 4 bebidas para todo mundo comer junto.</p>
+              <span class="price">R$ 119,00</span>
+              <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse combo</button>
+            </div>
+          </article>
+
+          <article class="card combo-card" data-combo-drinks="4">
+            <span class="combo-tag">Pedido em grupo</span>
+            <img src="img/piclesdasgalaxias.png" alt="Combo Aliens" loading="lazy" decoding="async">
+            <div class="card-content">
+              <h3>Combo Aliens</h3>
+              <p>Combo de tripulacao com 4 burgers, acompanhamento grande e 4 bebidas para pedido em grupo.</p>
+              <span class="price">R$ 117,90</span>
+              <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse combo</button>
+            </div>
+          </article>
+
+          <article class="card combo-card" data-combo-drinks="1" data-combo-drink-options="Guaracamp copo 285ml">
+            <span class="combo-tag">Kids</span>
+            <img src="img/etzinho.png" alt="Combo Kids" loading="lazy" decoding="async">
+            <div class="card-content">
+              <h3>Combo Kids</h3>
+              <p>Missao infantil resolvida com Etzinho, batata pequena e Guaracamp na medida certa.</p>
+              <span class="price">R$ 19,90</span>
+              <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse combo</button>
+            </div>
+          </article>
+
+          <article class="card combo-card" data-combo-drinks="3">
+            <span class="combo-tag">Compartilhe</span>
+            <img src="img/alfatasty.png" alt="Combo Galaxy" loading="lazy" decoding="async">
+            <div class="card-content">
+              <h3>Combo Galaxy</h3>
+              <p>Pacote da casa com 3 burgers, batata grande e 3 bebidas para compartilhar sem perder o ritmo.</p>
+              <span class="price">R$ 89,90</span>
+              <button class="add-btn" type="button" onclick="addToCart(this)">Quero esse combo</button>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="promocoes" class="section-block">
+      <div class="section-split">
+        <div class="section-callout">
+          <span class="section-kicker">Suprimentos da nave</span>
+          <h2>Porcoes, bebidas e adicionais para turbinar seu pedido do jeito certo</h2>
+          <p>Aqui voce equipa a bandeja com acompanhamentos crocantes, bebidas geladas e extras que combinam com a viagem.</p>
+          <a class="outline-link" href="#avaliacoes">Ver prova social</a>
+        </div>
+
+        <div class="supply-layout">
+          <div class="supply-block">
+            <div class="supply-head">
+              <span class="section-kicker">Porcoes</span>
+              <h3>Acompanhamentos</h3>
+            </div>
+
+            <div class="card-grid compact-grid">
+              <article class="card">
+                <img src="img/onionrings.png" alt="15 Onions crocante" loading="lazy" decoding="async">
+                <div class="card-content">
+                  <h3>15 Onions crocante</h3>
+                  <p>Aneis dourados e crocantes com o molho Galaxy para abrir a missao com impacto.</p>
+                  <span class="price">R$ 15,00</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Quero essa porcao</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <img src="img/batatagrande.png" alt="Batata Grande" loading="lazy" decoding="async">
+                <div class="card-content">
+                  <h3>Batata Grande</h3>
+                  <p>Uma porcao de apoio para dividir na mesa ou acompanhar qualquer burger da frota.</p>
+                  <span class="price">R$ 15,00</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Quero essa porcao</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <img src="img/catupiryebacon.png" alt="Batata Grande (catupiry)" loading="lazy" decoding="async">
+                <div class="card-content">
+                  <h3>Batata Grande (catupiry)</h3>
+                  <p>Batata grande coberta com catupiry e bacon para uma orbita cremosa sem desperdicio.</p>
+                  <span class="price">R$ 24,90</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Quero essa porcao</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <img src="img/cheddarebacon.png" alt="Batata Grande (cheddar)" loading="lazy" decoding="async">
+                <div class="card-content">
+                  <h3>Batata Grande (cheddar)</h3>
+                  <p>Batata grande com cheddar e bacon para reforcar qualquer combo com mais peso.</p>
+                  <span class="price">R$ 24,90</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Quero essa porcao</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <img src="img/batatapequena.png" alt="Batata pequena" loading="lazy" decoding="async">
+                <div class="card-content">
+                  <h3>Batata pequena</h3>
+                  <p>Porcao rapida, crocante e no ponto para completar pedidos individuais.</p>
+                  <span class="price">R$ 5,00</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Quero essa porcao</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <img src="img/nuggets.png" alt="Nuggets" loading="lazy" decoding="async">
+                <div class="card-content">
+                  <h3>Nuggets</h3>
+                  <p>Cinco unidades para reforcar a tripulacao dos pedidos mais rapidos.</p>
+                  <span class="price">R$ 5,00</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Quero essa porcao</button>
+                </div>
+              </article>
+            </div>
+          </div>
+
+          <div class="supply-block" id="bebidas">
+            <div class="supply-head">
+              <span class="section-kicker">Bebidas</span>
+              <h3>Bebidas</h3>
+            </div>
+
+            <div class="card-grid compact-grid">
+              <article class="card">
+                <img src="img/coca.png" alt="Coca-Cola Comum 350ML" loading="lazy" decoding="async">
+                <div class="card-content">
+                  <h3>Coca-Cola Comum 350ML</h3>
+                  <p>Coca bem gelada para acompanhar qualquer burger da galaxia.</p>
+                  <span class="price">R$ 6,90</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar bebida</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <img src="img/cocazero.png" alt="Coca-Cola Zero 350 ml" loading="lazy" decoding="async">
+                <div class="card-content">
+                  <h3>Coca-Cola Zero 350 ml</h3>
+                  <p>Versao zero para equilibrar a missao sem abrir mao do classico.</p>
+                  <span class="price">R$ 6,90</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar bebida</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <img src="img/pepsi.png" alt="Pepsi lata 350ml" loading="lazy" decoding="async">
+                <div class="card-content">
+                  <h3>Pepsi lata 350ml</h3>
+                  <p>Pepsi em lata para pedidos solo, combos e pousos rapidos.</p>
+                  <span class="price">R$ 5,90</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar bebida</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <img src="img/pepsi zero.png" alt="Pepsi Black lata 350ml" loading="lazy" decoding="async">
+                <div class="card-content">
+                  <h3>Pepsi Black lata 350ml</h3>
+                  <p>Escolha sem acucar para deixar a viagem mais leve.</p>
+                  <span class="price">R$ 6,90</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar bebida</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <img src="img/fantalaranja.png" alt="Fanta Laranja" loading="lazy" decoding="async">
+                <div class="card-content">
+                  <h3>Fanta Laranja</h3>
+                  <p>Toque citrus e gelado para quem curte uma orbita mais doce.</p>
+                  <span class="price">R$ 5,90</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar bebida</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <img src="img/guarana.png" alt="Guarana lata 350ml" loading="lazy" decoding="async">
+                <div class="card-content">
+                  <h3>Guarana lata 350ml</h3>
+                  <p>Guarana em lata para acompanhar burgers, porcoes e combos da base.</p>
+                  <span class="price">R$ 6,90</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar bebida</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <img src="img/sprite.png" alt="Sprite lata 350ml" loading="lazy" decoding="async">
+                <div class="card-content">
+                  <h3>Sprite lata 350ml</h3>
+                  <p>Leve, gelada e perfeita para equilibrar burgers mais intensos.</p>
+                  <span class="price">R$ 5,90</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar bebida</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <img src="img/fantauva.png" alt="Fanta uva" loading="lazy" decoding="async">
+                <div class="card-content">
+                  <h3>Fanta uva</h3>
+                  <p>Opcao frutada para completar lanches e combos com outra vibe.</p>
+                  <span class="price">R$ 5,90</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar bebida</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <img src="img/guaracamp.png" alt="Guaracamp copo 285ml" loading="lazy" decoding="async">
+                <div class="card-content">
+                  <h3>Guaracamp copo 285ml</h3>
+                  <p>A bebida mais economica da base para fechar o pedido sem pesar.</p>
+                  <span class="price">R$ 2,50</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar bebida</button>
+                </div>
+              </article>
+            </div>
+          </div>
+
+          <div class="supply-block" id="extras">
+            <div class="supply-head">
+              <span class="section-kicker">Adicionais</span>
+              <h3>Adicionais e molhos</h3>
+            </div>
+
+            <div class="card-grid compact-grid">
+              <article class="card">
+                <div class="card-content">
+                  <h3>Farofa de Bacon</h3>
+                  <p>Carga extra de crocancia e sabor de bacon para reforcar o burger.</p>
+                  <span class="price">R$ 4,00</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar ao pedido</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <div class="card-content">
+                  <h3>Carne</h3>
+                  <p>Blend extra de 150g para aumentar a potencia do seu lanche.</p>
+                  <span class="price">R$ 10,00</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar ao pedido</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <div class="card-content">
+                  <h3>Bacon</h3>
+                  <p>Uma camada extra de bacon para deixar a orbita ainda mais intensa.</p>
+                  <span class="price">R$ 4,00</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar ao pedido</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <div class="card-content">
+                  <h3>Cheddar</h3>
+                  <p>Fatia extra para elevar a cremosidade da mordida.</p>
+                  <span class="price">R$ 3,00</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar ao pedido</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <div class="card-content">
+                  <h3>Mussarela</h3>
+                  <p>Mais cobertura para quem quer o burger ainda mais encorpado.</p>
+                  <span class="price">R$ 3,00</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar ao pedido</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <div class="card-content">
+                  <h3>Molho Billy Jack</h3>
+                  <p>Um pote do molho assinatura da base para acompanhar burgers e porcoes.</p>
+                  <span class="price">R$ 3,00</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar ao pedido</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <div class="card-content">
+                  <h3>Maionese Verde</h3>
+                  <p>A maionese verde da nave em pote individual para completar seu pedido.</p>
+                  <span class="price">R$ 3,00</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar ao pedido</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <div class="card-content">
+                  <h3>Molho Tasty</h3>
+                  <p>Toque extra de sabor para mergulhar porcoes e reforcar burgers.</p>
+                  <span class="price">R$ 3,00</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar ao pedido</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <div class="card-content">
+                  <h3>Molho de Bacon</h3>
+                  <p>Molho cremoso com pegada de bacon para intensificar a experiencia.</p>
+                  <span class="price">R$ 3,00</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar ao pedido</button>
+                </div>
+              </article>
+
+              <article class="card">
+                <div class="card-content">
+                  <h3>Geleia de pimenta</h3>
+                  <p>Um boost picante em pote de 30 ml para deixar o pedido em combustao.</p>
+                  <span class="price">R$ 5,00</span>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Adicionar ao pedido</button>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="avaliacoes" class="section-block testimonials-block">
+      <div class="section-split testimonials-layout">
+        <div class="section-callout">
+          <span class="section-kicker">Sinais da orbita</span>
+          <h2>Quem entra na rota da Galaxy sente o impacto e volta para outra viagem</h2>
+          <p>Comentarios reais que reforcam confianca, desejo e aquela vontade de pedir ainda hoje.</p>
+        </div>
+
+        <div class="testimonial-grid">
+          <article class="testimonial-card">
+            <div class="stars" aria-label="5 estrelas">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+            <p>"Chegou quente, bem montado e muito mais bonito do que eu imaginava."</p>
+            <strong>Joao - Campo Grande</strong>
+          </article>
+          <article class="testimonial-card">
+            <div class="stars" aria-label="5 estrelas">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+            <p>"Pedi pela primeira vez e sinceramente me surpreendeu. Burger muito saboroso e entrega rapida."</p>
+            <strong>Mariana - Pedido pelo iFood</strong>
+          </article>
+          <article class="testimonial-card">
+            <div class="stars" aria-label="5 estrelas">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+            <p>"O molho e absurdo e a batata chegou crocante ainda. Da pra ver que os caras capricham."</p>
+            <strong>Lucas - Rio de Janeiro</strong>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-banner">
+      <div class="cta-banner-shell">
+        <div>
+          <span class="section-kicker">Pronto para decolar</span>
+          <h2>Escolha sua rota, monte seu pedido e deixe a Galaxy cuidar do resto</h2>
+          <p>Do burger principal ao combo completo, sua proxima experiencia da base esta a poucos toques de distancia.</p>
+        </div>
+        <a class="cta-banner-btn" href="https://www.ifood.com.br/delivery/rio-de-janeiro-rj/galaxy-burger-199-campo-grande/fe3716f9-fab7-4b6b-9e7a-09f0ccff22d1" onclick="return openIfoodStore(event);">Pedir pelo iFood</a>
+      </div>
+    </section>
+  </main>
+
+  <footer id="contato" class="site-footer">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <img src="img/logotipo.png" alt="Galaxy Burger">
+        <p>Galaxy Burger em Campo Grande com identidade espacial, burgers artesanais e uma operacao feita para entregar sabor, impacto visual e confianca do primeiro ao ultimo clique.</p>
+      </div>
+
+      <div class="footer-column">
+        <h3>Endereco</h3>
+        <p>Rua Embaixador Muniz Gordilho, 199</p>
+        <p>Campo Grande - Rio de Janeiro/RJ</p>
+      </div>
+
+      <div class="footer-column">
+        <h3>Horarios</h3>
+        <p>Domingo: 19h as 23h</p>
+        <p>Seg a Sab: 19h as 23h59</p>
+        <p class="footer-live-status" id="footer-store-status">Status atual: verificando horario.</p>
+      </div>
+
+      <div class="footer-column">
+        <h3>Atendimento</h3>
+        <p><a href="tel:+5521995578652">(21) 99557-8652</a></p>
+        <p><a class="footer-button" href="https://www.ifood.com.br/delivery/rio-de-janeiro-rj/galaxy-burger-199-campo-grande/fe3716f9-fab7-4b6b-9e7a-09f0ccff22d1" onclick="return openIfoodStore(event);">Pedir pelo iFood</a></p>
+      </div>
+
+      <div class="footer-column footer-marketplace">
+        <h3>Pedido oficial</h3>
+        <img src="img/ifood-43.svg" alt="Galaxy Burger no iFood" class="marketplace-badge" loading="lazy" decoding="async">
+        <p>Acesso direto ao cardapio oficial da base para pedir com rapidez, seguranca e menos atrito.</p>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <p>&copy; 2026 Galaxy Burger. Burgers artesanais e entrega rapida em Campo Grande.</p>
+    </div>
+  </footer>
+
+  <div id="cart-modal" hidden>
+    <div class="cart-modal-content" role="dialog" aria-modal="true" aria-labelledby="cart-modal-title" tabindex="-1">
+      <div class="cart-modal-header">
+        <div>
+          <span class="cart-modal-kicker">Checkout Galaxy</span>
+          <h3 id="cart-modal-title">Seu pedido</h3>
+        </div>
+        <button class="cart-close" type="button" aria-label="Fechar carrinho" onclick="closeCartModal()">X</button>
+      </div>
+
+        <div class="cart-status-strip" id="cart-order-status-strip" data-open="true">
+        <span id="cart-order-status-label">Confirme cada detalhe antes de finalizar</span>
+        <strong id="cart-order-status-message">Revise os itens, confirme a rota de entrega e envie tudo certo para a base na primeira tentativa.</strong>
+        </div>
+
+      <div id="modal-cart-items" aria-live="polite"></div>
+
+      <div class="cart-form">
+        <label class="field-label">Como quer receber?</label>
+        <input id="order-fulfillment" type="hidden" value="delivery">
+        <div class="fulfillment-grid">
+          <button class="fulfillment-btn selected" type="button" data-fulfillment="delivery" onclick="selectFulfillment(this)">Entrega</button>
+          <button class="fulfillment-btn" type="button" data-fulfillment="pickup" onclick="selectFulfillment(this)">Retirada</button>
+        </div>
+        <p class="field-helper" id="fulfillment-helper">Entrega com taxa estimada em Campo Grande e bairros atendidos em ate 5 km da base, ou retirada direta no balcao da Galaxy.</p>
+
+        <label class="field-label" for="customer-name">Seu nome</label>
+        <input id="customer-name" type="text" placeholder="Ex: Beatriz" autocomplete="name">
+
+        <label class="field-label" for="order-notes">Observacoes do pedido</label>
+        <textarea id="order-notes" placeholder="Ex: sem cebola, trocar bebida, caprichar no molho"></textarea>
+
+        <div id="delivery-address-group">
+          <div class="address-field address-field-full">
+            <p class="field-helper delivery-manual-helper" id="delivery-manual-helper">Preencha seu endereco manualmente. Se quiser, voce ainda pode usar o CEP para agilizar rua, bairro, cidade e estado.</p>
+          </div>
+
+          <div class="address-grid address-grid-main">
+            <div class="address-field">
+              <label class="field-label" for="customer-cep">CEP</label>
+              <div class="cep-action-row">
+                <input id="customer-cep" type="text" inputmode="numeric" autocomplete="postal-code" placeholder="Ex: 23080-010" maxlength="9">
+                <button id="search-cep-btn" class="btn-secondary address-inline-btn" type="button">Buscar CEP</button>
+              </div>
+            </div>
+
+            <div class="address-field">
+              <label class="field-label" for="customer-street">Rua</label>
+              <input id="customer-street" type="text" autocomplete="address-line1" placeholder="Rua do endereco">
+            </div>
+          </div>
+
+          <div class="address-grid address-grid-split">
+            <div class="address-field">
+              <label class="field-label" for="customer-number">Numero</label>
+              <input id="customer-number" type="text" inputmode="text" autocomplete="address-line2" placeholder="Ex: 199">
+            </div>
+
+            <div class="address-field">
+              <label class="field-label" for="customer-neighborhood">Bairro</label>
+              <input id="customer-neighborhood" type="text" autocomplete="address-level3" placeholder="Bairro">
+            </div>
+          </div>
+
+          <div class="address-grid address-grid-extra">
+            <div class="address-field">
+              <label class="field-label" for="customer-complement">Complemento</label>
+              <input id="customer-complement" type="text" autocomplete="off" placeholder="Apto, bloco, casa">
+            </div>
+
+            <div class="address-field">
+              <label class="field-label" for="customer-reference">Referencia</label>
+              <input id="customer-reference" type="text" autocomplete="off" placeholder="Ex: perto da praca, esquina ou portao">
+            </div>
+          </div>
+
+          <div class="address-grid address-grid-region">
+            <div class="address-field">
+              <label class="field-label" for="customer-city">Cidade</label>
+              <input id="customer-city" type="text" autocomplete="address-level2" placeholder="Cidade">
+            </div>
+
+            <div class="address-field">
+              <label class="field-label" for="customer-state">Estado</label>
+              <input id="customer-state" type="text" autocomplete="address-level1" placeholder="UF" maxlength="2">
+            </div>
+          </div>
+
+          <input id="customer-address" type="hidden" value="">
+
+          <div class="delivery-fee-panel" id="delivery-fee-panel" aria-live="polite">
+            <span class="field-label delivery-fee-title">Taxa estimada de entrega</span>
+            <p class="field-helper delivery-range-store">Origem: Rua Embaixador Muniz Gordilho, 199 - Campo Grande/RJ</p>
+            <label class="field-label" for="delivery-distance-range">Selecione a faixa estimada do seu endereco</label>
+            <select id="delivery-distance-range" class="delivery-distance-select">
+              <option value="">Selecione uma faixa estimada</option>
+              <option value="campo_grande">Campo Grande - estimativa R$ 5,00</option>
+              <option value="nearby_area">Outros bairros atendidos ate 5 km - estimativa R$ 10,00</option>
+              <option value="outside_area">Fora da area de entrega - apenas retirada</option>
+            </select>
+            <ul class="delivery-policy-list" aria-label="Politica temporaria de entrega">
+              <li>Campo Grande: estimativa de R$ 5,00</li>
+              <li>Demais bairros atendidos ate 5 km: estimativa de R$ 10,00</li>
+              <li>Acima de 5 km: entrega indisponivel e retirada recomendada</li>
+            </ul>
+            <p class="field-helper delivery-range-hint">A taxa exibida e uma estimativa operacional. A Galaxy Burger valida o endereco completo antes do preparo e pode ajustar a taxa ou recusar a entrega se o local estiver fora da area atendida.</p>
+            <label class="delivery-estimate-terms" id="delivery-estimate-terms">
+              <input id="delivery-estimate-ack" type="checkbox">
+              <span>Entendo que a taxa mostrada e estimada e que o pedido sera enviado para a hamburgueria, sujeito a confirmacao final da loja pelo WhatsApp.</span>
+            </label>
+            <p class="field-helper" id="delivery-fee-feedback">Preencha o endereco, selecione a faixa estimada e confirme a taxa para atualizar o total.</p>
+            <button id="calculate-delivery-btn" class="btn-primary calculate-delivery-btn" type="button">Confirmar taxa estimada</button>
+          </div>
+        </div>
+
+        <div id="pickup-panel" class="pickup-panel" hidden>
+          <p class="pix-title">Retirada no local</p>
+          <p>Rua Embaixador Muniz Gordilho, 199 - Campo Grande, Rio de Janeiro/RJ</p>
+          <p class="pix-instructions">Escolha retirada se preferir passar na base e buscar seu pedido direto no balcao.</p>
+        </div>
+
+        <label class="field-label">Forma de pagamento</label>
+        <input id="payment-method" type="hidden" value="">
+        <div class="payment-grid">
+          <button class="payment-btn" type="button" data-payment="pix" onclick="selectPayment(this)">Pix</button>
+          <button class="payment-btn" type="button" data-payment="dinheiro" onclick="selectPayment(this)">Dinheiro</button>
+          <button class="payment-btn" type="button" data-payment="cartao de credito" onclick="selectPayment(this)">Credito</button>
+          <button class="payment-btn" type="button" data-payment="cartao de debito" onclick="selectPayment(this)">Debito</button>
+        </div>
+
+        <div id="cash-change-panel" class="cash-panel" hidden>
+          <p class="pix-title">Troco para pagamento em dinheiro</p>
+
+          <div class="cash-choice-grid">
+            <label class="cash-option">
+              <input type="radio" name="cash-change-type" value="no-change" checked>
+              <span>Nao preciso de troco</span>
+            </label>
+
+            <label class="cash-option">
+              <input type="radio" name="cash-change-type" value="need-change">
+              <span>Preciso de troco</span>
+            </label>
+          </div>
+
+          <div id="cash-change-value-wrap" class="cash-input-wrap" hidden>
+            <label class="field-label" for="cash-change-value">Troco para quanto?</label>
+            <input id="cash-change-value" type="text" inputmode="decimal" placeholder="Ex: 50,00">
+          </div>
+        </div>
+      </div>
+
+      <div id="pix-info" class="pix-panel" hidden>
+        <div class="pix-panel-head">
+          <div>
+            <span class="pix-eyebrow">Pagamento instantaneo</span>
+            <p class="pix-title">Pagamento via Pix</p>
+          </div>
+          <span class="pix-status-pill">Confirmacao manual</span>
+        </div>
+
+        <p class="pix-intro">Use a chave oficial da Galaxy Burger, pague o valor exato do pedido e envie o comprovante pelo WhatsApp para liberar o preparo.</p>
+
+        <div class="pix-summary-grid">
+          <div class="pix-summary-card">
+            <span class="pix-label">Valor para pagar</span>
+            <strong class="pix-amount" id="pix-total-display">R$ 0,00</strong>
+            <span class="pix-support-text" id="pix-total-caption">O valor final do Pix aparece aqui conforme o seu pedido.</span>
+          </div>
+
+          <div class="pix-summary-card">
+            <span class="pix-label">Chave Pix oficial</span>
+            <strong class="pix-key-value" id="pix-key-display">66.219.861/0001-73</strong>
+            <span class="pix-support-text">Tipo de chave: CNPJ</span>
+            <span class="pix-support-text">Recebedor: <strong id="pix-beneficiary-display">Sulen Ferreira de Carvalho de Souza</strong></span>
+            <span class="pix-support-text">Confirme no app bancario se o favorecido exibido e Sulen Ferreira de Carvalho de Souza antes de concluir o pagamento.</span>
+          </div>
+        </div>
+
+        <ol class="pix-step-list">
+          <li>Copie a chave Pix oficial da hamburgueria.</li>
+          <li>Pague o valor exato mostrado acima para evitar divergencias na conferencia.</li>
+          <li>Envie o comprovante na mesma conversa do pedido no WhatsApp oficial.</li>
+          <li>O pedido entra em preparo so apos a confirmacao do pagamento pela loja.</li>
+        </ol>
+
+        <div class="pix-guidance">
+          <strong>Importante</strong>
+          <p class="pix-instructions" id="pix-proof-note">A Galaxy Burger confere o comprovante antes de preparar o pedido. Se o pagamento nao for identificado, o pedido fica aguardando confirmacao.</p>
+        </div>
+
+        <div class="pix-actions">
+          <button class="pix-copy-btn" type="button" onclick="copyPixKey()">Copiar chave Pix</button>
+        </div>
+      </div>
+
+      <div class="cart-submit-bar">
+        <div class="cart-total-bar">
+          <div class="cart-total-copy">
+            <span>Subtotal dos produtos</span>
+            <strong id="modal-cart-subtotal">R$ 0,00</strong>
+            <span class="delivery-fee-line" id="modal-delivery-fee-line">Entrega estimada: R$ 0,00</span>
+          </div>
+          <div class="cart-total-highlight">
+            <span id="modal-cart-total-label">Total estimado do pedido</span>
+            <h3 id="modal-cart-total">R$ 0,00</h3>
+            <span class="delivery-total-note" id="delivery-total-note">Total estimado com entrega inclusa</span>
+          </div>
+        </div>
+
+        <p class="checkout-helper" id="checkout-helper">Para entrega, o pedido e enviado pelo WhatsApp oficial da Galaxy Burger com taxa estimada e confirmacao final da loja. Pedido minimo: R$ 20,00 em produtos.</p>
+        <p class="minimum-order-note" id="minimum-order-note" data-status="idle">Pedido minimo da Galaxy Burger: R$ 20,00 em produtos.</p>
+        <button class="finalize-order-btn" type="button" onclick="finalizeOrder()">Enviar pedido para a hamburgueria</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="combo-drink-modal" hidden>
+    <div class="combo-modal-content" role="dialog" aria-modal="true" aria-labelledby="combo-drink-modal-title" tabindex="-1">
+      <div class="cart-modal-header">
+        <div>
+          <span class="cart-modal-kicker">Configurar combo</span>
+          <h3 id="combo-drink-modal-title">Escolha sua bebida</h3>
+        </div>
+        <button class="cart-close" type="button" aria-label="Fechar selecao de bebida" onclick="closeComboDrinkModal()">X</button>
+      </div>
+
+      <div class="cart-status-strip combo-status-strip">
+        <span>Antes de adicionar o combo</span>
+        <strong id="combo-drink-modal-copy">Selecione a bebida que acompanha seu pedido para fechar o combo corretamente.</strong>
+      </div>
+
+      <div id="combo-drink-fields" class="combo-drink-grid"></div>
+
+      <div class="combo-modal-actions">
+        <button class="btn-secondary combo-modal-btn" type="button" onclick="closeComboDrinkModal()">Cancelar</button>
+        <button class="btn-primary combo-modal-btn" type="button" onclick="confirmComboDrinkSelection()">Adicionar combo</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mobile-cart-dock">
+    <button class="mobile-cart-dock-btn" type="button" onclick="openCartModal()">
+      <span>Seu pedido</span>
+      <strong id="mobile-dock-cart-count">0</strong>
+    </button>
+  </div>
+</body>
+</html>
