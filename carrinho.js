@@ -14,6 +14,8 @@ const STORE_ADDRESS_LINES = Object.freeze([
   "Campo Grande - Rio de Janeiro/RJ",
   "CEP 23070-010"
 ]);
+const THERMAL_PAPER_WIDTH_MM = 58;
+const THERMAL_PRINT_MARGIN_MM = 2;
 const ORDER_TICKET_WIDTH = 30;
 const ORDER_TICKET_DIVIDER = "-".repeat(ORDER_TICKET_WIDTH);
 const STORE_TIME_ZONE = "America/Sao_Paulo";
@@ -1996,8 +1998,117 @@ function buildOrderTicketPreviewMarkup(orderDetails) {
   `;
 }
 
+function buildOrderTicketThermalMarkup(orderDetails) {
+  if (!orderDetails) {
+    return "";
+  }
+
+  const addressMarkup = orderDetails.addressLines
+    .map(line => `<p>${escapeHtml(line)}</p>`)
+    .join("");
+  const paymentMarkup = orderDetails.paymentLines
+    .map(line => `<p>${escapeHtml(line)}</p>`)
+    .join("");
+  const itemsMarkup = orderDetails.items
+    .map(item => `
+      <div class="thermal-item">
+        <div class="thermal-item-row">
+          <strong class="thermal-item-name">${escapeHtml(`${item.quantity}x ${item.name}`)}</strong>
+          <strong class="thermal-item-price">${escapeHtml(item.lineTotalLabel)}</strong>
+        </div>
+        <p class="thermal-item-meta">${escapeHtml(`${item.unitPriceLabel} por unidade`)}</p>
+        ${item.variantLabel ? `<p class="thermal-item-meta">Obs item: ${escapeHtml(item.variantLabel)}</p>` : ""}
+      </div>
+    `)
+    .join("");
+  const notesMarkup = orderDetails.notes
+    ? `<p>${escapeHtml(orderDetails.notes)}</p>`
+    : `<p>Sem observacoes.</p>`;
+
+  return `
+    <div class="thermal-ticket">
+      <header class="thermal-header">
+        <span class="thermal-eyebrow">Galaxy Burger</span>
+        <strong>Comanda da loja</strong>
+        <p>${escapeHtml(orderDetails.createdAt)}</p>
+      </header>
+
+      <div class="thermal-divider"></div>
+
+      <section class="thermal-block thermal-block-tight">
+        <div class="thermal-summary-row">
+          <span>${escapeHtml(orderDetails.fulfillmentLabel)}</span>
+          <strong>${escapeHtml(orderDetails.totalLabel)}</strong>
+        </div>
+        <div class="thermal-summary-row">
+          <span>Cliente</span>
+          <strong>${escapeHtml(orderDetails.name)}</strong>
+        </div>
+        <div class="thermal-summary-row">
+          <span>Status</span>
+          <strong>${escapeHtml(orderDetails.statusLabel || "Pronto para imprimir")}</strong>
+        </div>
+      </section>
+
+      <div class="thermal-divider"></div>
+
+      <section class="thermal-block">
+        <span class="thermal-section-title">${escapeHtml(orderDetails.fulfillmentLabel)}</span>
+        <div class="thermal-text-block">${addressMarkup}</div>
+      </section>
+
+      <div class="thermal-divider"></div>
+
+      <section class="thermal-block">
+        <span class="thermal-section-title">Itens</span>
+        <div class="thermal-items">${itemsMarkup}</div>
+      </section>
+
+      <div class="thermal-divider"></div>
+
+      <section class="thermal-block">
+        <span class="thermal-section-title">Observacoes</span>
+        <div class="thermal-text-block">${notesMarkup}</div>
+      </section>
+
+      <div class="thermal-divider"></div>
+
+      <section class="thermal-block">
+        <span class="thermal-section-title">Pagamento</span>
+        <div class="thermal-text-block">${paymentMarkup}</div>
+      </section>
+
+      <div class="thermal-divider"></div>
+
+      <section class="thermal-block">
+        <div class="thermal-total-row">
+          <span>Subtotal</span>
+          <strong>${escapeHtml(orderDetails.subtotalLabel)}</strong>
+        </div>
+        <div class="thermal-total-row">
+          <span>${escapeHtml(orderDetails.feeLabelTitle)}</span>
+          <strong>${escapeHtml(orderDetails.deliveryFeeLabel)}</strong>
+        </div>
+        <div class="thermal-total-row thermal-total-row-grand">
+          <span>Total</span>
+          <strong>${escapeHtml(orderDetails.totalLabel)}</strong>
+        </div>
+      </section>
+
+      <div class="thermal-divider"></div>
+
+      <footer class="thermal-footer">
+        <p>Pedido sujeito a confirmacao.</p>
+        <p>${escapeHtml(`${orderDetails.itemsCount} item(ns) no pedido`)}</p>
+      </footer>
+    </div>
+  `;
+}
+
 function buildOrderTicketPrintDocument(orderDetails) {
-  const previewMarkup = buildOrderTicketPreviewMarkup(orderDetails);
+  const thermalMarkup = buildOrderTicketThermalMarkup(orderDetails);
+  const thermalPaperWidth = `${THERMAL_PAPER_WIDTH_MM}mm`;
+  const thermalPageMargin = `${THERMAL_PRINT_MARGIN_MM}mm`;
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -2009,127 +2120,117 @@ function buildOrderTicketPrintDocument(orderDetails) {
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      padding: 16px;
-      font-family: Arial, sans-serif;
-      background: #f3f3f3;
-      color: #111111;
+      padding: 8px;
+      font-family: "Courier New", Consolas, monospace;
+      background: #f4f4f4;
+      color: #000000;
     }
     .print-shell {
-      width: min(100%, 420px);
+      width: min(100%, ${thermalPaperWidth});
       margin: 0 auto;
-      padding: 18px;
-      border: 1px solid #d6d6d6;
+      padding: 0;
+      border: 1px solid #d8d8d8;
       background: #ffffff;
     }
-    .order-ticket-sheet { display: grid; gap: 16px; }
-    .order-ticket-sheet-header {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid #d9d9d9;
+    .thermal-ticket {
+      width: 100%;
+      padding: 3.5mm 2.2mm 4mm;
+      font-size: 10px;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
-    .order-ticket-sheet-header p { margin: 0; }
-    .order-ticket-sheet-header strong {
+    .thermal-header,
+    .thermal-footer {
+      text-align: center;
+    }
+    .thermal-header strong {
       display: block;
-      margin-top: 4px;
-      font-size: 1.35rem;
-    }
-    .order-ticket-sheet-header span,
-    .order-ticket-section-label,
-    .order-ticket-meta-card span,
-    .order-ticket-total-row span,
-    .order-ticket-item-copy small {
-      color: #5a5a5a;
-      font-size: 0.84rem;
-    }
-    .order-ticket-brand {
+      font-size: 13px;
       text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .thermal-eyebrow,
+    .thermal-section-title {
+      display: block;
+      font-size: 8.5px;
       font-weight: 700;
+      text-transform: uppercase;
       letter-spacing: 0.06em;
-      color: #1b5d3f;
     }
-    .order-ticket-meta-grid,
-    .order-ticket-actions {
-      display: grid;
-      gap: 10px;
-      grid-template-columns: 1fr;
-    }
-    .order-ticket-meta-card,
-    .order-ticket-section {
-      padding: 12px;
-      border: 1px solid #d9d9d9;
-      border-radius: 12px;
-      background: #ffffff;
-    }
-    .order-ticket-meta-card strong,
-    .order-ticket-total-row strong,
-    .order-ticket-item-total {
-      color: #111111;
-    }
-    .order-ticket-address,
-    .order-ticket-payment,
-    .order-ticket-note {
-      display: grid;
-      gap: 6px;
-      margin-top: 10px;
-    }
-    .order-ticket-address p,
-    .order-ticket-payment p,
-    .order-ticket-note p {
+    .thermal-header p,
+    .thermal-footer p,
+    .thermal-text-block p,
+    .thermal-item-meta {
       margin: 0;
     }
-    .order-ticket-link,
-    .order-ticket-actions {
-      display: none !important;
+    .thermal-header p,
+    .thermal-footer p,
+    .thermal-item-meta {
+      margin-top: 3px;
     }
-    .order-ticket-items {
+    .thermal-divider {
+      border-top: 1px dashed #000000;
+      margin: 7px 0;
+    }
+    .thermal-block {
       display: grid;
-      gap: 10px;
-      margin-top: 12px;
+      gap: 6px;
     }
-    .order-ticket-item {
+    .thermal-block-tight {
+      gap: 4px;
+    }
+    .thermal-summary-row,
+    .thermal-total-row,
+    .thermal-item-row {
       display: flex;
       justify-content: space-between;
-      gap: 12px;
-      padding-top: 10px;
-      border-top: 1px solid #e5e5e5;
+      align-items: flex-start;
+      gap: 6px;
     }
-    .order-ticket-item:first-child {
+    .thermal-summary-row span,
+    .thermal-total-row span {
+      flex: 1;
+    }
+    .thermal-summary-row strong,
+    .thermal-total-row strong,
+    .thermal-item-price {
+      text-align: right;
+      white-space: nowrap;
+    }
+    .thermal-item {
+      display: grid;
+      gap: 2px;
+      padding-top: 6px;
+      border-top: 1px dotted #8a8a8a;
+    }
+    .thermal-item:first-child {
       padding-top: 0;
       border-top: 0;
     }
-    .order-ticket-item-copy strong,
-    .order-ticket-item-copy span,
-    .order-ticket-item-copy small {
-      display: block;
+    .thermal-item-name {
+      flex: 1;
+      padding-right: 4px;
     }
-    .order-ticket-item-copy span {
-      margin-top: 5px;
-      font-size: 0.88rem;
+    .thermal-item-price {
+      flex: 0 0 auto;
     }
-    .order-ticket-totals {
-      display: grid;
-      gap: 8px;
-      margin-top: 12px;
+    .thermal-item-meta {
+      font-size: 8.5px;
     }
-    .order-ticket-total-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-    }
-    .order-ticket-total-row.is-total {
-      padding-top: 10px;
-      border-top: 1px dashed #bdbdbd;
-    }
-    .order-ticket-total-row.is-total span,
-    .order-ticket-total-row.is-total strong {
-      color: #000000;
-      font-size: 1rem;
+    .thermal-total-row-grand {
+      margin-top: 3px;
+      padding-top: 6px;
+      border-top: 1px solid #000000;
       font-weight: 700;
+      font-size: 11px;
+    }
+    .thermal-footer {
+      font-size: 8.5px;
     }
     @page {
-      margin: 8mm;
+      size: ${thermalPaperWidth} auto;
+      margin: ${thermalPageMargin};
     }
     @media print {
       body {
@@ -2142,11 +2243,15 @@ function buildOrderTicketPrintDocument(orderDetails) {
         padding: 0;
         border: 0;
       }
+      .thermal-ticket {
+        width: auto;
+        padding: 0;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="print-shell">${previewMarkup}</div>
+  <div class="print-shell">${thermalMarkup}</div>
   <script>
     window.addEventListener("load", () => {
       window.setTimeout(() => window.print(), 120);
