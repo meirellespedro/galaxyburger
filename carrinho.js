@@ -2106,9 +2106,7 @@ function buildOrderTicketThermalMarkup(orderDetails) {
 }
 
 function buildOrderTicketPrintDocument(orderDetails) {
-  const thermalMarkup = buildOrderTicketThermalMarkup(orderDetails);
-  const thermalPaperWidth = `${THERMAL_PAPER_WIDTH_MM}mm`;
-  const thermalPageMargin = `${THERMAL_PRINT_MARGIN_MM}mm`;
+  const previewMarkup = buildOrderTicketPreviewMarkup(orderDetails);
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -2120,117 +2118,127 @@ function buildOrderTicketPrintDocument(orderDetails) {
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      padding: 8px;
-      font-family: "Courier New", Consolas, monospace;
-      background: #f4f4f4;
-      color: #000000;
+      padding: 16px;
+      font-family: Arial, sans-serif;
+      background: #f3f3f3;
+      color: #111111;
     }
     .print-shell {
-      width: min(100%, ${thermalPaperWidth});
+      width: min(100%, 420px);
       margin: 0 auto;
-      padding: 0;
-      border: 1px solid #d8d8d8;
+      padding: 18px;
+      border: 1px solid #d6d6d6;
       background: #ffffff;
     }
-    .thermal-ticket {
-      width: 100%;
-      padding: 3.5mm 2.2mm 4mm;
-      font-size: 10px;
-      line-height: 1.25;
-      overflow-wrap: anywhere;
-      word-break: break-word;
-    }
-    .thermal-header,
-    .thermal-footer {
-      text-align: center;
-    }
-    .thermal-header strong {
-      display: block;
-      font-size: 13px;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-    }
-    .thermal-eyebrow,
-    .thermal-section-title {
-      display: block;
-      font-size: 8.5px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-    .thermal-header p,
-    .thermal-footer p,
-    .thermal-text-block p,
-    .thermal-item-meta {
-      margin: 0;
-    }
-    .thermal-header p,
-    .thermal-footer p,
-    .thermal-item-meta {
-      margin-top: 3px;
-    }
-    .thermal-divider {
-      border-top: 1px dashed #000000;
-      margin: 7px 0;
-    }
-    .thermal-block {
-      display: grid;
-      gap: 6px;
-    }
-    .thermal-block-tight {
-      gap: 4px;
-    }
-    .thermal-summary-row,
-    .thermal-total-row,
-    .thermal-item-row {
+    .order-ticket-sheet { display: grid; gap: 16px; }
+    .order-ticket-sheet-header {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
-      gap: 6px;
+      gap: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #d9d9d9;
     }
-    .thermal-summary-row span,
-    .thermal-total-row span {
-      flex: 1;
+    .order-ticket-sheet-header p { margin: 0; }
+    .order-ticket-sheet-header strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 1.35rem;
     }
-    .thermal-summary-row strong,
-    .thermal-total-row strong,
-    .thermal-item-price {
-      text-align: right;
-      white-space: nowrap;
+    .order-ticket-sheet-header span,
+    .order-ticket-section-label,
+    .order-ticket-meta-card span,
+    .order-ticket-total-row span,
+    .order-ticket-item-copy small {
+      color: #5a5a5a;
+      font-size: 0.84rem;
     }
-    .thermal-item {
+    .order-ticket-brand {
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: #1b5d3f;
+    }
+    .order-ticket-meta-grid,
+    .order-ticket-actions {
       display: grid;
-      gap: 2px;
-      padding-top: 6px;
-      border-top: 1px dotted #8a8a8a;
+      gap: 10px;
+      grid-template-columns: 1fr;
     }
-    .thermal-item:first-child {
+    .order-ticket-meta-card,
+    .order-ticket-section {
+      padding: 12px;
+      border: 1px solid #d9d9d9;
+      border-radius: 12px;
+      background: #ffffff;
+    }
+    .order-ticket-meta-card strong,
+    .order-ticket-total-row strong,
+    .order-ticket-item-total {
+      color: #111111;
+    }
+    .order-ticket-address,
+    .order-ticket-payment,
+    .order-ticket-note {
+      display: grid;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .order-ticket-address p,
+    .order-ticket-payment p,
+    .order-ticket-note p {
+      margin: 0;
+    }
+    .order-ticket-link,
+    .order-ticket-actions {
+      display: none !important;
+    }
+    .order-ticket-items {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .order-ticket-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 10px;
+      border-top: 1px solid #e5e5e5;
+    }
+    .order-ticket-item:first-child {
       padding-top: 0;
       border-top: 0;
     }
-    .thermal-item-name {
-      flex: 1;
-      padding-right: 4px;
+    .order-ticket-item-copy strong,
+    .order-ticket-item-copy span,
+    .order-ticket-item-copy small {
+      display: block;
     }
-    .thermal-item-price {
-      flex: 0 0 auto;
+    .order-ticket-item-copy span {
+      margin-top: 5px;
+      font-size: 0.88rem;
     }
-    .thermal-item-meta {
-      font-size: 8.5px;
+    .order-ticket-totals {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
     }
-    .thermal-total-row-grand {
-      margin-top: 3px;
-      padding-top: 6px;
-      border-top: 1px solid #000000;
+    .order-ticket-total-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .order-ticket-total-row.is-total {
+      padding-top: 10px;
+      border-top: 1px dashed #bdbdbd;
+    }
+    .order-ticket-total-row.is-total span,
+    .order-ticket-total-row.is-total strong {
+      color: #000000;
+      font-size: 1rem;
       font-weight: 700;
-      font-size: 11px;
-    }
-    .thermal-footer {
-      font-size: 8.5px;
     }
     @page {
-      size: ${thermalPaperWidth} auto;
-      margin: ${thermalPageMargin};
+      margin: 8mm;
     }
     @media print {
       body {
@@ -2243,15 +2251,11 @@ function buildOrderTicketPrintDocument(orderDetails) {
         padding: 0;
         border: 0;
       }
-      .thermal-ticket {
-        width: auto;
-        padding: 0;
-      }
     }
   </style>
 </head>
 <body>
-  <div class="print-shell">${thermalMarkup}</div>
+  <div class="print-shell">${previewMarkup}</div>
   <script>
     window.addEventListener("load", () => {
       window.setTimeout(() => window.print(), 120);
