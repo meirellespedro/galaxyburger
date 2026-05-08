@@ -1,4 +1,4 @@
-let cart = JSON.parse(localStorage.getItem("cart")) || [];
+﻿let cart = JSON.parse(localStorage.getItem("cart")) || [];
 
 const PIX_KEY = "66.219.861/0001-73";
 const PIX_BENEFICIARY_NAME = "Sulen Ferreira de Carvalho de Souza";
@@ -14,8 +14,6 @@ const STORE_ADDRESS_LINES = Object.freeze([
   "Campo Grande - Rio de Janeiro/RJ",
   "CEP 23070-010"
 ]);
-const THERMAL_PAPER_WIDTH_MM = 58;
-const THERMAL_PRINT_MARGIN_MM = 2;
 const ORDER_TICKET_WIDTH = 30;
 const ORDER_TICKET_DIVIDER = "-".repeat(ORDER_TICKET_WIDTH);
 const STORE_TIME_ZONE = "America/Sao_Paulo";
@@ -33,11 +31,11 @@ const STORE_WEEKDAY_TOKENS = Object.freeze({
 const STORE_WEEKDAY_LABELS = Object.freeze([
   "domingo",
   "segunda",
-  "terca",
+  "ter\u00e7a",
   "quarta",
   "quinta",
   "sexta",
-  "sabado"
+  "s\u00e1bado"
 ]);
 const STORE_HOURS = Object.freeze({
   0: Object.freeze({ openMinutes: 19 * 60, closeMinutes: 23 * 60 }),
@@ -53,7 +51,7 @@ const VIA_CEP_BASE_URL = "https://viacep.com.br/ws";
 const DELIVERY_FEE_LOCAL = 5;
 const DELIVERY_FEE_EXTENDED = 10;
 const MIN_ORDER_AMOUNT = 20;
-const DELIVERY_IDLE_MESSAGE = "Preencha o endereco, selecione a faixa estimada e confirme a taxa para atualizar o total.";
+const DELIVERY_IDLE_MESSAGE = "Preencha o endere\u00e7o, selecione a faixa estimada e confirme a taxa para atualizar o total.";
 
 const DELIVERY_STORAGE_KEY = "galaxy_burguer_delivery_v9";
 const LEGACY_DELIVERY_STORAGE_KEYS = [
@@ -90,14 +88,14 @@ const MANUAL_DELIVERY_RANGES = Object.freeze({
     status: "ready",
     fee: DELIVERY_FEE_EXTENDED,
     label: "Outros bairros atendidos",
-    description: "Outros bairros atendidos ate 5 km - estimativa R$ 10,00"
+    description: "Outros bairros atendidos at\u00e9 5 km - estimativa R$ 10,00"
   }),
   outside_area: Object.freeze({
     value: "outside_area",
     status: "out_of_range",
     fee: 0,
-    label: "Fora da area de entrega",
-    description: "Fora da area de entrega - acima de 5 km"
+    label: "Fora da \u00e1rea de entrega",
+    description: "Fora da \u00e1rea de entrega - acima de 5 km"
   })
 });
 const DEFAULT_COMBO_DRINK_OPTIONS = Object.freeze([
@@ -106,7 +104,7 @@ const DEFAULT_COMBO_DRINK_OPTIONS = Object.freeze([
   "Pepsi lata 350ml",
   "Pepsi Black lata 350ml",
   "Fanta Laranja",
-  "Guarana lata 350ml",
+  "Guaran\u00e1 lata 350ml",
   "Sprite lata 350ml",
   "Fanta uva",
   "Guaracamp copo 285ml"
@@ -222,24 +220,24 @@ function getStoreAvailability(now = new Date()) {
 
 function formatNextOpeningMessage(nextOpen) {
   if (!nextOpen) {
-    return "Consulte a loja para o proximo horario.";
+    return "Consulte a loja para o pr\u00f3ximo hor\u00e1rio.";
   }
 
   const timeLabel = formatStoreTimeLabel(nextOpen.openMinutes);
 
   if (nextOpen.offset === 0) {
-    return `A proxima abertura e hoje, as ${timeLabel}.`;
+    return `A pr\u00f3xima abertura \u00e9 hoje, \u00e0s ${timeLabel}.`;
   }
 
   if (nextOpen.offset === 1) {
-    return `A proxima abertura e amanha, as ${timeLabel}.`;
+    return `A pr\u00f3xima abertura \u00e9 amanh\u00e3, \u00e0s ${timeLabel}.`;
   }
 
-  return `A proxima abertura e ${STORE_WEEKDAY_LABELS[nextOpen.dayIndex]}, as ${timeLabel}.`;
+  return `A pr\u00f3xima abertura \u00e9 ${STORE_WEEKDAY_LABELS[nextOpen.dayIndex]}, \u00e0s ${timeLabel}.`;
 }
 
 function getStoreClosedOrderMessage(availability = getStoreAvailability()) {
-  return `A Galaxy Burger esta fechada agora. ${formatNextOpeningMessage(availability.nextOpen)}`;
+  return `A Galaxy Burger est\u00e1 fechada agora. ${formatNextOpeningMessage(availability.nextOpen)}`;
 }
 
 function ensureStoreIsOpen(showMessage = true) {
@@ -405,7 +403,7 @@ function getCashChangeSummary(orderTotal, showMessage = true) {
   if (changeType !== "need-change") {
     return {
       paymentLabel: "Dinheiro",
-      cashChangeText: "Nao precisa de troco."
+      cashChangeText: "N\u00e3o precisa de troco."
     };
   }
 
@@ -497,7 +495,7 @@ function validateAddressFields(showMessage = true) {
 
   const required = [
     { field: fields.street, value: values.street, message: "Informe a rua." },
-    { field: fields.number, value: values.number, message: "Informe o numero." },
+    { field: fields.number, value: values.number, message: "Informe o n\u00famero." },
     { field: fields.neighborhood, value: values.neighborhood, message: "Informe o bairro." }
   ];
 
@@ -543,14 +541,14 @@ function validateManualDeliveryRange(showMessage = true) {
   if (showMessage) {
     setFieldInvalid(fields.distanceRange);
     fields.distanceRange?.focus();
-    showToast("Selecione a faixa estimada do endereco.");
+    showToast("Selecione a faixa estimada do endere\u00e7o.");
     setDeliveryState({
       status: "idle",
       fee: 0,
       distanceLabel: "",
       distanceRange: "",
       address: syncDeliveryAddressField(),
-      message: "Selecione a faixa estimada do endereco para confirmar a entrega."
+      message: "Selecione a faixa estimada do endere\u00e7o para confirmar a entrega."
     });
   }
 
@@ -641,10 +639,10 @@ async function lookupCep(isManual = false) {
   if (cep.length !== 8) {
     setDeliveryState({
       status: "idle",
-      message: "Digite um CEP valido com 8 numeros."
+      message: "Digite um CEP v\u00e1lido com 8 n\u00fameros."
     });
 
-    if (isManual) showToast("Digite um CEP valido com 8 numeros.");
+    if (isManual) showToast("Digite um CEP v\u00e1lido com 8 n\u00fameros.");
     return;
   }
 
@@ -669,7 +667,7 @@ async function lookupCep(isManual = false) {
       distanceLabel: "",
       distanceRange: fields.distanceRange?.value || "",
       address: syncDeliveryAddressField(),
-      message: "CEP localizado. Revise o endereco e confirme a taxa estimada de entrega."
+      message: "CEP localizado. Revise o endere\u00e7o e confirme a taxa estimada de entrega."
     });
 
     saveDeliveryData();
@@ -678,8 +676,8 @@ async function lookupCep(isManual = false) {
       status: "error",
       fee: 0,
       message: error.message === "cep_not_found"
-        ? "CEP nao encontrado."
-        : "Nao foi possivel buscar o CEP agora."
+        ? "CEP n\u00e3o encontrado."
+        : "N\u00e3o foi poss\u00edvel buscar o CEP agora."
     });
 
     showToast(deliveryState.message);
@@ -699,7 +697,7 @@ function handleCalculateDelivery() {
       distanceLabel: "",
       distanceRange: "",
       address: STORE_ADDRESS,
-      message: "Retirada no balcao, sem taxa de entrega."
+      message: "Retirada no balc\u00e3o, sem taxa de entrega."
     });
     updateCartTotals();
     return;
@@ -721,8 +719,8 @@ function handleCalculateDelivery() {
     distanceRange: selectedRange.value,
     address,
     message: isOutOfRange
-      ? "Esse endereco fica fora da area de entrega da Galaxy Burger. Acima de 5 km, trabalhamos apenas com retirada."
-      : `Taxa estimada confirmada: ${selectedRange.description}. O valor final segue sujeito a validacao da loja pelo endereco informado.`
+      ? "Esse endere\u00e7o fica fora da \u00e1rea de entrega da Galaxy Burger. Acima de 5 km, trabalhamos apenas com retirada."
+      : `Taxa estimada confirmada: ${selectedRange.description}. O valor final segue sujeito \u00e0 valida\u00e7\u00e3o da loja pelo endere\u00e7o informado.`
   });
   updateCartTotals();
 }
@@ -762,7 +760,7 @@ function updateDeliveryUI() {
         : deliveryState.status === "ready"
           ? "Taxa estimada confirmada"
           : deliveryState.status === "out_of_range"
-            ? "Entrega indisponivel"
+            ? "Entrega indispon\u00edvel"
           : "Confirmar taxa estimada";
 
     fields.calculateDeliveryButton.classList.toggle("is-success", deliveryState.status === "ready");
@@ -774,11 +772,11 @@ function updateDeliveryUI() {
     } else if (deliveryState.status === "ready") {
       fields.feeLine.textContent = `Entrega estimada: ${formatCurrency(deliveryState.fee)}`;
     } else if (deliveryState.status === "out_of_range") {
-      fields.feeLine.textContent = "Entrega: indisponivel";
+      fields.feeLine.textContent = "Entrega: indispon\u00edvel";
     } else if (deliveryState.status === "loading") {
       fields.feeLine.textContent = "Entrega estimada: confirmando...";
     } else {
-      fields.feeLine.textContent = "Entrega estimada: aguardando confirmacao";
+      fields.feeLine.textContent = "Entrega estimada: aguardando confirma\u00e7\u00e3o";
     }
   }
 
@@ -788,7 +786,7 @@ function updateDeliveryUI() {
     } else if (deliveryState.status === "ready") {
       fields.totalNote.textContent = `Taxa estimada selecionada: ${deliveryState.distanceLabel}. A loja valida esse valor no WhatsApp antes do preparo.`;
     } else if (deliveryState.status === "out_of_range") {
-      fields.totalNote.textContent = "Endereco fora da area de entrega. Selecione retirada para continuar.";
+      fields.totalNote.textContent = "Endere\u00e7o fora da \u00e1rea de entrega. Selecione retirada para continuar.";
     } else if (deliveryState.status === "loading") {
       fields.totalNote.textContent = "Confirmando taxa estimada...";
     } else {
@@ -895,18 +893,18 @@ function updateMinimumOrderNote(subtotal = getCartTotal()) {
 
   if (!cart.length) {
     note.dataset.status = "idle";
-    note.textContent = `Pedido minimo da Galaxy Burger: ${formatCurrency(MIN_ORDER_AMOUNT)} em produtos.`;
+    note.textContent = `Pedido m\u00ednimo da Galaxy Burger: ${formatCurrency(MIN_ORDER_AMOUNT)} em produtos.`;
     return;
   }
 
   if (hasReachedMinimumOrder(subtotal)) {
     note.dataset.status = "ready";
-    note.textContent = `Pedido minimo atingido. Subtotal dos produtos: ${formatCurrency(subtotal)}.`;
+    note.textContent = `Pedido m\u00ednimo atingido. Subtotal dos produtos: ${formatCurrency(subtotal)}.`;
     return;
   }
 
   note.dataset.status = "warning";
-  note.textContent = `Pedido minimo de ${formatCurrency(MIN_ORDER_AMOUNT)} em produtos. Faltam ${formatCurrency(getMinimumOrderShortfall(subtotal))} para liberar o envio.`;
+  note.textContent = `Pedido m\u00ednimo de ${formatCurrency(MIN_ORDER_AMOUNT)} em produtos. Faltam ${formatCurrency(getMinimumOrderShortfall(subtotal))} para liberar o envio.`;
 }
 
 function updatePixPanelSummary({ subtotal = getCartTotal(), total = subtotal } = {}) {
@@ -923,22 +921,22 @@ function updatePixPanelSummary({ subtotal = getCartTotal(), total = subtotal } =
 
   if (totalCaption) {
     if (!hasItems) {
-      totalCaption.textContent = "O valor final do Pix aparece aqui assim que voce adicionar itens ao pedido.";
+      totalCaption.textContent = "O valor final do Pix aparece aqui assim que voc\u00ea adicionar itens ao pedido.";
     } else if (!meetsMinimumOrder) {
       totalCaption.textContent = `Faltam ${formatCurrency(getMinimumOrderShortfall(subtotal))} em produtos para liberar o pedido.`;
     } else if (!isPickup && deliveryState.status !== "ready") {
       totalCaption.textContent = "Confirme a taxa estimada de entrega para fechar o valor final do Pix.";
     } else if (isPickup) {
-      totalCaption.textContent = "Pague o valor exato da retirada para agilizar a conferencia da loja.";
+      totalCaption.textContent = "Pague o valor exato da retirada para agilizar a confer\u00eancia da loja.";
     } else {
-      totalCaption.textContent = "Pague o valor exato exibido aqui para acelerar a conferencia do pagamento.";
+      totalCaption.textContent = "Pague o valor exato exibido aqui para acelerar a confer\u00eancia do pagamento.";
     }
   }
 
   if (proofNote) {
     proofNote.textContent = hasItems
       ? "A Galaxy Burger confere o comprovante antes de preparar o pedido. Envie o comprovante na mesma conversa do pedido no WhatsApp oficial."
-      : "A Galaxy Burger confere o comprovante antes de preparar o pedido. Assim que voce montar o carrinho, o valor final do Pix aparecera aqui.";
+      : "A Galaxy Burger confere o comprovante antes de preparar o pedido. Assim que voc\u00ea montar o carrinho, o valor final do Pix aparecer\u00e1 aqui.";
   }
 }
 
@@ -979,7 +977,7 @@ function updateCartTotals() {
     finalizeButton.textContent = !storeOpen
       ? "Loja fechada no momento"
       : hasItems && !meetsMinimumOrder
-        ? `Faltam ${formatCurrency(getMinimumOrderShortfall(subtotal))} para o minimo`
+        ? `Faltam ${formatCurrency(getMinimumOrderShortfall(subtotal))} para o m\u00ednimo`
         : getFinalizeButtonLabel();
   }
 
@@ -1013,7 +1011,7 @@ function updateModalCart() {
   container.innerHTML = "";
 
   if (!cart.length) {
-    container.innerHTML = `<p class="empty-cart">Seu pedido esta vazio.</p>`;
+    container.innerHTML = `<p class="empty-cart">Seu pedido est\u00e1 vazio.</p>`;
     updateCartTotals();
     return;
   }
@@ -1350,7 +1348,7 @@ function selectFulfillment(button) {
       distanceLabel: "",
       distanceRange: "",
       address: STORE_ADDRESS,
-      message: "Retirada no balcao, sem taxa de entrega."
+      message: "Retirada no balc\u00e3o, sem taxa de entrega."
     });
   } else {
     setDeliveryState({
@@ -1368,7 +1366,7 @@ function selectFulfillment(button) {
 
 function copyPixKey() {
   navigator.clipboard?.writeText(PIX_KEY)
-    .then(() => showToast(`Chave Pix oficial copiada. No banco, confira se o favorecido e ${PIX_BENEFICIARY_NAME}.`))
+    .then(() => showToast(`Chave Pix oficial copiada. No banco, confira se o favorecido \u00e9 ${PIX_BENEFICIARY_NAME}.`))
     .catch(() => showToast(`Chave Pix oficial: ${PIX_KEY}`));
 }
 
@@ -1392,7 +1390,7 @@ function updateOrderAvailabilityUI(availability = getStoreAvailability()) {
   const cartStatusMessage = document.getElementById("cart-order-status-message");
   const checkoutHelper = document.getElementById("checkout-helper");
   const subtotal = getCartTotal();
-  const minimumOrderCopy = `Pedido minimo: ${formatCurrency(MIN_ORDER_AMOUNT)} em produtos.`;
+  const minimumOrderCopy = `Pedido m\u00ednimo: ${formatCurrency(MIN_ORDER_AMOUNT)} em produtos.`;
   const orderLinks = document.querySelectorAll('a[onclick*="openIfoodStore"]');
 
   orderLinks.forEach(link => {
@@ -1419,22 +1417,22 @@ function updateOrderAvailabilityUI(availability = getStoreAvailability()) {
 
   if (cartStatusMessage) {
     cartStatusMessage.textContent = !availability.scheduleEnforced
-      ? "Modo de validacao ativo. O bloqueio por horario foi desativado temporariamente para voce testar o checkout, inclusive o envio do pedido para a hamburgueria."
+      ? "Modo de valida\u00e7\u00e3o ativo. O bloqueio por hor\u00e1rio foi desativado temporariamente para voc\u00ea testar o checkout, inclusive o envio do pedido para a hamburgueria."
       : availability.isOpen
       ? "Revise os itens, confirme a taxa estimada e envie o pedido direto para a hamburgueria pelo WhatsApp oficial."
-      : `${getStoreClosedOrderMessage(availability)} Voce pode montar o carrinho normalmente, mas o envio do pedido fica liberado apenas no horario de funcionamento.`;
+      : `${getStoreClosedOrderMessage(availability)} Voc\u00ea pode montar o carrinho normalmente, mas o envio do pedido fica liberado apenas no hor\u00e1rio de funcionamento.`;
   }
 
   if (checkoutHelper) {
     checkoutHelper.textContent = !availability.scheduleEnforced
-      ? `Modo de testes ativo: o envio para a hamburgueria esta liberado temporariamente para validar o fluxo completo do pedido. ${minimumOrderCopy}`
+      ? `Modo de testes ativo: o envio para a hamburgueria est\u00e1 liberado temporariamente para validar o fluxo completo do pedido. ${minimumOrderCopy}`
       : availability.isOpen
-      ? `Para entrega, o pedido e enviado pelo WhatsApp oficial da Galaxy Burger com taxa estimada e confirmacao final da loja. ${minimumOrderCopy}`
-      : `${getStoreClosedOrderMessage(availability)} Monte seu carrinho normalmente; o envio pelo WhatsApp fica bloqueado ate a reabertura. ${minimumOrderCopy}`;
+      ? `Para entrega, o pedido \u00e9 enviado pelo WhatsApp oficial da Galaxy Burger com taxa estimada e confirma\u00e7\u00e3o final da loja. ${minimumOrderCopy}`
+      : `${getStoreClosedOrderMessage(availability)} Monte seu carrinho normalmente; o envio pelo WhatsApp fica bloqueado at\u00e9 a reabertura. ${minimumOrderCopy}`;
   }
 
   if (availability.isOpen && cart.length && cartStatusLabel && cartStatusMessage && !hasReachedMinimumOrder(subtotal)) {
-    cartStatusLabel.textContent = "Pedido minimo nao atingido";
+    cartStatusLabel.textContent = "Pedido m\u00ednimo n\u00e3o atingido";
     cartStatusMessage.textContent = `Adicione mais ${formatCurrency(getMinimumOrderShortfall(subtotal))} em produtos para liberar o envio do pedido para a hamburgueria.`;
   }
 
@@ -1442,7 +1440,7 @@ function updateOrderAvailabilityUI(availability = getStoreAvailability()) {
     footerStatus.textContent = !availability.scheduleEnforced
       ? "Status atual: modo de testes ativo, com pedidos liberados temporariamente."
       : availability.isOpen
-      ? `Status atual: aberta ate ${formatStoreTimeLabel(availability.todaySchedule?.closeMinutes || 0)}.`
+      ? `Status atual: aberta at\u00e9 ${formatStoreTimeLabel(availability.todaySchedule?.closeMinutes || 0)}.`
       : `Status atual: fechada. ${formatNextOpeningMessage(availability.nextOpen)}`;
   }
 }
@@ -1514,10 +1512,10 @@ function formatTicketPaymentLabel(payment) {
   const labels = {
     pix: "Pix",
     dinheiro: "Dinheiro",
-    "cartao de credito": "Cartao de credito",
-    "cartao de debito": "Cartao de debito",
-    "Cart\u00E3o de cr\u00E9dito": "Cartao de credito",
-    "Cart\u00E3o de d\u00E9bito": "Cartao de debito"
+    "cartao de credito": "Cart\u00e3o de cr\u00e9dito",
+    "cartao de debito": "Cart\u00e3o de d\u00e9bito",
+    "Cart\u00E3o de cr\u00E9dito": "Cart\u00e3o de cr\u00e9dito",
+    "Cart\u00E3o de d\u00E9bito": "Cart\u00e3o de d\u00e9bito"
   };
 
   return labels[payment] || payment;
@@ -1652,7 +1650,7 @@ function buildDeliveryAddressData({ isPickup, deliveryValues = {}, address = "" 
     compactAddressLine,
     courierAddressLine,
     complementText: complement,
-    referenceText: reference || "Nao informado",
+    referenceText: reference || "N\u00e3o informado",
     mapsQueryAddress: mapsQueryAddress || address
   };
 }
@@ -1696,7 +1694,7 @@ function buildTicketItemsLines({ detailed = false } = {}) {
     }
 
     if (detailed) {
-      lines.push(`Unitario: ${item.unitPriceLabel}`);
+      lines.push(`Unit\u00e1rio: ${item.unitPriceLabel}`);
       lines.push(`Total item: ${item.lineTotalLabel}`);
     }
 
@@ -1720,7 +1718,7 @@ function buildOrderPaymentLines({ paymentMethod, paymentLabel, cashChangeText })
   }
 
   if (normalizedPaymentMethod === "dinheiro") {
-    paymentLines.push(`Troco: ${cashChangeText || "Nao precisa de troco."}`);
+    paymentLines.push(`Troco: ${cashChangeText || "N\u00e3o precisa de troco."}`);
   }
 
   return paymentLines;
@@ -1731,7 +1729,7 @@ function buildOrderAddressPreviewLines({ isPickup, address, deliveryValues }) {
   const addressLines = [...addressData.ticketAddressLines];
 
   if (!isPickup) {
-    addressLines.push(`Referencia: ${addressData.referenceText}`);
+    addressLines.push(`Refer\u00eancia: ${addressData.referenceText}`);
   }
 
   return {
@@ -1925,7 +1923,7 @@ function buildOrderTicketPreviewMarkup(orderDetails) {
     .join("");
   const notesMarkup = orderDetails.notes
     ? `<p>${escapeHtml(orderDetails.notes)}</p>`
-    : `<p>Sem observacoes adicionais.</p>`;
+    : `<p>Sem observa\u00e7\u00f5es adicionais.</p>`;
   const mapsLinkMarkup = !orderDetails.isPickup && orderDetails.mapsLink
     ? `<a class="order-ticket-link" href="${escapeHtml(orderDetails.mapsLink)}" target="_blank" rel="noopener noreferrer">Abrir no mapa</a>`
     : "";
@@ -1972,7 +1970,7 @@ function buildOrderTicketPreviewMarkup(orderDetails) {
       </section>
 
       <section class="order-ticket-section">
-        <span class="order-ticket-section-label">Observacoes</span>
+        <span class="order-ticket-section-label">Observa\u00e7\u00f5es</span>
         <div class="order-ticket-note">${notesMarkup}</div>
       </section>
 
@@ -1994,113 +1992,6 @@ function buildOrderTicketPreviewMarkup(orderDetails) {
           </div>
         </div>
       </section>
-    </div>
-  `;
-}
-
-function buildOrderTicketThermalMarkup(orderDetails) {
-  if (!orderDetails) {
-    return "";
-  }
-
-  const addressMarkup = orderDetails.addressLines
-    .map(line => `<p>${escapeHtml(line)}</p>`)
-    .join("");
-  const paymentMarkup = orderDetails.paymentLines
-    .map(line => `<p>${escapeHtml(line)}</p>`)
-    .join("");
-  const itemsMarkup = orderDetails.items
-    .map(item => `
-      <div class="thermal-item">
-        <div class="thermal-item-row">
-          <strong class="thermal-item-name">${escapeHtml(`${item.quantity}x ${item.name}`)}</strong>
-          <strong class="thermal-item-price">${escapeHtml(item.lineTotalLabel)}</strong>
-        </div>
-        <p class="thermal-item-meta">${escapeHtml(`${item.unitPriceLabel} por unidade`)}</p>
-        ${item.variantLabel ? `<p class="thermal-item-meta">Obs item: ${escapeHtml(item.variantLabel)}</p>` : ""}
-      </div>
-    `)
-    .join("");
-  const notesMarkup = orderDetails.notes
-    ? `<p>${escapeHtml(orderDetails.notes)}</p>`
-    : `<p>Sem observacoes.</p>`;
-
-  return `
-    <div class="thermal-ticket">
-      <header class="thermal-header">
-        <span class="thermal-eyebrow">Galaxy Burger</span>
-        <strong>Comanda da loja</strong>
-        <p>${escapeHtml(orderDetails.createdAt)}</p>
-      </header>
-
-      <div class="thermal-divider"></div>
-
-      <section class="thermal-block thermal-block-tight">
-        <div class="thermal-summary-row">
-          <span>${escapeHtml(orderDetails.fulfillmentLabel)}</span>
-          <strong>${escapeHtml(orderDetails.totalLabel)}</strong>
-        </div>
-        <div class="thermal-summary-row">
-          <span>Cliente</span>
-          <strong>${escapeHtml(orderDetails.name)}</strong>
-        </div>
-        <div class="thermal-summary-row">
-          <span>Status</span>
-          <strong>${escapeHtml(orderDetails.statusLabel || "Pronto para imprimir")}</strong>
-        </div>
-      </section>
-
-      <div class="thermal-divider"></div>
-
-      <section class="thermal-block">
-        <span class="thermal-section-title">${escapeHtml(orderDetails.fulfillmentLabel)}</span>
-        <div class="thermal-text-block">${addressMarkup}</div>
-      </section>
-
-      <div class="thermal-divider"></div>
-
-      <section class="thermal-block">
-        <span class="thermal-section-title">Itens</span>
-        <div class="thermal-items">${itemsMarkup}</div>
-      </section>
-
-      <div class="thermal-divider"></div>
-
-      <section class="thermal-block">
-        <span class="thermal-section-title">Observacoes</span>
-        <div class="thermal-text-block">${notesMarkup}</div>
-      </section>
-
-      <div class="thermal-divider"></div>
-
-      <section class="thermal-block">
-        <span class="thermal-section-title">Pagamento</span>
-        <div class="thermal-text-block">${paymentMarkup}</div>
-      </section>
-
-      <div class="thermal-divider"></div>
-
-      <section class="thermal-block">
-        <div class="thermal-total-row">
-          <span>Subtotal</span>
-          <strong>${escapeHtml(orderDetails.subtotalLabel)}</strong>
-        </div>
-        <div class="thermal-total-row">
-          <span>${escapeHtml(orderDetails.feeLabelTitle)}</span>
-          <strong>${escapeHtml(orderDetails.deliveryFeeLabel)}</strong>
-        </div>
-        <div class="thermal-total-row thermal-total-row-grand">
-          <span>Total</span>
-          <strong>${escapeHtml(orderDetails.totalLabel)}</strong>
-        </div>
-      </section>
-
-      <div class="thermal-divider"></div>
-
-      <footer class="thermal-footer">
-        <p>Pedido sujeito a confirmacao.</p>
-        <p>${escapeHtml(`${orderDetails.itemsCount} item(ns) no pedido`)}</p>
-      </footer>
     </div>
   `;
 }
@@ -2309,7 +2200,7 @@ function buildWhatsAppOrderMessage({
     lines.push(
       "ENTREGA:",
       addressData.compactAddressLine || address,
-      `Referencia: ${addressData.referenceText}`,
+      `Refer\u00eancia: ${addressData.referenceText}`,
       generateMapsLink(addressData.mapsQueryAddress)
     );
   }
@@ -2326,7 +2217,7 @@ function buildWhatsAppOrderMessage({
   if (notes) {
     lines.push(
       "",
-      "Observacoes:",
+      "Observa\u00e7\u00f5es:",
       notes
     );
   }
@@ -2345,13 +2236,13 @@ function buildWhatsAppOrderMessage({
     `Total: ${total}`,
     "",
     ORDER_TICKET_DIVIDER,
-    "Pedido sujeito a confirmacao."
+    "Pedido sujeito a confirma\u00e7\u00e3o."
   );
 
   if (ticketUrl) {
     lines.push(
       "",
-      "Comanda para impressao:",
+      "Comanda para impress\u00e3o:",
       ticketUrl
     );
   }
@@ -2389,7 +2280,7 @@ function updateOrderTicketModalMode() {
     if (actions) actions.dataset.mode = "shared";
     if (title) title.textContent = "Comanda da loja";
     if (label) label.textContent = "Comanda recebida no WhatsApp";
-    if (message) message.textContent = "Abra esta comanda no PC da loja e imprima direto na impressora de fita do balcao.";
+    if (message) message.textContent = "Abra esta comanda no PC da loja e imprima direto na impressora de fita do balc\u00e3o.";
     if (backButton) backButton.textContent = "Voltar ao site";
     if (printButton) printButton.hidden = false;
     if (printButton) printButton.textContent = "Imprimir na fita";
@@ -2399,8 +2290,8 @@ function updateOrderTicketModalMode() {
 
   if (actions) actions.dataset.mode = "checkout";
   if (title) title.textContent = "Revise seu pedido";
-  if (label) label.textContent = "Revisao final do pedido";
-  if (message) message.textContent = "Confira os detalhes e envie o pedido. A impressao da comanda sera feita pela loja quando abrirem o link recebido no WhatsApp.";
+  if (label) label.textContent = "Revis\u00e3o final do pedido";
+  if (message) message.textContent = "Confira os detalhes e envie o pedido. A impress\u00e3o da comanda ser\u00e1 feita pela loja quando abrirem o link recebido no WhatsApp.";
   if (backButton) backButton.textContent = "Voltar ao checkout";
   if (printButton) printButton.hidden = true;
   if (confirmButton) confirmButton.hidden = false;
@@ -2461,7 +2352,7 @@ function printOrderTicket() {
   const printWindow = window.open("", "_blank", "width=520,height=760");
 
   if (!printWindow) {
-    showToast("Nao foi possivel abrir a janela de impressao.");
+    showToast("N\u00e3o foi poss\u00edvel abrir a janela de impress\u00e3o.");
     return;
   }
 
@@ -2477,7 +2368,7 @@ function confirmOrderTicket() {
   }
 
   if (!pendingOrderPreview.sharedTicketUrl) {
-    showToast("Link da comanda indisponivel neste teste local. Configure a URL publica da loja para liberar a impressao pelo WhatsApp.");
+    showToast("Link da comanda indispon\u00edvel neste teste local. Configure a URL p\u00fablica da loja para liberar a impress\u00e3o pelo WhatsApp.");
   }
 
   openWhatsAppOrder(pendingOrderPreview.whatsAppMessage);
@@ -2510,7 +2401,7 @@ function validateCheckout() {
   const subtotal = getCartTotal();
 
   if (!cart.length) {
-    showToast("Seu pedido esta vazio.");
+    showToast("Seu pedido est\u00e1 vazio.");
     return false;
   }
 
@@ -2527,7 +2418,7 @@ function validateCheckout() {
   clearFieldInvalid(nameField);
 
   if (!hasReachedMinimumOrder(subtotal)) {
-    showToast(`O pedido minimo da Galaxy Burger e ${formatCurrency(MIN_ORDER_AMOUNT)} em produtos. Faltam ${formatCurrency(getMinimumOrderShortfall(subtotal))} para continuar.`);
+    showToast(`O pedido m\u00ednimo da Galaxy Burger \u00e9 ${formatCurrency(MIN_ORDER_AMOUNT)} em produtos. Faltam ${formatCurrency(getMinimumOrderShortfall(subtotal))} para continuar.`);
     return false;
   }
 
@@ -2538,12 +2429,12 @@ function validateCheckout() {
     if (!validateAreaMatchesNeighborhood(selectedRange, true)) return false;
 
     if (deliveryState.status === "loading") {
-      showToast("Aguarde a confirmacao da entrega.");
+      showToast("Aguarde a confirma\u00e7\u00e3o da entrega.");
       return false;
     }
 
     if (deliveryState.status === "out_of_range") {
-      showToast("Esse endereco esta fora da area de entrega. Selecione retirada para continuar.");
+      showToast("Esse endere\u00e7o est\u00e1 fora da \u00e1rea de entrega. Selecione retirada para continuar.");
       return false;
     }
 
@@ -2690,7 +2581,7 @@ function bindDeliveryEvents() {
         fee: 0,
         distanceLabel: "",
         distanceRange: fields.distanceRange?.value || "",
-        message: "Endereco alterado. Confirme novamente a taxa estimada de entrega."
+        message: "Endere\u00e7o alterado. Confirme novamente a taxa estimada de entrega."
       };
 
       updateDeliveryUI();
@@ -2769,16 +2660,16 @@ function updateStoreStatusUI(availability = getStoreAvailability()) {
   }
   if (statusTitle) {
     statusTitle.textContent = !availability.scheduleEnforced
-      ? "A Galaxy Burger esta liberada para testes"
+      ? "A Galaxy Burger est\u00e1 liberada para testes"
       : availability.isOpen
-        ? "A Galaxy Burger esta aberta agora"
-        : "A Galaxy Burger esta fechada agora";
+        ? "A Galaxy Burger est\u00e1 aberta agora"
+        : "A Galaxy Burger est\u00e1 fechada agora";
   }
   if (statusMessage) {
     statusMessage.textContent = !availability.scheduleEnforced
-      ? "Bloqueio por horario desativado temporariamente para validacao do checkout e apresentacao ao cliente."
+      ? "Bloqueio por hor\u00e1rio desativado temporariamente para valida\u00e7\u00e3o do checkout e apresenta\u00e7\u00e3o ao cliente."
       : availability.isOpen
-        ? `Recebendo pedidos ate ${closeTimeLabel}.`
+        ? `Recebendo pedidos at\u00e9 ${closeTimeLabel}.`
         : formatNextOpeningMessage(availability.nextOpen);
   }
 
@@ -2824,3 +2715,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+
+
+
