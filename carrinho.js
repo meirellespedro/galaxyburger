@@ -4,6 +4,9 @@ const PIX_KEY = "66.219.861/0001-73";
 const PIX_BENEFICIARY_NAME = "Sulen Ferreira de Carvalho de Souza";
 const STORE_WHATSAPP = "5521995578652";
 const IFOOD_STORE_URL = "https://www.ifood.com.br/delivery/rio-de-janeiro-rj/galaxy-burger-199-campo-grande/fe3716f9-fab7-4b6b-9e7a-09f0ccff22d1";
+// Quando o site estiver publicado, coloque aqui a URL final da loja.
+// Exemplo: "https://galaxy-burger.vercel.app"
+const PUBLIC_ORDER_TICKET_BASE_URL = "https://galaxyburger.vercel.app/";
 
 const STORE_ADDRESS = "Rua Embaixador Muniz Gordilho, 199 - Campo Grande, Rio de Janeiro/RJ - CEP 23070-010";
 const STORE_ADDRESS_LINES = Object.freeze([
@@ -107,6 +110,8 @@ const DEFAULT_COMBO_DRINK_OPTIONS = Object.freeze([
   "Guaracamp copo 285ml"
 ]);
 let activeComboSelection = null;
+let pendingOrderPreview = null;
+let orderTicketModalMode = "checkout";
 
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString("pt-BR", {
@@ -1098,6 +1103,15 @@ function getComboDrinkModalElements() {
   };
 }
 
+function syncBodyModalState() {
+  const hasVisibleModal = ["cart-modal", "combo-drink-modal", "order-ticket-modal"].some(id => {
+    const modal = document.getElementById(id);
+    return modal && !modal.hidden;
+  });
+
+  document.body.classList.toggle("modal-open", hasVisibleModal);
+}
+
 function closeComboDrinkModal() {
   const { modal, fields } = getComboDrinkModalElements();
   if (!modal) return;
@@ -1107,12 +1121,8 @@ function closeComboDrinkModal() {
   setTimeout(() => {
     modal.hidden = true;
     if (fields) fields.innerHTML = "";
+    syncBodyModalState();
   }, 220);
-
-  const cartModal = document.getElementById("cart-modal");
-  if (!cartModal || cartModal.hidden) {
-    document.body.classList.remove("modal-open");
-  }
 
   activeComboSelection = null;
 }
@@ -1453,10 +1463,10 @@ function closeCartModal() {
   if (!modal) return;
 
   modal.classList.remove("is-visible");
-  document.body.classList.remove("modal-open");
 
   setTimeout(() => {
     modal.hidden = true;
+    syncBodyModalState();
   }, 220);
 }
 
@@ -1645,20 +1655,505 @@ function buildDeliveryAddressData({ isPickup, deliveryValues = {}, address = "" 
   };
 }
 
-function buildTicketItemsLines() {
-  return cart.flatMap((item, index) => {
+function getOrderCreatedAtLabel(date = new Date()) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: STORE_TIME_ZONE,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(date).replace(",", "");
+}
+
+function getOrderLineItems() {
+  return cart.map(item => {
+    const lineTotal = item.price * item.quantity;
+
+    return {
+      name: item.name,
+      quantity: item.quantity,
+      variantLabel: normalizeText(item.variantLabel),
+      unitPrice: item.price,
+      lineTotal,
+      unitPriceLabel: formatCurrency(item.price),
+      lineTotalLabel: formatCurrency(lineTotal)
+    };
+  });
+}
+
+function buildTicketItemsLines({ detailed = false } = {}) {
+  const orderItems = getOrderLineItems();
+
+  return orderItems.flatMap((item, index) => {
     const lines = [`${item.quantity}x ${item.name}`];
 
     if (item.variantLabel) {
-      lines.push(`Obs: ${item.variantLabel}`);
+      lines.push(`Obs item: ${item.variantLabel}`);
     }
 
-    if (index < cart.length - 1) {
+    if (detailed) {
+      lines.push(`Unitario: ${item.unitPriceLabel}`);
+      lines.push(`Total item: ${item.lineTotalLabel}`);
+    }
+
+    if (index < orderItems.length - 1) {
       lines.push("");
     }
 
     return lines;
   });
+}
+
+function buildOrderPaymentLines({ paymentMethod, paymentLabel, cashChangeText }) {
+  const normalizedPaymentMethod = String(paymentMethod || "").toLowerCase();
+  const resolvedPaymentLabel = paymentLabel || formatPaymentLabel(paymentMethod);
+  const paymentLines = [];
+
+  if (normalizedPaymentMethod === "pix") {
+    paymentLines.push("Pix - aguardando comprovante");
+  } else {
+    paymentLines.push(resolvedPaymentLabel);
+  }
+
+  if (normalizedPaymentMethod === "dinheiro") {
+    paymentLines.push(`Troco: ${cashChangeText || "Nao precisa de troco."}`);
+  }
+
+  return paymentLines;
+}
+
+function buildOrderAddressPreviewLines({ isPickup, address, deliveryValues }) {
+  const addressData = buildDeliveryAddressData({ isPickup, deliveryValues, address });
+  const addressLines = [...addressData.ticketAddressLines];
+
+  if (!isPickup) {
+    addressLines.push(`Referencia: ${addressData.referenceText}`);
+  }
+
+  return {
+    addressData,
+    addressLines
+  };
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function encodeBase64UrlText(value) {
+  const bytes = new TextEncoder().encode(String(value || ""));
+  let binary = "";
+
+  bytes.forEach(byte => {
+    binary += String.fromCharCode(byte);
+  });
+
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function decodeBase64UrlText(value) {
+  const normalized = String(value || "")
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+  const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
+  const binary = atob(`${normalized}${padding}`);
+  const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+
+  return new TextDecoder().decode(bytes);
+}
+
+function resolveOrderTicketBaseUrl() {
+  const configuredBaseUrl = normalizeText(PUBLIC_ORDER_TICKET_BASE_URL);
+  if (configuredBaseUrl) {
+    try {
+      return new URL(configuredBaseUrl);
+    } catch {
+      return null;
+    }
+  }
+
+  const currentHref = String(window?.location?.href || "").trim();
+  const isHttpPage = /^https?:\/\//i.test(currentHref);
+  if (!isHttpPage) {
+    return null;
+  }
+
+  try {
+    const currentUrl = new URL(currentHref);
+    const isLocalHost = /^(localhost|127\.0\.0\.1)$/i.test(currentUrl.hostname);
+    if (isLocalHost) {
+      return null;
+    }
+
+    return currentUrl;
+  } catch {
+    return null;
+  }
+}
+
+function buildSharedOrderTicketUrl(orderDetails) {
+  const baseUrl = resolveOrderTicketBaseUrl();
+
+  if (!orderDetails || !baseUrl) {
+    return "";
+  }
+
+  const sharedPayload = {
+    d: orderDetails.createdAt,
+    n: orderDetails.name,
+    o: orderDetails.notes,
+    p: orderDetails.isPickup ? 1 : 0,
+    a: Array.isArray(orderDetails.addressLines) ? orderDetails.addressLines : [],
+    m: orderDetails.mapsLink || "",
+    y: Array.isArray(orderDetails.paymentLines) ? orderDetails.paymentLines : [],
+    f: Number(orderDetails.deliveryFeeValue || 0),
+    s: Number(orderDetails.subtotalValue || 0),
+    t: Number(orderDetails.totalValue || 0),
+    i: Array.isArray(orderDetails.items)
+      ? orderDetails.items.map(item => [
+          Number(item.quantity || 0),
+          item.name || "",
+          item.variantLabel || "",
+          Number(item.unitPrice || 0)
+        ])
+      : []
+  };
+  const url = new URL(baseUrl.toString());
+
+  url.search = "";
+  url.hash = "";
+  url.searchParams.set("t", encodeBase64UrlText(JSON.stringify(sharedPayload)));
+  return url.toString();
+}
+
+function decodeSharedOrderTicketPayload(encodedTicket) {
+  if (!encodedTicket) {
+    return null;
+  }
+
+  try {
+    const rawPayload = JSON.parse(decodeBase64UrlText(encodedTicket));
+    const isPickup = Boolean(rawPayload.p);
+    const items = Array.isArray(rawPayload.i)
+      ? rawPayload.i.map(item => {
+          const quantity = Number(item?.[0] || 0);
+          const name = normalizeText(item?.[1]);
+          const variantLabel = normalizeText(item?.[2]);
+          const unitPrice = Number(item?.[3] || 0);
+          const lineTotal = quantity * unitPrice;
+
+          return {
+            name,
+            quantity,
+            variantLabel,
+            unitPrice,
+            lineTotal,
+            unitPriceLabel: formatCurrency(unitPrice),
+            lineTotalLabel: formatCurrency(lineTotal)
+          };
+        }).filter(item => item.name && item.quantity > 0)
+      : [];
+    const subtotalValue = Number(rawPayload.s || 0);
+    const totalValue = Number(rawPayload.t || 0);
+    const deliveryFeeValue = Number(rawPayload.f || 0);
+
+    return {
+      createdAt: normalizeText(rawPayload.d) || getOrderCreatedAtLabel(),
+      name: normalizeText(rawPayload.n),
+      notes: normalizeText(rawPayload.o),
+      isPickup,
+      fulfillmentLabel: isPickup ? "Retirada" : "Entrega",
+      items,
+      itemsCount: items.reduce((sum, item) => sum + item.quantity, 0),
+      addressLines: Array.isArray(rawPayload.a)
+        ? rawPayload.a.map(line => normalizeText(line)).filter(Boolean)
+        : [],
+      mapsLink: String(rawPayload.m || "").trim(),
+      paymentSummary: Array.isArray(rawPayload.y)
+        ? rawPayload.y.map(line => normalizeText(line)).filter(Boolean).join(" | ")
+        : "",
+      paymentLines: Array.isArray(rawPayload.y)
+        ? rawPayload.y.map(line => normalizeText(line)).filter(Boolean)
+        : [],
+      deliveryFeeValue,
+      deliveryFeeLabel: isPickup ? "Sem taxa de entrega" : formatCurrency(deliveryFeeValue),
+      feeLabelTitle: isPickup ? "Retirada" : "Entrega estimada",
+      subtotalValue,
+      subtotalLabel: formatCurrency(subtotalValue),
+      totalValue,
+      totalLabel: formatCurrency(totalValue)
+    };
+  } catch {
+    return null;
+  }
+}
+
+function buildOrderTicketPreviewMarkup(orderDetails) {
+  if (!orderDetails) {
+    return `<p class="empty-cart">Nenhuma comanda pronta no momento.</p>`;
+  }
+
+  const addressMarkup = orderDetails.addressLines
+    .map(line => `<p>${escapeHtml(line)}</p>`)
+    .join("");
+  const paymentMarkup = orderDetails.paymentLines
+    .map(line => `<p>${escapeHtml(line)}</p>`)
+    .join("");
+  const itemsMarkup = orderDetails.items
+    .map(item => `
+      <article class="order-ticket-item">
+        <div class="order-ticket-item-copy">
+          <strong>${escapeHtml(`${item.quantity}x ${item.name}`)}</strong>
+          ${item.variantLabel ? `<span>${escapeHtml(item.variantLabel)}</span>` : ""}
+          <small>${escapeHtml(`${item.unitPriceLabel} por unidade`)}</small>
+        </div>
+        <strong class="order-ticket-item-total">${escapeHtml(item.lineTotalLabel)}</strong>
+      </article>
+    `)
+    .join("");
+  const notesMarkup = orderDetails.notes
+    ? `<p>${escapeHtml(orderDetails.notes)}</p>`
+    : `<p>Sem observacoes adicionais.</p>`;
+  const mapsLinkMarkup = !orderDetails.isPickup && orderDetails.mapsLink
+    ? `<a class="order-ticket-link" href="${escapeHtml(orderDetails.mapsLink)}" target="_blank" rel="noopener noreferrer">Abrir no mapa</a>`
+    : "";
+
+  return `
+    <div class="order-ticket-sheet">
+      <div class="order-ticket-sheet-header">
+        <div>
+          <span class="order-ticket-brand">Galaxy Burger</span>
+          <strong>Comanda detalhada</strong>
+          <span>Gerada em ${escapeHtml(orderDetails.createdAt)}</span>
+        </div>
+        <div>
+          <span>${escapeHtml(orderDetails.fulfillmentLabel)}</span>
+          <strong>${escapeHtml(orderDetails.totalLabel)}</strong>
+          <span>${escapeHtml(`${orderDetails.itemsCount} item(ns) no pedido`)}</span>
+        </div>
+      </div>
+
+      <div class="order-ticket-meta-grid">
+        <div class="order-ticket-meta-card">
+          <span>Cliente</span>
+          <strong>${escapeHtml(orderDetails.name)}</strong>
+        </div>
+        <div class="order-ticket-meta-card">
+          <span>Pagamento</span>
+          <strong>${escapeHtml(orderDetails.paymentSummary)}</strong>
+        </div>
+        <div class="order-ticket-meta-card">
+          <span>Status</span>
+          <strong>${escapeHtml(orderDetails.statusLabel || "Pronto para enviar")}</strong>
+        </div>
+      </div>
+
+      <section class="order-ticket-section">
+        <span class="order-ticket-section-label">${escapeHtml(orderDetails.fulfillmentLabel)}</span>
+        <div class="order-ticket-address">${addressMarkup}</div>
+        ${mapsLinkMarkup}
+      </section>
+
+      <section class="order-ticket-section">
+        <span class="order-ticket-section-label">Itens</span>
+        <div class="order-ticket-items">${itemsMarkup}</div>
+      </section>
+
+      <section class="order-ticket-section">
+        <span class="order-ticket-section-label">Observacoes</span>
+        <div class="order-ticket-note">${notesMarkup}</div>
+      </section>
+
+      <section class="order-ticket-section">
+        <span class="order-ticket-section-label">Pagamento</span>
+        <div class="order-ticket-payment">${paymentMarkup}</div>
+        <div class="order-ticket-totals">
+          <div class="order-ticket-total-row">
+            <span>Subtotal dos produtos</span>
+            <strong>${escapeHtml(orderDetails.subtotalLabel)}</strong>
+          </div>
+          <div class="order-ticket-total-row">
+            <span>${escapeHtml(orderDetails.feeLabelTitle)}</span>
+            <strong>${escapeHtml(orderDetails.deliveryFeeLabel)}</strong>
+          </div>
+          <div class="order-ticket-total-row is-total">
+            <span>Total do pedido</span>
+            <strong>${escapeHtml(orderDetails.totalLabel)}</strong>
+          </div>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function buildOrderTicketPrintDocument(orderDetails) {
+  const previewMarkup = buildOrderTicketPreviewMarkup(orderDetails);
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Comanda Galaxy Burger</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: Arial, sans-serif;
+      background: #f3f3f3;
+      color: #111111;
+    }
+    .print-shell {
+      width: min(100%, 420px);
+      margin: 0 auto;
+      padding: 18px;
+      border: 1px solid #d6d6d6;
+      background: #ffffff;
+    }
+    .order-ticket-sheet { display: grid; gap: 16px; }
+    .order-ticket-sheet-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #d9d9d9;
+    }
+    .order-ticket-sheet-header p { margin: 0; }
+    .order-ticket-sheet-header strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 1.35rem;
+    }
+    .order-ticket-sheet-header span,
+    .order-ticket-section-label,
+    .order-ticket-meta-card span,
+    .order-ticket-total-row span,
+    .order-ticket-item-copy small {
+      color: #5a5a5a;
+      font-size: 0.84rem;
+    }
+    .order-ticket-brand {
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: #1b5d3f;
+    }
+    .order-ticket-meta-grid,
+    .order-ticket-actions {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr;
+    }
+    .order-ticket-meta-card,
+    .order-ticket-section {
+      padding: 12px;
+      border: 1px solid #d9d9d9;
+      border-radius: 12px;
+      background: #ffffff;
+    }
+    .order-ticket-meta-card strong,
+    .order-ticket-total-row strong,
+    .order-ticket-item-total {
+      color: #111111;
+    }
+    .order-ticket-address,
+    .order-ticket-payment,
+    .order-ticket-note {
+      display: grid;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .order-ticket-address p,
+    .order-ticket-payment p,
+    .order-ticket-note p {
+      margin: 0;
+    }
+    .order-ticket-link,
+    .order-ticket-actions {
+      display: none !important;
+    }
+    .order-ticket-items {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .order-ticket-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 10px;
+      border-top: 1px solid #e5e5e5;
+    }
+    .order-ticket-item:first-child {
+      padding-top: 0;
+      border-top: 0;
+    }
+    .order-ticket-item-copy strong,
+    .order-ticket-item-copy span,
+    .order-ticket-item-copy small {
+      display: block;
+    }
+    .order-ticket-item-copy span {
+      margin-top: 5px;
+      font-size: 0.88rem;
+    }
+    .order-ticket-totals {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .order-ticket-total-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .order-ticket-total-row.is-total {
+      padding-top: 10px;
+      border-top: 1px dashed #bdbdbd;
+    }
+    .order-ticket-total-row.is-total span,
+    .order-ticket-total-row.is-total strong {
+      color: #000000;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+    @page {
+      margin: 8mm;
+    }
+    @media print {
+      body {
+        padding: 0;
+        background: #ffffff;
+      }
+      .print-shell {
+        width: auto;
+        margin: 0;
+        padding: 0;
+        border: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="print-shell">${previewMarkup}</div>
+  <script>
+    window.addEventListener("load", () => {
+      window.setTimeout(() => window.print(), 120);
+    });
+  </script>
+</body>
+</html>`;
 }
 
 function getCartItemsCount() {
@@ -1676,28 +2171,23 @@ function buildWhatsAppOrderMessage({
   paymentMethod,
   paymentLabel,
   cashChangeText,
-  notes
+  notes,
+  createdAt,
+  ticketUrl
 }) {
-  const resolvedPaymentLabel = formatTicketPaymentLabel(paymentMethod || paymentLabel);
   const addressData = buildDeliveryAddressData({ isPickup, deliveryValues, address });
   const itemsCount = getCartItemsCount();
-  const paymentLines = [];
-  const normalizedPaymentMethod = String(paymentMethod || "").toLowerCase();
-
-  if (normalizedPaymentMethod === "pix") {
-    paymentLines.push("Pix - AGUARDANDO COMPROVANTE");
-  } else {
-    paymentLines.push(resolvedPaymentLabel);
-  }
-
-  if (normalizedPaymentMethod === "dinheiro") {
-    paymentLines.push(`Troco: ${cashChangeText || "Nao precisa de troco."}`);
-  }
+  const paymentLines = buildOrderPaymentLines({
+    paymentMethod,
+    paymentLabel: formatTicketPaymentLabel(paymentMethod || paymentLabel),
+    cashChangeText
+  }).map(line => line === "Pix - aguardando comprovante" ? "Pix - AGUARDANDO COMPROVANTE" : line);
 
   const lines = [
     "NOTA - GALAXY BURGER",
     ORDER_TICKET_DIVIDER,
     "NOVO PEDIDO",
+    `Data: ${createdAt || getOrderCreatedAtLabel()}`,
     ""
   ];
 
@@ -1721,7 +2211,7 @@ function buildWhatsAppOrderMessage({
     `Pedido: ${itemsCount}`,
     "",
     "Itens:",
-    ...buildTicketItemsLines()
+    ...buildTicketItemsLines({ detailed: true })
   );
 
   if (notes) {
@@ -1736,12 +2226,11 @@ function buildWhatsAppOrderMessage({
     "",
     "Pagamento:",
     ...paymentLines,
-    ""
+    "",
+    `Subtotal: ${subtotal}`
   );
 
-  if (!isPickup) {
-    lines.push(`Entrega: ${deliveryFee}`);
-  }
+  lines.push(`Entrega: ${deliveryFee}`);
 
   lines.push(
     `Total: ${total}`,
@@ -1749,6 +2238,14 @@ function buildWhatsAppOrderMessage({
     ORDER_TICKET_DIVIDER,
     "Pedido sujeito a confirmacao."
   );
+
+  if (ticketUrl) {
+    lines.push(
+      "",
+      "Comanda para impressao:",
+      ticketUrl
+    );
+  }
 
   return formatTicketLines(lines);
 }
@@ -1761,6 +2258,140 @@ function openWhatsAppOrder(message) {
   if (!popup) {
     window.location.href = whatsappUrl;
   }
+}
+
+function renderOrderTicketPreview() {
+  const preview = document.getElementById("order-ticket-preview");
+  if (!preview) return;
+
+  preview.innerHTML = buildOrderTicketPreviewMarkup(pendingOrderPreview);
+}
+
+function updateOrderTicketModalMode() {
+  const title = document.getElementById("order-ticket-modal-title");
+  const label = document.getElementById("order-ticket-mode-label");
+  const message = document.getElementById("order-ticket-mode-message");
+  const actions = document.getElementById("order-ticket-actions");
+  const backButton = document.getElementById("order-ticket-back-button");
+  const printButton = document.getElementById("order-ticket-print-button");
+  const confirmButton = document.getElementById("order-ticket-confirm-button");
+
+  if (orderTicketModalMode === "shared") {
+    if (actions) actions.dataset.mode = "shared";
+    if (title) title.textContent = "Comanda da loja";
+    if (label) label.textContent = "Comanda recebida no WhatsApp";
+    if (message) message.textContent = "Abra esta comanda no PC da loja e imprima direto na impressora de fita do balcao.";
+    if (backButton) backButton.textContent = "Voltar ao site";
+    if (printButton) printButton.hidden = false;
+    if (printButton) printButton.textContent = "Imprimir na fita";
+    if (confirmButton) confirmButton.hidden = true;
+    return;
+  }
+
+  if (actions) actions.dataset.mode = "checkout";
+  if (title) title.textContent = "Revise seu pedido";
+  if (label) label.textContent = "Revisao final do pedido";
+  if (message) message.textContent = "Confira os detalhes e envie o pedido. A impressao da comanda sera feita pela loja quando abrirem o link recebido no WhatsApp.";
+  if (backButton) backButton.textContent = "Voltar ao checkout";
+  if (printButton) printButton.hidden = true;
+  if (confirmButton) confirmButton.hidden = false;
+}
+
+function openOrderTicketModal(mode = "checkout") {
+  const modal = document.getElementById("order-ticket-modal");
+  if (!modal) return;
+
+  orderTicketModalMode = mode;
+  if (pendingOrderPreview) {
+    pendingOrderPreview = {
+      ...pendingOrderPreview,
+      statusLabel: mode === "shared" ? "Pronto para imprimir" : "Pronto para enviar"
+    };
+  }
+
+  updateOrderTicketModalMode();
+  renderOrderTicketPreview();
+  modal.hidden = false;
+  document.body.classList.add("modal-open");
+  document.body.classList.toggle("ticket-view-active", mode === "shared");
+
+  requestAnimationFrame(() => {
+    modal.classList.add("is-visible");
+    modal.querySelector(".order-ticket-modal-content")?.focus();
+  });
+}
+
+function closeOrderTicketModal() {
+  const modal = document.getElementById("order-ticket-modal");
+  if (!modal) return;
+  const wasSharedMode = orderTicketModalMode === "shared";
+
+  modal.classList.remove("is-visible");
+
+  setTimeout(() => {
+    modal.hidden = true;
+    if (wasSharedMode) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("t");
+      url.searchParams.delete("ticket");
+      history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      document.body.classList.remove("ticket-view-active");
+      pendingOrderPreview = null;
+      orderTicketModalMode = "checkout";
+    }
+    syncBodyModalState();
+  }, 220);
+}
+
+function printOrderTicket() {
+  if (!pendingOrderPreview) {
+    showToast("Nenhuma comanda pronta para imprimir.");
+    return;
+  }
+
+  const printWindow = window.open("", "_blank", "width=520,height=760");
+
+  if (!printWindow) {
+    showToast("Nao foi possivel abrir a janela de impressao.");
+    return;
+  }
+
+  printWindow.document.open();
+  printWindow.document.write(buildOrderTicketPrintDocument(pendingOrderPreview));
+  printWindow.document.close();
+}
+
+function confirmOrderTicket() {
+  if (!pendingOrderPreview) {
+    showToast("Monte a comanda novamente antes de enviar.");
+    return;
+  }
+
+  if (!pendingOrderPreview.sharedTicketUrl) {
+    showToast("Link da comanda indisponivel neste teste local. Configure a URL publica da loja para liberar a impressao pelo WhatsApp.");
+  }
+
+  openWhatsAppOrder(pendingOrderPreview.whatsAppMessage);
+
+  cart = [];
+  saveCart();
+  clearDeliveryData();
+  pendingOrderPreview = null;
+  updateUI();
+  closeOrderTicketModal();
+  closeCartModal();
+}
+
+function handleSharedOrderTicketFromUrl() {
+  const searchParams = new URLSearchParams(window.location.search);
+  const encodedTicket = searchParams.get("t") || searchParams.get("ticket");
+  if (!encodedTicket) return;
+
+  const decodedTicket = decodeSharedOrderTicketPayload(encodedTicket);
+  if (!decodedTicket) return;
+
+  pendingOrderPreview = decodedTicket;
+  openOrderTicketModal("shared");
 }
 
 function validateCheckout() {
@@ -1830,41 +2461,89 @@ function validateCheckout() {
   return true;
 }
 
-function finalizeOrder() {
-  if (!validateCheckout()) return;
-
+function buildPendingOrderPreview() {
   const name = normalizeText(document.getElementById("customer-name")?.value);
   const notes = normalizeText(document.getElementById("order-notes")?.value);
-  const payment = document.getElementById("payment-method")?.value || "";
+  const paymentMethod = document.getElementById("payment-method")?.value || "";
   const isPickup = getCurrentFulfillmentMode() === "pickup";
   const address = isPickup ? STORE_ADDRESS : syncDeliveryAddressField();
   const deliveryValues = isPickup ? {} : getDeliveryValues();
-
   const totals = updateCartTotals();
   const cashChangeSummary = getCashChangeSummary(totals.total, false);
-  if (!cashChangeSummary) return;
+  const createdAt = getOrderCreatedAtLabel();
 
-  const message = buildWhatsAppOrderMessage({
-    name,
+  if (!cashChangeSummary) {
+    return null;
+  }
+
+  const paymentLabel = cashChangeSummary.paymentLabel || formatPaymentLabel(paymentMethod);
+  const paymentLines = buildOrderPaymentLines({
+    paymentMethod,
+    paymentLabel,
+    cashChangeText: cashChangeSummary.cashChangeText
+  });
+  const { addressData, addressLines } = buildOrderAddressPreviewLines({
     isPickup,
     address,
-    deliveryValues,
-    deliveryFee: isPickup ? "Sem taxa de entrega" : formatCurrency(totals.fee),
-    subtotal: formatCurrency(totals.subtotal),
-    total: formatCurrency(totals.total),
-    paymentMethod: payment,
-    paymentLabel: cashChangeSummary.paymentLabel || formatPaymentLabel(payment),
-    cashChangeText: cashChangeSummary.cashChangeText,
-    notes
+    deliveryValues
   });
+  const deliveryFeeLabel = isPickup ? "Sem taxa de entrega" : formatCurrency(totals.fee);
+  const subtotalLabel = formatCurrency(totals.subtotal);
+  const totalLabel = formatCurrency(totals.total);
+  const orderPreview = {
+    createdAt,
+    name,
+    notes,
+    isPickup,
+    fulfillmentLabel: isPickup ? "Retirada" : "Entrega",
+    items: getOrderLineItems(),
+    itemsCount: getCartItemsCount(),
+    addressData,
+    addressLines,
+    mapsLink: isPickup ? "" : generateMapsLink(addressData.mapsQueryAddress),
+    paymentMethod,
+    paymentSummary: paymentLines.join(" | "),
+    paymentLines,
+    deliveryFeeValue: totals.fee,
+    deliveryFeeLabel,
+    feeLabelTitle: isPickup ? "Retirada" : "Entrega estimada",
+    subtotalValue: totals.subtotal,
+    subtotalLabel,
+    totalValue: totals.total,
+    totalLabel
+  };
+  const sharedTicketUrl = buildSharedOrderTicketUrl(orderPreview);
 
-  openWhatsAppOrder(message);
+  return {
+    ...orderPreview,
+    sharedTicketUrl,
+    whatsAppMessage: buildWhatsAppOrderMessage({
+      name,
+      isPickup,
+      address,
+      deliveryValues,
+      deliveryFee: deliveryFeeLabel,
+      subtotal: subtotalLabel,
+      total: totalLabel,
+      paymentMethod,
+      paymentLabel,
+      cashChangeText: cashChangeSummary.cashChangeText,
+      notes,
+      createdAt,
+      ticketUrl: sharedTicketUrl
+    })
+  };
+}
 
-  cart = [];
-  saveCart();
-  clearDeliveryData();
-  updateUI();
-  closeCartModal();
+function finalizeOrder() {
+  if (!validateCheckout()) return;
+  pendingOrderPreview = buildPendingOrderPreview();
+
+  if (!pendingOrderPreview) {
+    return;
+  }
+
+  openOrderTicketModal();
 }
 
 function bindDeliveryEvents() {
@@ -2010,9 +2689,11 @@ document.addEventListener("DOMContentLoaded", () => {
   loadDeliveryData();
   bindDeliveryEvents();
   updateCashChangeUI();
+  updateOrderTicketModalMode();
   updateUI();
   updateDeliveryUI();
   updateStoreStatusUI();
+  handleSharedOrderTicketFromUrl();
   window.setInterval(() => updateStoreStatusUI(), 60000);
 
   const pixKeyDisplay = document.getElementById("pix-key-display");
@@ -2027,6 +2708,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.addEventListener("keydown", event => {
     if (event.key === "Escape") {
+      closeOrderTicketModal();
       closeCartModal();
       closeComboDrinkModal();
       closeMobileNav();

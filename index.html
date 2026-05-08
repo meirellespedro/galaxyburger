@@ -1015,7 +1015,32 @@
 
         <p class="checkout-helper" id="checkout-helper">Para entrega, o pedido e enviado pelo WhatsApp oficial da Galaxy Burger com taxa estimada e confirmacao final da loja. Pedido minimo: R$ 20,00 em produtos.</p>
         <p class="minimum-order-note" id="minimum-order-note" data-status="idle">Pedido minimo da Galaxy Burger: R$ 20,00 em produtos.</p>
-        <button class="finalize-order-btn" type="button" onclick="finalizeOrder()">Enviar pedido para a hamburgueria</button>
+        <button class="finalize-order-btn" type="button" onclick="finalizeOrder()">Revisar pedido e enviar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="order-ticket-modal" hidden>
+    <div class="order-ticket-modal-content" role="dialog" aria-modal="true" aria-labelledby="order-ticket-modal-title" tabindex="-1">
+      <div class="cart-modal-header">
+        <div>
+          <span class="cart-modal-kicker">Comanda Galaxy</span>
+          <h3 id="order-ticket-modal-title">Revise seu pedido</h3>
+        </div>
+        <button class="cart-close" type="button" aria-label="Fechar comanda" onclick="closeOrderTicketModal()">X</button>
+      </div>
+
+      <div class="cart-status-strip">
+        <span id="order-ticket-mode-label">Revisao final do pedido</span>
+        <strong id="order-ticket-mode-message">Confira os detalhes e envie o pedido. A impressao da comanda sera feita pela loja quando abrirem o link recebido no WhatsApp.</strong>
+      </div>
+
+      <div id="order-ticket-preview" class="order-ticket-preview" aria-live="polite"></div>
+
+      <div id="order-ticket-actions" class="order-ticket-actions">
+        <button id="order-ticket-back-button" class="btn-secondary order-ticket-btn" type="button" onclick="closeOrderTicketModal()">Voltar ao checkout</button>
+        <button id="order-ticket-print-button" class="btn-secondary order-ticket-btn" type="button" onclick="printOrderTicket()" hidden>Imprimir na fita</button>
+        <button id="order-ticket-confirm-button" class="btn-primary order-ticket-btn order-ticket-submit-btn" type="button" onclick="confirmOrderTicket()">Enviar no WhatsApp</button>
       </div>
     </div>
   </div>

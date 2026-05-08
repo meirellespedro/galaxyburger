@@ -30,6 +30,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   scroll-behavior: smooth;
 }
@@ -86,6 +90,10 @@ body::after {
 body.modal-open,
 body.menu-open {
   overflow: hidden;
+}
+
+body.ticket-view-active {
+  overflow: auto;
 }
 
 .space-dust,
@@ -391,10 +399,41 @@ a.btn-primary.is-disabled:active,
 
 .mobile-nav[hidden],
 #cart-modal[hidden],
+#order-ticket-modal[hidden],
 #combo-drink-modal[hidden],
 #pickup-panel[hidden],
 #delivery-address-group[hidden] {
   display: none !important;
+}
+
+body.ticket-view-active .skip-link,
+body.ticket-view-active .space-dust,
+body.ticket-view-active .aurora,
+body.ticket-view-active .site-header,
+body.ticket-view-active #mobile-nav,
+body.ticket-view-active main,
+body.ticket-view-active .site-footer,
+body.ticket-view-active #cart-modal,
+body.ticket-view-active #combo-drink-modal,
+body.ticket-view-active .mobile-cart-dock {
+  display: none !important;
+}
+
+body.ticket-view-active #order-ticket-modal {
+  position: static;
+  min-height: 100vh;
+  padding: 24px;
+  opacity: 1;
+  background:
+    radial-gradient(circle at top left, rgba(125, 255, 198, 0.08), transparent 26%),
+    radial-gradient(circle at bottom right, rgba(240, 70, 84, 0.08), transparent 28%),
+    linear-gradient(180deg, #020408 0%, #07101a 42%, #03060a 100%);
+}
+
+body.ticket-view-active .order-ticket-modal-content {
+  max-height: none;
+  opacity: 1;
+  transform: none;
 }
 
 .mobile-nav {
@@ -1441,7 +1480,8 @@ a.btn-primary.is-disabled:active,
 }
 
 #cart-modal,
-#combo-drink-modal {
+#combo-drink-modal,
+#order-ticket-modal {
   position: fixed;
   top: 0;
   left: 0;
@@ -1457,12 +1497,14 @@ a.btn-primary.is-disabled:active,
 }
 
 #cart-modal.is-visible,
-#combo-drink-modal.is-visible {
+#combo-drink-modal.is-visible,
+#order-ticket-modal.is-visible {
   opacity: 1;
 }
 
 .cart-modal-content,
-.combo-modal-content {
+.combo-modal-content,
+.order-ticket-modal-content {
   width: 100%;
   max-height: calc(100vh - 48px);
   margin: auto;
@@ -1481,9 +1523,18 @@ a.btn-primary.is-disabled:active,
 }
 
 #cart-modal.is-visible .cart-modal-content,
-#combo-drink-modal.is-visible .combo-modal-content {
+#combo-drink-modal.is-visible .combo-modal-content,
+#order-ticket-modal.is-visible .order-ticket-modal-content {
   transform: translateY(0);
   opacity: 1;
+}
+
+#order-ticket-modal {
+  z-index: 1600;
+}
+
+.order-ticket-modal-content {
+  max-width: 760px;
 }
 
 .cart-modal-header {
@@ -1643,6 +1694,214 @@ a.btn-primary.is-disabled:active,
 
 .combo-modal-btn {
   min-height: 44px;
+}
+
+.order-ticket-preview {
+  margin-top: 24px;
+  padding: 20px;
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(circle at top left, rgba(125, 255, 198, 0.08), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(240, 70, 84, 0.06), transparent 32%),
+    linear-gradient(180deg, rgba(8, 18, 25, 0.92), rgba(5, 8, 12, 0.96));
+}
+
+.order-ticket-sheet {
+  display: grid;
+  gap: 18px;
+}
+
+.order-ticket-sheet-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.order-ticket-sheet-header p,
+.order-ticket-section p {
+  margin: 0;
+}
+
+.order-ticket-sheet-header strong {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  letter-spacing: 0.03em;
+}
+
+.order-ticket-sheet-header span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.order-ticket-brand {
+  color: var(--green);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.order-ticket-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.order-ticket-meta-card,
+.order-ticket-section {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(11, 24, 22, 0.42), rgba(19, 10, 12, 0.3));
+}
+
+.order-ticket-meta-card span,
+.order-ticket-section-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.84rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.order-ticket-meta-card strong {
+  display: block;
+  margin-top: 8px;
+  color: #f7f8fa;
+  font-size: 1.02rem;
+}
+
+.order-ticket-address,
+.order-ticket-payment,
+.order-ticket-note {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.order-ticket-address p,
+.order-ticket-payment p,
+.order-ticket-note p {
+  color: #eef5fb;
+}
+
+.order-ticket-link {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-top: 12px;
+  color: var(--green);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.order-ticket-items {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.order-ticket-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.order-ticket-item:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.order-ticket-item-copy strong {
+  display: block;
+}
+
+.order-ticket-item-copy span,
+.order-ticket-item-copy small {
+  display: block;
+}
+
+.order-ticket-item-copy span {
+  margin-top: 6px;
+  color: rgba(216, 255, 232, 0.84);
+  font-size: 0.9rem;
+}
+
+.order-ticket-item-copy small {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.order-ticket-item-total {
+  color: #f7f8fa;
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+.order-ticket-totals {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.order-ticket-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.order-ticket-total-row span {
+  color: var(--muted);
+}
+
+.order-ticket-total-row strong {
+  color: #f7f8fa;
+}
+
+.order-ticket-total-row.is-total {
+  padding-top: 12px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.2);
+}
+
+.order-ticket-total-row.is-total span,
+.order-ticket-total-row.is-total strong {
+  color: var(--green);
+  font-size: 1.08rem;
+}
+
+.order-ticket-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+  align-items: stretch;
+}
+
+.order-ticket-actions[data-mode="checkout"] {
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.15fr);
+}
+
+.order-ticket-actions[data-mode="shared"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.order-ticket-btn {
+  min-height: 44px;
+  width: 100%;
+}
+
+.order-ticket-submit-btn {
+  margin-top: 0;
 }
 
 .item-controls {
@@ -2495,7 +2754,8 @@ a.btn-primary.is-disabled:active,
   }
 
   #cart-modal,
-  #combo-drink-modal {
+  #combo-drink-modal,
+  #order-ticket-modal {
     display: flex;
     align-items: flex-end;
     justify-content: center;
@@ -2503,7 +2763,8 @@ a.btn-primary.is-disabled:active,
   }
 
   .cart-modal-content,
-  .combo-modal-content {
+  .combo-modal-content,
+  .order-ticket-modal-content {
     width: 100%;
     max-height: 100dvh;
     margin: 0;
@@ -2543,7 +2804,9 @@ a.btn-primary.is-disabled:active,
   .pix-summary-grid,
   .cash-choice-grid,
   .fulfillment-grid,
-  .combo-modal-actions {
+  .combo-modal-actions,
+  .order-ticket-actions,
+  .order-ticket-meta-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2570,6 +2833,7 @@ a.btn-primary.is-disabled:active,
   .hero-shell,
   .feature-band,
   .cart-modal-content,
+  .order-ticket-modal-content,
   .footer-grid,
   .mission-chip {
     border-radius: 24px;
@@ -2697,6 +2961,17 @@ a.btn-primary.is-disabled:active,
   .cart-item {
     grid-template-columns: 1fr;
     justify-items: start;
+  }
+
+  .order-ticket-sheet-header,
+  .order-ticket-item,
+  .order-ticket-total-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .order-ticket-item-total {
+    white-space: normal;
   }
 
   .address-grid-main,
