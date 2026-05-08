@@ -17,7 +17,7 @@ const STORE_ADDRESS_LINES = Object.freeze([
 const ORDER_TICKET_WIDTH = 30;
 const ORDER_TICKET_DIVIDER = "-".repeat(ORDER_TICKET_WIDTH);
 const STORE_TIME_ZONE = "America/Sao_Paulo";
-// Use "live" para respeitar o horario real da loja. Troque para "preview" apenas em testes.
+// Use "live" para respeitar o horário real da loja. Troque para "preview" apenas em testes.
 const STORE_SCHEDULE_MODE = "live";
 const STORE_WEEKDAY_TOKENS = Object.freeze({
   Sun: 0,
@@ -2679,8 +2679,8 @@ function updateStoreStatusUI(availability = getStoreAvailability()) {
 
 document.addEventListener("DOMContentLoaded", () => {
   /*
-    Remove coordenadas antigas salvas por versoes anteriores.
-    Isso e essencial, porque seu bug pode estar vindo do localStorage antigo.
+    Remove coordenadas antigas salvas por versões anteriores.
+    Isso é essencial, porque seu bug pode estar vindo do localStorage antigo.
   */
   LEGACY_DELIVERY_STORAGE_KEYS.forEach(storageKey => {
     localStorage.removeItem(storageKey);
