@@ -38,7 +38,7 @@ const STORE_WEEKDAY_LABELS = Object.freeze([
   "s\u00e1bado"
 ]);
 const STORE_HOURS = Object.freeze({
-  0: Object.freeze({ openMinutes: 19 * 60, closeMinutes: 23 * 60 }),
+  0: Object.freeze({ openMinutes: 19 * 60, closeMinutes: 23 * 60 + 59 }),
   1: Object.freeze({ openMinutes: 19 * 60, closeMinutes: 23 * 60 + 59 }),
   2: Object.freeze({ openMinutes: 19 * 60, closeMinutes: 23 * 60 + 59 }),
   3: Object.freeze({ openMinutes: 19 * 60, closeMinutes: 23 * 60 + 59 }),

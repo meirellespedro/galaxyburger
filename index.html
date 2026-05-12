@@ -36,7 +36,7 @@
           "@type": "OpeningHoursSpecification",
           "dayOfWeek": "Sunday",
           "opens": "19:00",
-          "closes": "23:00"
+          "closes": "23:59"
         },
         {
           "@type": "OpeningHoursSpecification",
@@ -488,7 +488,7 @@
                   <h3>Batata Grande (catupiry)</h3>
                   <p>Batata grande coberta com catupiry e bacon para uma &oacute;rbita cremosa sem desperd&iacute;cio.</p>
                   <span class="price">R$ 24,90</span>
-                  <button class="add-btn" type="button" disabled>Esgotado</button>
+                  <button class="add-btn" type="button" onclick="addToCart(this)">Quero essa por&ccedil;&atilde;o</button>
                 </div>
               </article>
 
@@ -518,7 +518,7 @@
                   <h3>Nuggets</h3>
                   <p>Cinco unidades para refor&ccedil;ar a tripula&ccedil;&atilde;o dos pedidos mais r&aacute;pidos.</p>
                   <span class="price">R$ 5,00</span>
-                  <button class="add-btn" type="button" onclick="addToCart(this)">Quero essa por&ccedil;&atilde;o</button>
+                  <button class="add-btn" type="button" disabled>Esgotado</button>
                 </div>
               </article>
             </div>
@@ -785,7 +785,7 @@
 
       <div class="footer-column">
         <h3>Hor&aacute;rios</h3>
-        <p>Domingo: 19h &agrave;s 23h</p>
+        <p>Domingo: 19h &agrave;s 23h59</p>
         <p>Seg a S&aacute;b: 19h &agrave;s 23h59</p>
         <p class="footer-live-status" id="footer-store-status">Status atual: verificando hor&aacute;rio.</p>
       </div>
