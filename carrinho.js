@@ -51,6 +51,7 @@ const VIA_CEP_BASE_URL = "https://viacep.com.br/ws";
 const DELIVERY_FEE_LOCAL = 5;
 const DELIVERY_FEE_EXTENDED = 10;
 const MIN_ORDER_AMOUNT = 20;
+const MAX_WHATSAPP_URL_LENGTH = 1800;
 const DELIVERY_IDLE_MESSAGE = "Preencha o endere\u00e7o, selecione a faixa estimada e confirme a taxa para atualizar o total.";
 
 const DELIVERY_STORAGE_KEY = "galaxy_burguer_delivery_v9";
@@ -1593,10 +1594,15 @@ function wrapTicketLine(line, maxWidth = ORDER_TICKET_WIDTH) {
 }
 
 function formatTicketLines(lines) {
-  return lines
-    .flatMap(line => wrapTicketLine(line))
-    .join("\n")
-    .trim();
+  const wrappedLines = [];
+
+  lines.forEach(line => {
+    wrapTicketLine(line).forEach(wrappedLine => {
+      wrappedLines.push(wrappedLine);
+    });
+  });
+
+  return wrappedLines.join("\n").trim();
 }
 
 function generateMapsLink(address) {
@@ -1685,9 +1691,10 @@ function getOrderLineItems() {
 
 function buildTicketItemsLines({ detailed = false } = {}) {
   const orderItems = getOrderLineItems();
+  const lines = [];
 
-  return orderItems.flatMap((item, index) => {
-    const lines = [`${item.quantity}x ${item.name}`];
+  orderItems.forEach((item, index) => {
+    lines.push(`${item.quantity}x ${item.name}`);
 
     if (item.variantLabel) {
       lines.push(`Obs item: ${item.variantLabel}`);
@@ -1701,9 +1708,9 @@ function buildTicketItemsLines({ detailed = false } = {}) {
     if (index < orderItems.length - 1) {
       lines.push("");
     }
-
-    return lines;
   });
+
+  return lines;
 }
 
 function buildOrderPaymentLines({ paymentMethod, paymentLabel, cashChangeText }) {
@@ -1748,12 +1755,20 @@ function escapeHtml(value) {
 }
 
 function encodeBase64UrlText(value) {
-  const bytes = new TextEncoder().encode(String(value || ""));
+  const text = String(value || "");
   let binary = "";
 
-  bytes.forEach(byte => {
-    binary += String.fromCharCode(byte);
-  });
+  if (typeof TextEncoder === "function") {
+    const bytes = new TextEncoder().encode(text);
+
+    for (let index = 0; index < bytes.length; index += 1) {
+      binary += String.fromCharCode(bytes[index]);
+    }
+  } else {
+    binary = encodeURIComponent(text).replace(/%([0-9A-F]{2})/gi, (_, hex) =>
+      String.fromCharCode(parseInt(hex, 16))
+    );
+  }
 
   return btoa(binary)
     .replace(/\+/g, "-")
@@ -1767,9 +1782,24 @@ function decodeBase64UrlText(value) {
     .replace(/_/g, "/");
   const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
   const binary = atob(`${normalized}${padding}`);
-  const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
 
-  return new TextDecoder().decode(bytes);
+  if (typeof TextDecoder === "function") {
+    const bytes = new Uint8Array(binary.length);
+
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+
+    return new TextDecoder().decode(bytes);
+  }
+
+  let encodedText = "";
+
+  for (let index = 0; index < binary.length; index += 1) {
+    encodedText += `%${binary.charCodeAt(index).toString(16).padStart(2, "0")}`;
+  }
+
+  return decodeURIComponent(encodedText);
 }
 
 function resolveOrderTicketBaseUrl() {
@@ -2250,9 +2280,13 @@ function buildWhatsAppOrderMessage({
   return formatTicketLines(lines);
 }
 
-function openWhatsAppOrder(message) {
+function buildWhatsAppUrl(message) {
   const normalizedMessage = String(message || "").replace(/\r\n/g, "\n").trim();
-  const whatsappUrl = `https://wa.me/${STORE_WHATSAPP}?text=${encodeURIComponent(normalizedMessage)}`;
+  return `https://wa.me/${STORE_WHATSAPP}?text=${encodeURIComponent(normalizedMessage)}`;
+}
+
+function openWhatsAppOrder(message) {
+  const whatsappUrl = buildWhatsAppUrl(message);
   const popup = window.open(whatsappUrl, "_blank", "noopener,noreferrer");
 
   if (!popup) {
@@ -2370,16 +2404,34 @@ function confirmOrderTicket() {
   if (!pendingOrderPreview.sharedTicketUrl) {
     showToast("Link da comanda indispon\u00edvel neste teste local. Configure a URL p\u00fablica da loja para liberar a impress\u00e3o pelo WhatsApp.");
   }
+  const confirmButton = document.getElementById("order-ticket-confirm-button");
 
-  openWhatsAppOrder(pendingOrderPreview.whatsAppMessage);
+  if (confirmButton) {
+    confirmButton.disabled = true;
+    confirmButton.textContent = "Abrindo WhatsApp...";
+  }
 
-  cart = [];
-  saveCart();
-  clearDeliveryData();
-  pendingOrderPreview = null;
-  updateUI();
-  closeOrderTicketModal();
-  closeCartModal();
+  window.setTimeout(() => {
+    try {
+      openWhatsAppOrder(pendingOrderPreview.whatsAppMessage);
+
+      cart = [];
+      saveCart();
+      clearDeliveryData();
+      pendingOrderPreview = null;
+      updateUI();
+      closeOrderTicketModal();
+      closeCartModal();
+    } catch (error) {
+      console.error("Galaxy Burger: falha ao abrir o WhatsApp do pedido.", error);
+      showToast("N\u00e3o foi poss\u00edvel abrir o WhatsApp agora. Tente novamente.");
+
+      if (confirmButton) {
+        confirmButton.disabled = false;
+        confirmButton.textContent = "Enviar no WhatsApp";
+      }
+    }
+  }, 0);
 }
 
 function handleSharedOrderTicketFromUrl() {
@@ -2512,38 +2564,76 @@ function buildPendingOrderPreview() {
     totalValue: totals.total,
     totalLabel
   };
-  const sharedTicketUrl = buildSharedOrderTicketUrl(orderPreview);
+  let sharedTicketUrl = "";
+
+  try {
+    sharedTicketUrl = buildSharedOrderTicketUrl(orderPreview);
+  } catch (error) {
+    console.error("Galaxy Burger: falha ao gerar a comanda compartilhada.", error);
+  }
+
+  const whatsAppPayload = {
+    name,
+    isPickup,
+    address,
+    deliveryValues,
+    deliveryFee: deliveryFeeLabel,
+    subtotal: subtotalLabel,
+    total: totalLabel,
+    paymentMethod,
+    paymentLabel,
+    cashChangeText: cashChangeSummary.cashChangeText,
+    notes,
+    createdAt
+  };
+  const compactWhatsAppMessage = buildWhatsAppOrderMessage({
+    ...whatsAppPayload,
+    ticketUrl: ""
+  });
+  const whatsAppMessageWithTicket = sharedTicketUrl
+    ? buildWhatsAppOrderMessage({
+        ...whatsAppPayload,
+        ticketUrl: sharedTicketUrl
+      })
+    : "";
+  const shouldUseSharedTicketUrl = Boolean(whatsAppMessageWithTicket)
+    && buildWhatsAppUrl(whatsAppMessageWithTicket).length <= MAX_WHATSAPP_URL_LENGTH;
 
   return {
     ...orderPreview,
     sharedTicketUrl,
-    whatsAppMessage: buildWhatsAppOrderMessage({
-      name,
-      isPickup,
-      address,
-      deliveryValues,
-      deliveryFee: deliveryFeeLabel,
-      subtotal: subtotalLabel,
-      total: totalLabel,
-      paymentMethod,
-      paymentLabel,
-      cashChangeText: cashChangeSummary.cashChangeText,
-      notes,
-      createdAt,
-      ticketUrl: sharedTicketUrl
-    })
+    sharedTicketIncludedInMessage: shouldUseSharedTicketUrl,
+    whatsAppMessage: shouldUseSharedTicketUrl
+      ? whatsAppMessageWithTicket
+      : compactWhatsAppMessage
   };
 }
 
 function finalizeOrder() {
   if (!validateCheckout()) return;
-  pendingOrderPreview = buildPendingOrderPreview();
+  const finalizeButton = document.querySelector(".finalize-order-btn");
 
-  if (!pendingOrderPreview) {
-    return;
+  if (finalizeButton) {
+    finalizeButton.disabled = true;
+    finalizeButton.textContent = "Preparando revis\u00e3o...";
   }
 
-  openOrderTicketModal();
+  window.setTimeout(() => {
+    try {
+      pendingOrderPreview = buildPendingOrderPreview();
+
+      if (!pendingOrderPreview) {
+        return;
+      }
+
+      openOrderTicketModal();
+    } catch (error) {
+      console.error("Galaxy Burger: falha ao preparar o checkout.", error);
+      showToast("N\u00e3o foi poss\u00edvel preparar o pedido agora. Tente novamente.");
+    } finally {
+      updateCartTotals();
+    }
+  }, 0);
 }
 
 function bindDeliveryEvents() {

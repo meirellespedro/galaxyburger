@@ -1905,6 +1905,13 @@ body.ticket-view-active .order-ticket-modal-content {
   width: 100%;
 }
 
+.order-ticket-btn:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
 .order-ticket-submit-btn {
   margin-top: 0;
 }
