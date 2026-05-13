@@ -2448,14 +2448,16 @@ body.ticket-view-active .order-ticket-modal-content {
 }
 
 .cart-submit-bar {
-  position: sticky;
-  bottom: -28px;
+  position: static;
   margin-top: 20px;
-  padding-top: 12px;
-  background: linear-gradient(180deg, rgba(4, 6, 8, 0), rgba(4, 6, 8, 0.98) 28%);
+  padding-top: 0;
+  background: none;
 }
 
 .finalize-order-btn {
+  position: sticky;
+  bottom: 12px;
+  z-index: 2;
   width: 100%;
   margin-top: 14px;
   border: 1px solid var(--cta-red-border);
@@ -2795,8 +2797,7 @@ body.ticket-view-active .order-ticket-modal-content {
   }
 
   .cart-submit-bar {
-    bottom: calc(-14px - env(safe-area-inset-bottom, 0px));
-    padding-top: 14px;
+    margin-top: 18px;
   }
 
   .delivery-fee-panel,
@@ -3014,6 +3015,10 @@ body.ticket-view-active .order-ticket-modal-content {
 
   .cart-total-highlight {
     text-align: left;
+  }
+
+  .finalize-order-btn {
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   }
 
   .mobile-cart-dock {
