@@ -3,6 +3,7 @@
 const PIX_KEY = "66.219.861/0001-73";
 const PIX_BENEFICIARY_NAME = "Sulen Ferreira de Carvalho de Souza";
 const STORE_WHATSAPP = "5521995578652";
+const WHATSAPP_ORDER_BASE_URL = "https://api.whatsapp.com/send";
 const IFOOD_STORE_URL = "https://www.ifood.com.br/delivery/rio-de-janeiro-rj/galaxy-burger-199-campo-grande/fe3716f9-fab7-4b6b-9e7a-09f0ccff22d1";
 // Quando o site estiver publicado, coloque aqui a URL final da loja.
 // Exemplo: "https://galaxy-burger.vercel.app"
@@ -113,6 +114,7 @@ const DEFAULT_COMBO_DRINK_OPTIONS = Object.freeze([
 let activeComboSelection = null;
 let pendingOrderPreview = null;
 let orderTicketModalMode = "checkout";
+let cartModalHiddenForOrderTicket = false;
 
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString("pt-BR", {
@@ -691,6 +693,8 @@ async function lookupCep(isManual = false) {
 }
 
 function handleCalculateDelivery() {
+  const fields = getDeliveryFields();
+
   if (getCurrentFulfillmentMode() === "pickup") {
     setDeliveryState({
       status: "pickup",
@@ -723,6 +727,14 @@ function handleCalculateDelivery() {
       ? "Esse endere\u00e7o fica fora da \u00e1rea de entrega da Galaxy Burger. Acima de 5 km, trabalhamos apenas com retirada."
       : `Taxa estimada confirmada: ${selectedRange.description}. O valor final segue sujeito \u00e0 valida\u00e7\u00e3o da loja pelo endere\u00e7o informado.`
   });
+
+  if (fields.estimateAck && !isOutOfRange) {
+    fields.estimateAck.checked = true;
+    clearEstimateTermsInvalid(fields.estimateTerms, fields.estimateAck);
+    updateDeliveryUI();
+    saveDeliveryData();
+  }
+
   updateCartTotals();
 }
 
@@ -943,8 +955,24 @@ function updatePixPanelSummary({ subtotal = getCartTotal(), total = subtotal } =
 
 function getFinalizeButtonLabel() {
   return getCurrentFulfillmentMode() === "pickup"
-    ? "Enviar retirada para a hamburgueria"
-    : "Enviar pedido para a hamburgueria";
+    ? "Enviar retirada no WhatsApp"
+    : "Enviar pedido no WhatsApp";
+}
+
+function isFinalizeButtonBusy(button = document.querySelector(".finalize-order-btn")) {
+  return button?.dataset.busy === "true";
+}
+
+function setFinalizeButtonBusy(isBusy, label = "Abrindo WhatsApp...") {
+  const finalizeButton = document.querySelector(".finalize-order-btn");
+  if (!finalizeButton) return;
+
+  finalizeButton.dataset.busy = isBusy ? "true" : "false";
+  finalizeButton.disabled = Boolean(isBusy);
+
+  if (isBusy) {
+    finalizeButton.textContent = label;
+  }
 }
 
 function updateCartTotals() {
@@ -970,16 +998,23 @@ function updateCartTotals() {
   updatePixPanelSummary({ subtotal, total });
 
   if (finalizeButton) {
-    finalizeButton.disabled =
-      !storeOpen ||
-      !hasItems ||
-      !meetsMinimumOrder ||
-      (!isPickup && (deliveryState.status !== "ready" || !hasAcceptedEstimate));
-    finalizeButton.textContent = !storeOpen
-      ? "Loja fechada no momento"
-      : hasItems && !meetsMinimumOrder
-        ? `Faltam ${formatCurrency(getMinimumOrderShortfall(subtotal))} para o m\u00ednimo`
-        : getFinalizeButtonLabel();
+    const busy = isFinalizeButtonBusy(finalizeButton);
+
+    finalizeButton.disabled = busy;
+
+    if (!busy) {
+      finalizeButton.textContent = !storeOpen
+        ? "Loja fechada no momento"
+        : hasItems && !meetsMinimumOrder
+          ? `Faltam ${formatCurrency(getMinimumOrderShortfall(subtotal))} para o m\u00ednimo`
+          : !hasItems
+            ? getFinalizeButtonLabel()
+            : !isPickup && deliveryState.status !== "ready"
+              ? "Confirme a taxa para enviar"
+              : !isPickup && !hasAcceptedEstimate
+                ? "Confirme a taxa para enviar"
+                : getFinalizeButtonLabel();
+    }
   }
 
   return {
@@ -1420,7 +1455,7 @@ function updateOrderAvailabilityUI(availability = getStoreAvailability()) {
     cartStatusMessage.textContent = !availability.scheduleEnforced
       ? "Modo de valida\u00e7\u00e3o ativo. O bloqueio por hor\u00e1rio foi desativado temporariamente para voc\u00ea testar o checkout, inclusive o envio do pedido para a hamburgueria."
       : availability.isOpen
-      ? "Revise os itens, confirme a taxa estimada e envie o pedido direto para a hamburgueria pelo WhatsApp oficial."
+      ? "Confirme a taxa estimada, escolha o pagamento e toque no bot\u00e3o vermelho para abrir o WhatsApp oficial."
       : `${getStoreClosedOrderMessage(availability)} Voc\u00ea pode montar o carrinho normalmente, mas o envio do pedido fica liberado apenas no hor\u00e1rio de funcionamento.`;
   }
 
@@ -1428,7 +1463,7 @@ function updateOrderAvailabilityUI(availability = getStoreAvailability()) {
     checkoutHelper.textContent = !availability.scheduleEnforced
       ? `Modo de testes ativo: o envio para a hamburgueria est\u00e1 liberado temporariamente para validar o fluxo completo do pedido. ${minimumOrderCopy}`
       : availability.isOpen
-      ? `Para entrega, o pedido \u00e9 enviado pelo WhatsApp oficial da Galaxy Burger com taxa estimada e confirma\u00e7\u00e3o final da loja. ${minimumOrderCopy}`
+      ? `Para entrega, o bot\u00e3o vermelho abre o WhatsApp oficial da Galaxy Burger com o pedido preenchido. ${minimumOrderCopy}`
       : `${getStoreClosedOrderMessage(availability)} Monte seu carrinho normalmente; o envio pelo WhatsApp fica bloqueado at\u00e9 a reabertura. ${minimumOrderCopy}`;
   }
 
@@ -1450,6 +1485,7 @@ function openCartModal() {
   const modal = document.getElementById("cart-modal");
   if (!modal) return;
 
+  cartModalHiddenForOrderTicket = false;
   modal.hidden = false;
   document.body.classList.add("modal-open");
   updateModalCart();
@@ -1463,6 +1499,7 @@ function closeCartModal() {
   const modal = document.getElementById("cart-modal");
   if (!modal) return;
 
+  cartModalHiddenForOrderTicket = false;
   modal.classList.remove("is-visible");
 
   setTimeout(() => {
@@ -1522,11 +1559,52 @@ function formatTicketPaymentLabel(payment) {
   return labels[payment] || payment;
 }
 
+const TICKET_EMOJI_PATTERN = (() => {
+  try {
+    return new RegExp("[\\p{Extended_Pictographic}\\p{Regional_Indicator}\\u200D\\uFE0F]", "gu");
+  } catch {
+    return /[\u200D\uFE0F]/g;
+  }
+})();
+
 function sanitizeTicketText(value) {
   return String(value ?? "")
     .replace(/[#*`_~]/g, "")
-    .replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}\u200D\uFE0F]/gu, "")
+    .replace(TICKET_EMOJI_PATTERN, "")
     .trim();
+}
+
+function hideCartModalForOrderTicket() {
+  const cartModal = document.getElementById("cart-modal");
+  if (!cartModal || cartModal.hidden) {
+    cartModalHiddenForOrderTicket = false;
+    return;
+  }
+
+  cartModal.classList.remove("is-visible");
+  cartModal.hidden = true;
+  cartModalHiddenForOrderTicket = true;
+}
+
+function restoreCartModalAfterOrderTicket() {
+  if (!cartModalHiddenForOrderTicket) {
+    return;
+  }
+
+  const cartModal = document.getElementById("cart-modal");
+  if (!cartModal) {
+    cartModalHiddenForOrderTicket = false;
+    return;
+  }
+
+  cartModal.hidden = false;
+
+  requestAnimationFrame(() => {
+    cartModal.classList.add("is-visible");
+    syncBodyModalState();
+  });
+
+  cartModalHiddenForOrderTicket = false;
 }
 
 function chunkTicketWord(word, maxWidth = ORDER_TICKET_WIDTH) {
@@ -2230,8 +2308,7 @@ function buildWhatsAppOrderMessage({
     lines.push(
       "ENTREGA:",
       addressData.compactAddressLine || address,
-      `Refer\u00eancia: ${addressData.referenceText}`,
-      generateMapsLink(addressData.mapsQueryAddress)
+      `Refer\u00eancia: ${addressData.referenceText}`
     );
   }
 
@@ -2241,7 +2318,7 @@ function buildWhatsAppOrderMessage({
     `Pedido: ${itemsCount}`,
     "",
     "Itens:",
-    ...buildTicketItemsLines({ detailed: true })
+    ...buildTicketItemsLines({ detailed: false })
   );
 
   if (notes) {
@@ -2282,16 +2359,44 @@ function buildWhatsAppOrderMessage({
 
 function buildWhatsAppUrl(message) {
   const normalizedMessage = String(message || "").replace(/\r\n/g, "\n").trim();
-  return `https://wa.me/${STORE_WHATSAPP}?text=${encodeURIComponent(normalizedMessage)}`;
+  const whatsappUrl = new URL(WHATSAPP_ORDER_BASE_URL);
+
+  whatsappUrl.searchParams.set("phone", STORE_WHATSAPP);
+  whatsappUrl.searchParams.set("text", normalizedMessage);
+  whatsappUrl.searchParams.set("type", "phone_number");
+  whatsappUrl.searchParams.set("app_absent", "0");
+
+  return whatsappUrl.toString();
 }
 
 function openWhatsAppOrder(message) {
   const whatsappUrl = buildWhatsAppUrl(message);
-  const popup = window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+  window.location.assign(whatsappUrl);
+}
 
-  if (!popup) {
-    window.location.href = whatsappUrl;
+function submitPendingOrder(preview, options = {}) {
+  const orderPreview = preview || pendingOrderPreview;
+  const shouldCloseReviewModal = Boolean(options.closeReviewModal);
+
+  if (!orderPreview) {
+    showToast("Monte o pedido novamente antes de enviar.");
+    return false;
   }
+
+  openWhatsAppOrder(orderPreview.whatsAppMessage);
+
+  cart = [];
+  saveCart();
+  clearDeliveryData();
+  pendingOrderPreview = null;
+  updateUI();
+
+  if (shouldCloseReviewModal) {
+    closeOrderTicketModal({ restoreCart: false });
+  }
+
+  closeCartModal();
+  return true;
 }
 
 function renderOrderTicketPreview() {
@@ -2336,6 +2441,12 @@ function openOrderTicketModal(mode = "checkout") {
   if (!modal) return;
 
   orderTicketModalMode = mode;
+  if (mode === "checkout") {
+    hideCartModalForOrderTicket();
+  } else {
+    cartModalHiddenForOrderTicket = false;
+  }
+
   if (pendingOrderPreview) {
     pendingOrderPreview = {
       ...pendingOrderPreview,
@@ -2355,10 +2466,11 @@ function openOrderTicketModal(mode = "checkout") {
   });
 }
 
-function closeOrderTicketModal() {
+function closeOrderTicketModal(options = {}) {
   const modal = document.getElementById("order-ticket-modal");
   if (!modal) return;
   const wasSharedMode = orderTicketModalMode === "shared";
+  const shouldRestoreCart = options.restoreCart !== false && !wasSharedMode;
 
   modal.classList.remove("is-visible");
 
@@ -2373,6 +2485,13 @@ function closeOrderTicketModal() {
       pendingOrderPreview = null;
       orderTicketModalMode = "checkout";
     }
+
+    if (shouldRestoreCart) {
+      restoreCartModalAfterOrderTicket();
+    } else {
+      cartModalHiddenForOrderTicket = false;
+    }
+
     syncBodyModalState();
   }, 220);
 }
@@ -2411,27 +2530,17 @@ function confirmOrderTicket() {
     confirmButton.textContent = "Abrindo WhatsApp...";
   }
 
-  window.setTimeout(() => {
-    try {
-      openWhatsAppOrder(pendingOrderPreview.whatsAppMessage);
+  try {
+    submitPendingOrder(pendingOrderPreview, { closeReviewModal: true });
+  } catch (error) {
+    console.error("Galaxy Burger: falha ao abrir o WhatsApp do pedido.", error);
+    showToast("N\u00e3o foi poss\u00edvel abrir o WhatsApp agora. Tente novamente.");
 
-      cart = [];
-      saveCart();
-      clearDeliveryData();
-      pendingOrderPreview = null;
-      updateUI();
-      closeOrderTicketModal();
-      closeCartModal();
-    } catch (error) {
-      console.error("Galaxy Burger: falha ao abrir o WhatsApp do pedido.", error);
-      showToast("N\u00e3o foi poss\u00edvel abrir o WhatsApp agora. Tente novamente.");
-
-      if (confirmButton) {
-        confirmButton.disabled = false;
-        confirmButton.textContent = "Enviar no WhatsApp";
-      }
+    if (confirmButton) {
+      confirmButton.disabled = false;
+      confirmButton.textContent = "Enviar no WhatsApp";
     }
-  }, 0);
+  }
 }
 
 function handleSharedOrderTicketFromUrl() {
@@ -2611,29 +2720,23 @@ function buildPendingOrderPreview() {
 
 function finalizeOrder() {
   if (!validateCheckout()) return;
-  const finalizeButton = document.querySelector(".finalize-order-btn");
+  setFinalizeButtonBusy(true);
 
-  if (finalizeButton) {
-    finalizeButton.disabled = true;
-    finalizeButton.textContent = "Preparando revis\u00e3o...";
-  }
+  try {
+    pendingOrderPreview = buildPendingOrderPreview();
 
-  window.setTimeout(() => {
-    try {
-      pendingOrderPreview = buildPendingOrderPreview();
-
-      if (!pendingOrderPreview) {
-        return;
-      }
-
-      openOrderTicketModal();
-    } catch (error) {
-      console.error("Galaxy Burger: falha ao preparar o checkout.", error);
-      showToast("N\u00e3o foi poss\u00edvel preparar o pedido agora. Tente novamente.");
-    } finally {
-      updateCartTotals();
+    if (!pendingOrderPreview) {
+      return;
     }
-  }, 0);
+
+    submitPendingOrder(pendingOrderPreview);
+  } catch (error) {
+    console.error("Galaxy Burger: falha ao preparar o checkout.", error);
+    showToast("N\u00e3o foi poss\u00edvel preparar o pedido agora. Tente novamente.");
+  } finally {
+    setFinalizeButtonBusy(false);
+    updateCartTotals();
+  }
 }
 
 function bindDeliveryEvents() {

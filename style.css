@@ -1912,6 +1912,16 @@ body.ticket-view-active .order-ticket-modal-content {
   transform: none;
 }
 
+@media (max-width: 768px) {
+  #cart-modal,
+  #combo-drink-modal,
+  #order-ticket-modal {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(0, 0, 0, 0.9);
+  }
+}
+
 .order-ticket-submit-btn {
   margin-top: 0;
 }

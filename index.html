@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20260513-2">
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -54,7 +54,7 @@
       ]
     }
   </script>
-  <script src="carrinho.js" defer></script>
+  <script src="carrinho.js?v=20260513-2" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
@@ -820,7 +820,7 @@
 
         <div class="cart-status-strip" id="cart-order-status-strip" data-open="true">
         <span id="cart-order-status-label">Confirme cada detalhe antes de finalizar</span>
-        <strong id="cart-order-status-message">Revise os itens, confirme a rota de entrega e envie tudo certo para a base na primeira tentativa.</strong>
+        <strong id="cart-order-status-message">Confirme os dados do pedido e toque no bot&atilde;o vermelho para abrir o WhatsApp oficial da Galaxy Burger.</strong>
         </div>
 
       <div id="modal-cart-items" aria-live="polite"></div>
@@ -1018,9 +1018,9 @@
           </div>
         </div>
 
-        <p class="checkout-helper" id="checkout-helper">Para entrega, o pedido &eacute; enviado pelo WhatsApp oficial da Galaxy Burger com taxa estimada e confirma&ccedil;&atilde;o final da loja. Pedido m&iacute;nimo: R$ 20,00 em produtos.</p>
+        <p class="checkout-helper" id="checkout-helper">Para entrega, o pedido &eacute; enviado pelo WhatsApp oficial da Galaxy Burger assim que voc&ecirc; tocar no bot&atilde;o vermelho. Pedido m&iacute;nimo: R$ 20,00 em produtos.</p>
         <p class="minimum-order-note" id="minimum-order-note" data-status="idle">Pedido m&iacute;nimo da Galaxy Burger: R$ 20,00 em produtos.</p>
-        <button class="finalize-order-btn" type="button" onclick="finalizeOrder()">Revisar pedido e enviar</button>
+        <button class="finalize-order-btn" type="button" onclick="finalizeOrder()">Enviar pedido no WhatsApp</button>
       </div>
     </div>
   </div>
