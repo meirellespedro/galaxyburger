@@ -110,7 +110,6 @@ const DEFAULT_COMBO_DRINK_OPTIONS = Object.freeze([
   "Pepsi Black lata 350ml",
   "Fanta Laranja",
   "Guaran\u00e1 lata 350ml",
-  "Sprite lata 350ml",
   "Fanta uva",
   "Guaracamp copo 285ml"
 ]);
