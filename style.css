@@ -424,6 +424,7 @@ body.ticket-view-active #order-ticket-modal {
   min-height: 100vh;
   padding: 24px;
   opacity: 1;
+  pointer-events: auto;
   background:
     radial-gradient(circle at top left, rgba(125, 255, 198, 0.08), transparent 26%),
     radial-gradient(circle at bottom right, rgba(240, 70, 84, 0.08), transparent 28%),
@@ -1224,6 +1225,97 @@ body.ticket-view-active .order-ticket-modal-content {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+.featured-picks .card-content p,
+#cardapio .card-content p {
+  font-size: 1rem;
+  line-height: 1.64;
+}
+
+.card.has-description-toggle .card-content p.is-expandable {
+  position: relative;
+  cursor: pointer;
+}
+
+.card.has-description-toggle .card-content p.is-expandable::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1.8rem;
+  background: linear-gradient(180deg, rgba(10, 14, 20, 0), rgba(10, 14, 20, 0.96));
+  pointer-events: none;
+  transition: opacity var(--transition);
+}
+
+.card.has-description-toggle .card-content p.is-expandable:focus-visible {
+  outline: 2px solid rgba(125, 255, 198, 0.5);
+  outline-offset: 6px;
+  border-radius: 10px;
+}
+
+.card.is-description-expanded .card-content p.is-expandable {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  overflow: visible;
+}
+
+.card.is-description-expanded .card-content p.is-expandable::after {
+  opacity: 0;
+}
+
+.card-description-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--green);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: color var(--transition), transform var(--transition);
+}
+
+.card-description-toggle::after {
+  content: "+";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(125, 255, 198, 0.22);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  line-height: 1;
+  transition: transform var(--transition), border-color var(--transition);
+}
+
+.card-description-toggle:hover,
+.card-description-toggle:focus-visible {
+  color: #d8ffec;
+  transform: translateX(1px);
+}
+
+.card-description-toggle:focus-visible {
+  outline: 2px solid rgba(125, 255, 198, 0.4);
+  outline-offset: 4px;
+}
+
+.card.is-description-expanded .card-description-toggle::after {
+  content: "-";
+}
+
+.card.is-description-expanded .card-description-toggle {
+  color: #d8ffec;
+}
+
 #extras .card-content {
   padding-top: 20px;
 }
@@ -1498,6 +1590,7 @@ body.ticket-view-active .order-ticket-modal-content {
   -webkit-backdrop-filter: blur(10px);
   padding: 24px;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 220ms ease;
 }
 
@@ -1505,6 +1598,7 @@ body.ticket-view-active .order-ticket-modal-content {
 #combo-drink-modal.is-visible,
 #order-ticket-modal.is-visible {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .cart-modal-content,
@@ -2962,6 +3056,12 @@ body.ticket-view-active .order-ticket-modal-content {
     line-height: 1.45;
     -webkit-line-clamp: 2;
     line-clamp: 2;
+  }
+
+  .featured-picks .card-content p,
+  #cardapio .card-content p {
+    font-size: 0.94rem;
+    line-height: 1.52;
   }
 
   #extras .card-content h3 {

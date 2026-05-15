@@ -53,7 +53,10 @@ const DELIVERY_FEE_LOCAL = 5;
 const DELIVERY_FEE_EXTENDED = 10;
 const MIN_ORDER_AMOUNT = 20;
 const MAX_WHATSAPP_URL_LENGTH = 1800;
+const WHATSAPP_FALLBACK_DELAY_MS = 700;
+const WHATSAPP_OPEN_CHECK_DELAY_MS = 1800;
 const DELIVERY_IDLE_MESSAGE = "Preencha o endere\u00e7o, selecione a faixa estimada e confirme a taxa para atualizar o total.";
+const CHECKOUT_LOG_PREFIX = "[Galaxy Burger checkout]";
 
 const DELIVERY_STORAGE_KEY = "galaxy_burguer_delivery_v9";
 const LEGACY_DELIVERY_STORAGE_KEYS = [
@@ -115,6 +118,7 @@ let activeComboSelection = null;
 let pendingOrderPreview = null;
 let orderTicketModalMode = "checkout";
 let cartModalHiddenForOrderTicket = false;
+let activeWhatsAppAttempt = null;
 
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString("pt-BR", {
@@ -285,6 +289,41 @@ function getCurrentFulfillmentMode() {
   return document.getElementById("order-fulfillment")?.value || "delivery";
 }
 
+function getPaymentFields() {
+  return {
+    field: document.getElementById("payment-method"),
+    grid: document.querySelector(".payment-grid"),
+    buttons: Array.from(document.querySelectorAll(".payment-btn"))
+  };
+}
+
+function logCheckoutInfo(message, details) {
+  if (details !== undefined) {
+    console.info(`${CHECKOUT_LOG_PREFIX} ${message}`, details);
+    return;
+  }
+
+  console.info(`${CHECKOUT_LOG_PREFIX} ${message}`);
+}
+
+function logCheckoutWarn(message, details) {
+  if (details !== undefined) {
+    console.warn(`${CHECKOUT_LOG_PREFIX} ${message}`, details);
+    return;
+  }
+
+  console.warn(`${CHECKOUT_LOG_PREFIX} ${message}`);
+}
+
+function logCheckoutError(message, error) {
+  if (error !== undefined) {
+    console.error(`${CHECKOUT_LOG_PREFIX} ${message}`, error);
+    return;
+  }
+
+  console.error(`${CHECKOUT_LOG_PREFIX} ${message}`);
+}
+
 function setFieldInvalid(field) {
   if (!field) return;
   field.classList.add("is-invalid");
@@ -305,6 +344,18 @@ function setEstimateTermsInvalid(container, checkbox) {
 function clearEstimateTermsInvalid(container, checkbox) {
   if (container) container.classList.remove("is-invalid");
   if (checkbox) checkbox.removeAttribute("aria-invalid");
+}
+
+function setPaymentInvalid() {
+  const payment = getPaymentFields();
+  if (payment.grid) payment.grid.classList.add("is-invalid");
+  payment.buttons.forEach(button => button.setAttribute("aria-invalid", "true"));
+}
+
+function clearPaymentInvalid() {
+  const payment = getPaymentFields();
+  if (payment.grid) payment.grid.classList.remove("is-invalid");
+  payment.buttons.forEach(button => button.removeAttribute("aria-invalid"));
 }
 
 function showToast(message) {
@@ -499,7 +550,9 @@ function validateAddressFields(showMessage = true) {
   const required = [
     { field: fields.street, value: values.street, message: "Informe a rua." },
     { field: fields.number, value: values.number, message: "Informe o n\u00famero." },
-    { field: fields.neighborhood, value: values.neighborhood, message: "Informe o bairro." }
+    { field: fields.neighborhood, value: values.neighborhood, message: "Informe o bairro." },
+    { field: fields.city, value: values.city, message: "Informe a cidade." },
+    { field: fields.state, value: values.state, message: "Informe o estado." }
   ];
 
   const missing = required.find(item => !item.value);
@@ -511,6 +564,7 @@ function validateAddressFields(showMessage = true) {
     missing.field?.focus();
 
     if (showMessage) {
+      logCheckoutWarn("Checkout bloqueado: endere\u00e7o incompleto.", { missingField: missing.field?.id || "unknown" });
       showToast(missing.message);
       setDeliveryState({
         status: "idle",
@@ -544,6 +598,7 @@ function validateManualDeliveryRange(showMessage = true) {
   if (showMessage) {
     setFieldInvalid(fields.distanceRange);
     fields.distanceRange?.focus();
+    logCheckoutWarn("Checkout bloqueado: faixa de entrega n\u00e3o selecionada.");
     showToast("Selecione a faixa estimada do endere\u00e7o.");
     setDeliveryState({
       status: "idle",
@@ -570,6 +625,7 @@ function validateDeliveryEstimateAcceptance(showMessage = true) {
   if (showMessage) {
     setEstimateTermsInvalid(fields.estimateTerms, fields.estimateAck);
     fields.estimateAck?.focus();
+    logCheckoutWarn("Checkout bloqueado: aceite da taxa estimada n\u00e3o confirmado.");
     showToast("Confirme que entendeu a taxa estimada antes de enviar o pedido.");
   }
 
@@ -594,6 +650,10 @@ function validateAreaMatchesNeighborhood(selectedRange, showMessage = true) {
   if (showMessage) {
     setFieldInvalid(fields.distanceRange);
     fields.distanceRange?.focus();
+    logCheckoutWarn("Checkout bloqueado: faixa de entrega incompat\u00edvel com o bairro informado.", {
+      neighborhood,
+      selectedRange: selectedRange.value
+    });
     showToast("Para usar a estimativa de R$ 5,00, o bairro informado precisa ser Campo Grande.");
     setDeliveryState({
       status: "idle",
@@ -959,12 +1019,16 @@ function getFinalizeButtonLabel() {
     : "Enviar pedido no WhatsApp";
 }
 
-function isFinalizeButtonBusy(button = document.querySelector(".finalize-order-btn")) {
+function getFinalizeButton() {
+  return document.getElementById("finalize-order-btn") || document.querySelector(".finalize-order-btn");
+}
+
+function isFinalizeButtonBusy(button = getFinalizeButton()) {
   return button?.dataset.busy === "true";
 }
 
 function setFinalizeButtonBusy(isBusy, label = "Abrindo WhatsApp...") {
-  const finalizeButton = document.querySelector(".finalize-order-btn");
+  const finalizeButton = getFinalizeButton();
   if (!finalizeButton) return;
 
   finalizeButton.dataset.busy = isBusy ? "true" : "false";
@@ -975,11 +1039,30 @@ function setFinalizeButtonBusy(isBusy, label = "Abrindo WhatsApp...") {
   }
 }
 
+function setOrderTicketConfirmButtonBusy(isBusy, label = "Abrindo WhatsApp...") {
+  const confirmButton = document.getElementById("order-ticket-confirm-button");
+  if (!confirmButton) return;
+
+  if (!confirmButton.dataset.defaultLabel) {
+    confirmButton.dataset.defaultLabel = confirmButton.textContent.trim() || "Enviar no WhatsApp";
+  }
+
+  confirmButton.dataset.busy = isBusy ? "true" : "false";
+  confirmButton.disabled = Boolean(isBusy);
+  confirmButton.textContent = isBusy ? label : confirmButton.dataset.defaultLabel;
+}
+
+function resetOrderSubmissionButtons() {
+  setFinalizeButtonBusy(false);
+  setOrderTicketConfirmButtonBusy(false);
+  updateCartTotals();
+}
+
 function updateCartTotals() {
   const subtotal = getCartTotal();
   const subtotalEl = document.getElementById("modal-cart-subtotal");
   const totalEl = document.getElementById("modal-cart-total");
-  const finalizeButton = document.querySelector(".finalize-order-btn");
+  const finalizeButton = getFinalizeButton();
   const storeOpen = getStoreAvailability().isOpen;
 
   const isPickup = getCurrentFulfillmentMode() === "pickup";
@@ -1341,6 +1424,7 @@ function changeItemQuantity(index, delta) {
 }
 
 function selectPayment(button) {
+  clearPaymentInvalid();
   document.querySelectorAll(".payment-btn").forEach(btn => btn.classList.remove("selected"));
   button.classList.add("selected");
 
@@ -1485,6 +1569,10 @@ function openCartModal() {
   const modal = document.getElementById("cart-modal");
   if (!modal) return;
 
+  logCheckoutInfo("Abrindo carrinho.", {
+    items: getCartItemsCount(),
+    subtotal: getCartTotal()
+  });
   cartModalHiddenForOrderTicket = false;
   modal.hidden = false;
   document.body.classList.add("modal-open");
@@ -1492,6 +1580,7 @@ function openCartModal() {
 
   requestAnimationFrame(() => {
     modal.classList.add("is-visible");
+    modal.querySelector(".cart-modal-content")?.focus();
   });
 }
 
@@ -1499,6 +1588,7 @@ function closeCartModal() {
   const modal = document.getElementById("cart-modal");
   if (!modal) return;
 
+  logCheckoutInfo("Fechando carrinho.");
   cartModalHiddenForOrderTicket = false;
   modal.classList.remove("is-visible");
 
@@ -2357,33 +2447,67 @@ function buildWhatsAppOrderMessage({
   return formatTicketLines(lines);
 }
 
+function encodeWhatsAppMessage(message) {
+  return encodeURIComponent(String(message || "").replace(/\r\n/g, "\n").trim());
+}
+
 function buildWhatsAppUrl(message) {
   const normalizedMessage = String(message || "").replace(/\r\n/g, "\n").trim();
-  const whatsappUrl = new URL(WHATSAPP_ORDER_BASE_URL);
-
-  whatsappUrl.searchParams.set("phone", STORE_WHATSAPP);
-  whatsappUrl.searchParams.set("text", normalizedMessage);
-  whatsappUrl.searchParams.set("type", "phone_number");
-  whatsappUrl.searchParams.set("app_absent", "0");
-
-  return whatsappUrl.toString();
+  const encodedMessage = encodeWhatsAppMessage(normalizedMessage);
+  return `${WHATSAPP_ORDER_BASE_URL}?phone=${encodeURIComponent(STORE_WHATSAPP)}&text=${encodedMessage}&type=phone_number&app_absent=0`;
 }
 
-function openWhatsAppOrder(message) {
-  const whatsappUrl = buildWhatsAppUrl(message);
-  window.location.assign(whatsappUrl);
+function buildWhatsAppDeepLink(message) {
+  const normalizedMessage = String(message || "").replace(/\r\n/g, "\n").trim();
+  const encodedMessage = encodeWhatsAppMessage(normalizedMessage);
+  return `whatsapp://send?phone=${encodeURIComponent(STORE_WHATSAPP)}&text=${encodedMessage}`;
 }
 
-function submitPendingOrder(preview, options = {}) {
-  const orderPreview = preview || pendingOrderPreview;
-  const shouldCloseReviewModal = Boolean(options.closeReviewModal);
+function isProbablyMobileCheckoutClient() {
+  const userAgent = String(window.navigator?.userAgent || "");
+  const matchesMobileViewport = typeof window.matchMedia === "function"
+    && window.matchMedia("(max-width: 860px)").matches;
 
-  if (!orderPreview) {
-    showToast("Monte o pedido novamente antes de enviar.");
-    return false;
+  return matchesMobileViewport
+    || /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(userAgent)
+    || Number(window.navigator?.maxTouchPoints || 0) > 1;
+}
+
+function clearActiveWhatsAppAttempt(attempt = activeWhatsAppAttempt) {
+  if (!attempt) return;
+
+  if (attempt.fallbackTimer) {
+    window.clearTimeout(attempt.fallbackTimer);
   }
 
-  openWhatsAppOrder(orderPreview.whatsAppMessage);
+  if (attempt.failureTimer) {
+    window.clearTimeout(attempt.failureTimer);
+  }
+
+  if (attempt.visibilityHandler) {
+    document.removeEventListener("visibilitychange", attempt.visibilityHandler);
+  }
+
+  if (attempt.pageHideHandler) {
+    window.removeEventListener("pagehide", attempt.pageHideHandler);
+  }
+
+  if (activeWhatsAppAttempt === attempt) {
+    activeWhatsAppAttempt = null;
+  }
+}
+
+function finalizeSuccessfulOrderSubmission(attempt, trigger) {
+  if (!attempt || attempt.completed) return;
+
+  attempt.completed = true;
+  clearActiveWhatsAppAttempt(attempt);
+
+  logCheckoutInfo("Pedido encaminhado para o WhatsApp.", {
+    trigger,
+    source: attempt.source,
+    urlLength: attempt.browserUrl.length
+  });
 
   cart = [];
   saveCart();
@@ -2391,11 +2515,115 @@ function submitPendingOrder(preview, options = {}) {
   pendingOrderPreview = null;
   updateUI();
 
-  if (shouldCloseReviewModal) {
+  if (attempt.closeReviewModal) {
     closeOrderTicketModal({ restoreCart: false });
   }
 
   closeCartModal();
+  resetOrderSubmissionButtons();
+}
+
+function handleWhatsAppOpenFailure(attempt) {
+  if (!attempt || attempt.completed || activeWhatsAppAttempt !== attempt) return;
+
+  clearActiveWhatsAppAttempt(attempt);
+  resetOrderSubmissionButtons();
+  logCheckoutWarn("Falha ao abrir o WhatsApp automaticamente.", {
+    source: attempt.source,
+    urlLength: attempt.browserUrl.length
+  });
+  showToast("N\u00e3o foi poss\u00edvel abrir o WhatsApp agora. Verifique o bloqueio do navegador e toque novamente.");
+}
+
+function openWhatsAppOrder(message, options = {}) {
+  const normalizedMessage = String(message || "").replace(/\r\n/g, "\n").trim();
+
+  if (!normalizedMessage) {
+    throw new Error("Mensagem do pedido vazia.");
+  }
+
+  const browserUrl = buildWhatsAppUrl(normalizedMessage);
+  const deepLinkUrl = buildWhatsAppDeepLink(normalizedMessage);
+  const source = options.source || "checkout";
+  const shouldPreferDeepLink = options.preferDeepLink ?? isProbablyMobileCheckoutClient();
+
+  clearActiveWhatsAppAttempt();
+
+  const attempt = {
+    source,
+    closeReviewModal: Boolean(options.closeReviewModal),
+    browserUrl,
+    deepLinkUrl,
+    completed: false,
+    fallbackTimer: 0,
+    failureTimer: 0,
+    visibilityHandler: null,
+    pageHideHandler: null
+  };
+
+  attempt.visibilityHandler = () => {
+    if (document.visibilityState === "hidden") {
+      finalizeSuccessfulOrderSubmission(attempt, "visibilitychange");
+    }
+  };
+
+  attempt.pageHideHandler = () => {
+    finalizeSuccessfulOrderSubmission(attempt, "pagehide");
+  };
+
+  document.addEventListener("visibilitychange", attempt.visibilityHandler);
+  window.addEventListener("pagehide", attempt.pageHideHandler);
+
+  activeWhatsAppAttempt = attempt;
+
+  logCheckoutInfo("Tentando abrir o WhatsApp.", {
+    source,
+    preferDeepLink: shouldPreferDeepLink,
+    urlLength: browserUrl.length
+  });
+
+  if (shouldPreferDeepLink) {
+    attempt.fallbackTimer = window.setTimeout(() => {
+      if (activeWhatsAppAttempt !== attempt || attempt.completed || document.visibilityState === "hidden") {
+        return;
+      }
+
+      logCheckoutWarn("WhatsApp app n\u00e3o respondeu; usando fallback web.", { source });
+      window.location.href = browserUrl;
+    }, WHATSAPP_FALLBACK_DELAY_MS);
+
+    window.location.href = deepLinkUrl;
+  } else {
+    window.location.href = browserUrl;
+  }
+
+  attempt.failureTimer = window.setTimeout(() => {
+    if (activeWhatsAppAttempt !== attempt || attempt.completed || document.visibilityState === "hidden") {
+      return;
+    }
+
+    handleWhatsAppOpenFailure(attempt);
+  }, WHATSAPP_OPEN_CHECK_DELAY_MS);
+
+  return browserUrl;
+}
+
+function submitPendingOrder(preview, options = {}) {
+  const orderPreview = preview || pendingOrderPreview;
+  const shouldCloseReviewModal = Boolean(options.closeReviewModal);
+  const source = options.source || "checkout";
+
+  if (!orderPreview) {
+    logCheckoutWarn("Tentativa de envio sem comanda preparada.");
+    showToast("Monte o pedido novamente antes de enviar.");
+    return false;
+  }
+
+  openWhatsAppOrder(orderPreview.whatsAppMessage, {
+    source,
+    closeReviewModal: shouldCloseReviewModal
+  });
+
   return true;
 }
 
@@ -2516,6 +2744,7 @@ function printOrderTicket() {
 
 function confirmOrderTicket() {
   if (!pendingOrderPreview) {
+    logCheckoutWarn("Tentativa de confirmar comanda sem preview.");
     showToast("Monte a comanda novamente antes de enviar.");
     return;
   }
@@ -2523,23 +2752,21 @@ function confirmOrderTicket() {
   if (!pendingOrderPreview.sharedTicketUrl) {
     showToast("Link da comanda indispon\u00edvel neste teste local. Configure a URL p\u00fablica da loja para liberar a impress\u00e3o pelo WhatsApp.");
   }
-  const confirmButton = document.getElementById("order-ticket-confirm-button");
-
-  if (confirmButton) {
-    confirmButton.disabled = true;
-    confirmButton.textContent = "Abrindo WhatsApp...";
-  }
+  setOrderTicketConfirmButtonBusy(true);
 
   try {
-    submitPendingOrder(pendingOrderPreview, { closeReviewModal: true });
-  } catch (error) {
-    console.error("Galaxy Burger: falha ao abrir o WhatsApp do pedido.", error);
-    showToast("N\u00e3o foi poss\u00edvel abrir o WhatsApp agora. Tente novamente.");
+    const wasSubmitted = submitPendingOrder(pendingOrderPreview, {
+      closeReviewModal: true,
+      source: "review"
+    });
 
-    if (confirmButton) {
-      confirmButton.disabled = false;
-      confirmButton.textContent = "Enviar no WhatsApp";
+    if (!wasSubmitted) {
+      resetOrderSubmissionButtons();
     }
+  } catch (error) {
+    logCheckoutError("Falha ao abrir o WhatsApp do pedido.", error);
+    showToast("N\u00e3o foi poss\u00edvel abrir o WhatsApp agora. Tente novamente.");
+    resetOrderSubmissionButtons();
   }
 }
 
@@ -2557,21 +2784,25 @@ function handleSharedOrderTicketFromUrl() {
 
 function validateCheckout() {
   const nameField = document.getElementById("customer-name");
-  const paymentField = document.getElementById("payment-method");
+  const payment = getPaymentFields();
+  const paymentField = payment.field;
   const isPickup = getCurrentFulfillmentMode() === "pickup";
   const subtotal = getCartTotal();
 
   if (!cart.length) {
+    logCheckoutWarn("Checkout bloqueado: carrinho vazio.");
     showToast("Seu pedido est\u00e1 vazio.");
     return false;
   }
 
   if (!ensureStoreIsOpen(true)) {
+    logCheckoutWarn("Checkout bloqueado: loja fechada.");
     return false;
   }
 
   if (!normalizeText(nameField?.value)) {
     setFieldInvalid(nameField);
+    logCheckoutWarn("Checkout bloqueado: nome n\u00e3o informado.");
     showToast("Informe seu nome.");
     return false;
   }
@@ -2579,6 +2810,7 @@ function validateCheckout() {
   clearFieldInvalid(nameField);
 
   if (!hasReachedMinimumOrder(subtotal)) {
+    logCheckoutWarn("Checkout bloqueado: pedido m\u00ednimo n\u00e3o atingido.", { subtotal });
     showToast(`O pedido m\u00ednimo da Galaxy Burger \u00e9 ${formatCurrency(MIN_ORDER_AMOUNT)} em produtos. Faltam ${formatCurrency(getMinimumOrderShortfall(subtotal))} para continuar.`);
     return false;
   }
@@ -2590,16 +2822,19 @@ function validateCheckout() {
     if (!validateAreaMatchesNeighborhood(selectedRange, true)) return false;
 
     if (deliveryState.status === "loading") {
+      logCheckoutWarn("Checkout bloqueado: valida\u00e7\u00e3o da entrega em andamento.");
       showToast("Aguarde a confirma\u00e7\u00e3o da entrega.");
       return false;
     }
 
     if (deliveryState.status === "out_of_range") {
+      logCheckoutWarn("Checkout bloqueado: endere\u00e7o fora da \u00e1rea.");
       showToast("Esse endere\u00e7o est\u00e1 fora da \u00e1rea de entrega. Selecione retirada para continuar.");
       return false;
     }
 
     if (deliveryState.status !== "ready") {
+      logCheckoutWarn("Checkout bloqueado: taxa de entrega n\u00e3o confirmada.", { deliveryState });
       showToast("Confirme a taxa estimada de entrega antes de finalizar.");
       return false;
     }
@@ -2609,7 +2844,12 @@ function validateCheckout() {
     }
   }
 
+  clearPaymentInvalid();
+
   if (!paymentField?.value) {
+    setPaymentInvalid();
+    payment.buttons[0]?.focus();
+    logCheckoutWarn("Checkout bloqueado: forma de pagamento n\u00e3o selecionada.");
     showToast("Escolha uma forma de pagamento.");
     return false;
   }
@@ -2678,7 +2918,7 @@ function buildPendingOrderPreview() {
   try {
     sharedTicketUrl = buildSharedOrderTicketUrl(orderPreview);
   } catch (error) {
-    console.error("Galaxy Burger: falha ao gerar a comanda compartilhada.", error);
+    logCheckoutError("Falha ao gerar a comanda compartilhada.", error);
   }
 
   const whatsAppPayload = {
@@ -2708,6 +2948,13 @@ function buildPendingOrderPreview() {
   const shouldUseSharedTicketUrl = Boolean(whatsAppMessageWithTicket)
     && buildWhatsAppUrl(whatsAppMessageWithTicket).length <= MAX_WHATSAPP_URL_LENGTH;
 
+  logCheckoutInfo("Comanda preparada para envio.", {
+    items: orderPreview.itemsCount,
+    isPickup,
+    paymentMethod,
+    sharedTicketIncluded: shouldUseSharedTicketUrl
+  });
+
   return {
     ...orderPreview,
     sharedTicketUrl,
@@ -2719,6 +2966,11 @@ function buildPendingOrderPreview() {
 }
 
 function finalizeOrder() {
+  if (isFinalizeButtonBusy()) {
+    logCheckoutWarn("Clique ignorado: envio j\u00e1 est\u00e1 em andamento.");
+    return false;
+  }
+
   if (!validateCheckout()) return;
   setFinalizeButtonBusy(true);
 
@@ -2726,16 +2978,23 @@ function finalizeOrder() {
     pendingOrderPreview = buildPendingOrderPreview();
 
     if (!pendingOrderPreview) {
-      return;
+      resetOrderSubmissionButtons();
+      return false;
     }
 
-    submitPendingOrder(pendingOrderPreview);
+    const wasSubmitted = submitPendingOrder(pendingOrderPreview, { source: "checkout" });
+
+    if (!wasSubmitted) {
+      resetOrderSubmissionButtons();
+      return false;
+    }
+
+    return true;
   } catch (error) {
-    console.error("Galaxy Burger: falha ao preparar o checkout.", error);
+    logCheckoutError("Falha ao preparar o checkout.", error);
     showToast("N\u00e3o foi poss\u00edvel preparar o pedido agora. Tente novamente.");
-  } finally {
-    setFinalizeButtonBusy(false);
-    updateCartTotals();
+    resetOrderSubmissionButtons();
+    return false;
   }
 }
 
@@ -2870,6 +3129,117 @@ function updateStoreStatusUI(availability = getStoreAvailability()) {
   updateCartTotals();
 }
 
+let cardDescriptionIdSequence = 0;
+let cardDescriptionSyncFrame = 0;
+
+function setCardDescriptionExpanded(card, isExpanded) {
+  const description = card.querySelector(".card-description");
+  const toggle = card.querySelector(".card-description-toggle");
+  if (!description || !toggle) return;
+
+  card.classList.toggle("is-description-expanded", isExpanded);
+  description.setAttribute("aria-expanded", String(isExpanded));
+  toggle.setAttribute("aria-expanded", String(isExpanded));
+  toggle.textContent = isExpanded ? "Ocultar ingredientes" : "Ver ingredientes";
+}
+
+function toggleCardDescription(source) {
+  const card = source.closest(".card");
+  if (!card || !card.classList.contains("has-description-toggle")) return;
+
+  setCardDescriptionExpanded(card, !card.classList.contains("is-description-expanded"));
+}
+
+function syncExpandableCardDescription(description) {
+  const card = description.closest(".card");
+  const toggle = card?.querySelector(".card-description-toggle");
+  if (!card || !toggle) return;
+
+  const wasExpanded = card.classList.contains("is-description-expanded");
+
+  card.classList.remove("is-description-expanded");
+  description.classList.remove("is-expandable");
+  description.removeAttribute("aria-expanded");
+  description.removeAttribute("role");
+  description.removeAttribute("tabindex");
+  toggle.removeAttribute("aria-expanded");
+  toggle.textContent = "Ver ingredientes";
+  toggle.hidden = true;
+
+  const needsToggle = description.scrollHeight > description.clientHeight + 2;
+  card.classList.toggle("has-description-toggle", needsToggle);
+
+  if (!needsToggle) {
+    return;
+  }
+
+  description.classList.add("is-expandable");
+  description.setAttribute("role", "button");
+  description.setAttribute("tabindex", "0");
+  toggle.hidden = false;
+  setCardDescriptionExpanded(card, wasExpanded);
+}
+
+function syncAllExpandableCardDescriptions() {
+  document.querySelectorAll(".card-description").forEach(syncExpandableCardDescription);
+}
+
+function requestExpandableCardDescriptionsSync() {
+  if (cardDescriptionSyncFrame) {
+    window.cancelAnimationFrame(cardDescriptionSyncFrame);
+  }
+
+  cardDescriptionSyncFrame = window.requestAnimationFrame(() => {
+    cardDescriptionSyncFrame = 0;
+    syncAllExpandableCardDescriptions();
+  });
+}
+
+function setupExpandableCardDescriptions() {
+  const descriptions = Array.from(document.querySelectorAll(".card .card-content p"));
+
+  descriptions.forEach(description => {
+    description.classList.add("card-description");
+
+    if (!description.id) {
+      cardDescriptionIdSequence += 1;
+      description.id = `card-description-${cardDescriptionIdSequence}`;
+    }
+
+    let toggle = description.parentElement?.querySelector(".card-description-toggle");
+    if (!toggle && description.parentElement) {
+      toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "card-description-toggle";
+      toggle.hidden = true;
+      toggle.setAttribute("aria-controls", description.id);
+      description.parentElement.insertBefore(toggle, description.parentElement.querySelector(".price"));
+    }
+
+    if (!toggle) return;
+
+    if (!description.dataset.expandableBound) {
+      description.dataset.expandableBound = "true";
+      description.addEventListener("click", () => {
+        if (!description.classList.contains("is-expandable")) return;
+        toggleCardDescription(description);
+      });
+      description.addEventListener("keydown", event => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        toggleCardDescription(description);
+      });
+    }
+
+    if (!toggle.dataset.expandableBound) {
+      toggle.dataset.expandableBound = "true";
+      toggle.addEventListener("click", () => toggleCardDescription(toggle));
+    }
+  });
+
+  requestExpandableCardDescriptionsSync();
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   /*
     Remove coordenadas antigas salvas por versões anteriores.
@@ -2887,7 +3257,17 @@ document.addEventListener("DOMContentLoaded", () => {
   updateDeliveryUI();
   updateStoreStatusUI();
   handleSharedOrderTicketFromUrl();
+  setupExpandableCardDescriptions();
   window.setInterval(() => updateStoreStatusUI(), 60000);
+  window.addEventListener("resize", requestExpandableCardDescriptionsSync);
+
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(() => {
+      requestExpandableCardDescriptionsSync();
+    });
+  }
+
+  window.addEventListener("load", requestExpandableCardDescriptionsSync, { once: true });
 
   const pixKeyDisplay = document.getElementById("pix-key-display");
   if (pixKeyDisplay) {
@@ -2898,6 +3278,14 @@ document.addEventListener("DOMContentLoaded", () => {
   if (pixBeneficiaryDisplay) {
     pixBeneficiaryDisplay.textContent = PIX_BENEFICIARY_NAME;
   }
+
+  window.addEventListener("error", event => {
+    logCheckoutError("Erro global capturado no checkout.", event.error || event.message);
+  });
+
+  window.addEventListener("unhandledrejection", event => {
+    logCheckoutError("Promise rejeitada sem tratamento no checkout.", event.reason);
+  });
 
   document.addEventListener("keydown", event => {
     if (event.key === "Escape") {
