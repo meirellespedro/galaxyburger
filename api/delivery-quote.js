@@ -2,10 +2,28 @@ const { createHmac, timingSafeEqual } = require("crypto");
 
 const VIA_CEP_BASE_URL = "https://viacep.com.br/ws";
 const NOMINATIM_SEARCH_URL = "https://nominatim.openstreetmap.org/search";
+const PHOTON_SEARCH_URL = "https://photon.komoot.io/api/";
 const OSRM_ROUTE_URL = "https://router.project-osrm.org/route/v1/driving";
 const QUOTE_TTL_MS = 15 * 60 * 1000;
 const DEFAULT_DEV_SECRET = "galaxy-burger-local-delivery-dev-secret";
 const USER_AGENT = "GalaxyBurgerDelivery/1.0 (+https://galaxyburger.vercel.app/)";
+const STREET_LEVEL_DISTANCE_BUFFER_KM = 0.35;
+const MAX_GEOCODER_RESULTS = 5;
+const ADDRESS_STOP_WORDS = new Set([
+  "rua",
+  "r",
+  "avenida",
+  "av",
+  "travessa",
+  "tv",
+  "estrada",
+  "estr",
+  "rodovia",
+  "praça",
+  "praca",
+  "alameda",
+  "ladeira"
+]);
 
 const STORE_ADDRESS = Object.freeze({
   street: "Rua Embaixador Muniz Gordilho",
@@ -15,6 +33,15 @@ const STORE_ADDRESS = Object.freeze({
   state: "RJ",
   cep: "23070010",
   country: "Brasil"
+});
+// A base da loja fica fixa para não depender da divergência entre o CEP oficial
+// e a grafia da rua indexada pelos provedores de mapa externos.
+const STORE_COORDINATES = Object.freeze({
+  lat: -22.9024174,
+  lon: -43.5777858,
+  precision: "street",
+  source: "fixed_store_coordinates",
+  distanceBufferKm: 0
 });
 
 const DELIVERY_ZONES = Object.freeze([
@@ -128,7 +155,11 @@ async function parseJsonBody(req) {
   }
 
   if (typeof req.body === "string" && req.body.trim()) {
-    return JSON.parse(req.body);
+    try {
+      return JSON.parse(req.body);
+    } catch {
+      throw createError("invalid_json", "JSON inv\u00e1lido no corpo da requisi\u00e7\u00e3o.", 400);
+    }
   }
 
   const chunks = [];
@@ -138,7 +169,15 @@ async function parseJsonBody(req) {
   }
 
   const rawBody = Buffer.concat(chunks).toString("utf8").trim();
-  return rawBody ? JSON.parse(rawBody) : {};
+  if (!rawBody) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(rawBody);
+  } catch {
+    throw createError("invalid_json", "JSON inv\u00e1lido no corpo da requisi\u00e7\u00e3o.", 400);
+  }
 }
 
 function normalizeText(value) {
@@ -150,6 +189,13 @@ function normalizeCompareText(value) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
+}
+
+function normalizeStreetLabel(value) {
+  return normalizeCompareText(value)
+    .replace(/[.,/\\-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function normalizeCep(value) {
@@ -263,14 +309,91 @@ function verifyQuoteToken(token) {
 }
 
 function streetsLookCompatible(submittedStreet, officialStreet) {
-  const submitted = normalizeCompareText(submittedStreet);
-  const official = normalizeCompareText(officialStreet);
+  const submitted = normalizeStreetLabel(submittedStreet);
+  const official = normalizeStreetLabel(officialStreet);
 
   if (!submitted || !official) {
     return true;
   }
 
-  return submitted.includes(official) || official.includes(submitted);
+  if (submitted.includes(official) || official.includes(submitted)) {
+    return true;
+  }
+
+  const submittedTokens = tokenizeComparableAddressText(submitted);
+  const officialTokens = tokenizeComparableAddressText(official);
+
+  if (!submittedTokens.length || !officialTokens.length) {
+    return false;
+  }
+
+  const matchedTokens = submittedTokens.filter(submittedToken =>
+    officialTokens.some(officialToken => areAddressTokensCompatible(submittedToken, officialToken))
+  );
+
+  return matchedTokens.length / submittedTokens.length >= 0.75;
+}
+
+function tokenizeComparableAddressText(value) {
+  return normalizeStreetLabel(value)
+    .split(" ")
+    .map(token => token.trim())
+    .filter(token => token && !ADDRESS_STOP_WORDS.has(token));
+}
+
+function areAddressTokensCompatible(left, right) {
+  if (left === right) {
+    return true;
+  }
+
+  if (!left || !right) {
+    return false;
+  }
+
+  if (left.includes(right) || right.includes(left)) {
+    return true;
+  }
+
+  const maxDistance = Math.max(left.length, right.length) >= 7 ? 1 : 0;
+  return levenshteinDistanceWithin(left, right, maxDistance);
+}
+
+function levenshteinDistanceWithin(left, right, maxDistance) {
+  if (Math.abs(left.length - right.length) > maxDistance) {
+    return false;
+  }
+
+  const previousRow = new Array(right.length + 1);
+  const currentRow = new Array(right.length + 1);
+
+  for (let index = 0; index <= right.length; index += 1) {
+    previousRow[index] = index;
+  }
+
+  for (let row = 1; row <= left.length; row += 1) {
+    currentRow[0] = row;
+    let rowMin = currentRow[0];
+
+    for (let column = 1; column <= right.length; column += 1) {
+      const cost = left[row - 1] === right[column - 1] ? 0 : 1;
+      currentRow[column] = Math.min(
+        previousRow[column] + 1,
+        currentRow[column - 1] + 1,
+        previousRow[column - 1] + cost
+      );
+      rowMin = Math.min(rowMin, currentRow[column]);
+    }
+
+    if (rowMin > maxDistance) {
+      return false;
+    }
+
+    for (let column = 0; column <= right.length; column += 1) {
+      previousRow[column] = currentRow[column];
+    }
+  }
+
+  return previousRow[right.length] <= maxDistance;
 }
 
 function sanitizeSubmittedAddress(payload = {}) {
@@ -376,30 +499,192 @@ function validateOfficialAddress(submittedAddress, officialAddress, viaCepData) 
   }
 }
 
-function buildAddressQuery(address) {
-  return [
-    `${address.street}, ${address.number}`,
-    address.neighborhood,
-    address.city,
-    address.state,
-    formatCep(address.cep),
-    "Brasil"
-  ].filter(Boolean).join(", ");
+function dedupeAddressQueries(queries) {
+  const uniqueQueries = [];
+  const seen = new Set();
+
+  queries.forEach(query => {
+    const normalized = normalizeCompareText(query);
+    if (!normalized || seen.has(normalized)) {
+      return;
+    }
+
+    seen.add(normalized);
+    uniqueQueries.push(query);
+  });
+
+  return uniqueQueries;
 }
 
-async function geocodeAddress(address) {
-  const query = buildAddressQuery(address);
-  const cacheKey = normalizeCompareText(query);
+function buildAddressQueries(address) {
+  const streetNumber = [address.street, address.number].filter(Boolean).join(", ");
+  const streetOnly = normalizeText(address.street);
+  const cep = formatCep(address.cep);
+  const cityState = [address.city, address.state].filter(Boolean).join(", ");
 
-  if (geocodeCache.has(cacheKey)) {
-    return geocodeCache.get(cacheKey);
+  return dedupeAddressQueries([
+    [streetNumber, address.neighborhood, address.city, address.state, cep, "Brasil"].filter(Boolean).join(", "),
+    [streetNumber, address.city, address.state, cep, "Brasil"].filter(Boolean).join(", "),
+    [streetOnly, address.neighborhood, address.city, address.state, cep, "Brasil"].filter(Boolean).join(", "),
+    [streetOnly, address.city, address.state, cep, "Brasil"].filter(Boolean).join(", "),
+    [streetOnly, address.neighborhood, address.city, address.state, "Brasil"].filter(Boolean).join(", "),
+    [streetOnly, address.city, address.state, "Brasil"].filter(Boolean).join(", "),
+    [cep, address.neighborhood, address.city, address.state, "Brasil"].filter(Boolean).join(", "),
+    [cep, cityState, "Brasil"].filter(Boolean).join(", ")
+  ]);
+}
+
+function getCandidateCity(value) {
+  return normalizeText(value);
+}
+
+function getCandidateNeighborhood(value) {
+  return normalizeText(value);
+}
+
+function getCandidateStreet(value) {
+  return normalizeText(value);
+}
+
+function inferCandidatePrecision(rawType, houseNumber = "") {
+  const type = normalizeCompareText(rawType);
+
+  if (houseNumber || type === "house" || type === "building") {
+    return "exact";
   }
 
+  if (type === "street" || type === "road" || type === "residential") {
+    return "street";
+  }
+
+  if (type === "postcode" || type === "postal_code" || type === "other") {
+    return "postcode";
+  }
+
+  return "street";
+}
+
+function normalizeCandidate(result, provider) {
+  if (provider === "nominatim") {
+    const address = result?.address || {};
+    const houseNumber = normalizeText(address.house_number || "");
+
+    return {
+      provider,
+      lat: Number(result?.lat),
+      lon: Number(result?.lon),
+      street: getCandidateStreet(address.road || address.pedestrian || address.footway || address.cycleway || address.path || result?.name || ""),
+      neighborhood: getCandidateNeighborhood(address.suburb || address.neighbourhood || address.neighborhood || address.city_district || address.quarter || ""),
+      city: getCandidateCity(address.city || address.town || address.village || address.municipality || address.county || ""),
+      state: normalizeText(address.state || address.region || ""),
+      postcode: normalizeCep(address.postcode || ""),
+      countryCode: normalizeCompareText(address.country_code || ""),
+      precision: inferCandidatePrecision(result?.addresstype || result?.type || "", houseNumber),
+      houseNumber,
+      raw: result
+    };
+  }
+
+  const properties = result?.properties || {};
+  const houseNumber = normalizeText(properties.housenumber || "");
+
+  return {
+    provider,
+    lat: Number(result?.geometry?.coordinates?.[1]),
+    lon: Number(result?.geometry?.coordinates?.[0]),
+    street: getCandidateStreet(properties.street || properties.name || ""),
+    neighborhood: getCandidateNeighborhood(properties.district || properties.suburb || properties.locality || ""),
+    city: getCandidateCity(properties.city || properties.county || ""),
+    state: normalizeText(properties.state || ""),
+    postcode: normalizeCep(properties.postcode || ""),
+    countryCode: normalizeCompareText(properties.countrycode || ""),
+    precision: inferCandidatePrecision(properties.type || "", houseNumber),
+    houseNumber,
+    raw: result
+  };
+}
+
+function candidateMatchesAddress(candidate, address) {
+  if (!Number.isFinite(candidate.lat) || !Number.isFinite(candidate.lon)) {
+    return false;
+  }
+
+  if (candidate.countryCode && candidate.countryCode !== "br") {
+    return false;
+  }
+
+  if (candidate.state && normalizeCompareText(candidate.state) !== normalizeCompareText(address.state)) {
+    return false;
+  }
+
+  if (candidate.city && normalizeCompareText(candidate.city) !== normalizeCompareText(address.city)) {
+    return false;
+  }
+
+  if (candidate.precision === "postcode") {
+    return false;
+  }
+
+  if (!streetsLookCompatible(address.street, candidate.street)) {
+    return false;
+  }
+
+  if (candidate.postcode && candidate.postcode !== normalizeCep(address.cep)) {
+    const sameNeighborhood = candidate.neighborhood
+      && normalizeCompareText(candidate.neighborhood) === normalizeCompareText(address.neighborhood);
+
+    if (!sameNeighborhood) {
+      return false;
+    }
+  }
+
+  if (candidate.neighborhood) {
+    const sameNeighborhood = normalizeCompareText(candidate.neighborhood) === normalizeCompareText(address.neighborhood);
+    const neighborhoodMentionedInStreet = normalizeCompareText(candidate.street).includes(normalizeCompareText(address.neighborhood));
+
+    if (!sameNeighborhood && !neighborhoodMentionedInStreet) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function scoreCandidate(candidate, address) {
+  let score = 0;
+
+  if (candidateMatchesAddress(candidate, address)) {
+    score += 100;
+  }
+
+  if (candidate.precision === "exact") score += 15;
+  if (candidate.precision === "street") score += 8;
+  if (candidate.postcode === normalizeCep(address.cep)) score += 6;
+  if (candidate.neighborhood && normalizeCompareText(candidate.neighborhood) === normalizeCompareText(address.neighborhood)) score += 5;
+  if (candidate.city && normalizeCompareText(candidate.city) === normalizeCompareText(address.city)) score += 4;
+  if (candidate.state && normalizeCompareText(candidate.state) === normalizeCompareText(address.state)) score += 3;
+  if (streetsLookCompatible(candidate.street, address.street)) score += 8;
+  if (candidate.provider === "photon") score += 1;
+
+  return score;
+}
+
+function buildResolvedCoordinates(candidate) {
+  return {
+    lat: candidate.lat,
+    lon: candidate.lon,
+    precision: candidate.precision,
+    source: candidate.provider,
+    distanceBufferKm: candidate.precision === "street" ? STREET_LEVEL_DISTANCE_BUFFER_KM : 0
+  };
+}
+
+async function searchNominatim(query) {
   const searchUrl = new URL(NOMINATIM_SEARCH_URL);
   searchUrl.searchParams.set("format", "jsonv2");
   searchUrl.searchParams.set("addressdetails", "1");
   searchUrl.searchParams.set("countrycodes", "br");
-  searchUrl.searchParams.set("limit", "1");
+  searchUrl.searchParams.set("limit", String(MAX_GEOCODER_RESULTS));
   searchUrl.searchParams.set("accept-language", "pt-BR");
   searchUrl.searchParams.set("q", query);
 
@@ -415,28 +700,94 @@ async function geocodeAddress(address) {
   }
 
   const results = await response.json();
-  const firstResult = Array.isArray(results) ? results[0] : null;
+  return Array.isArray(results) ? results : [];
+}
 
-  if (!firstResult?.lat || !firstResult?.lon) {
-    throw createError(
-      "address_not_found",
-      "N\u00e3o foi poss\u00edvel localizar esse endere\u00e7o automaticamente. Revise a rua, n\u00famero e CEP.",
-      422
-    );
+async function searchPhoton(query) {
+  const searchUrl = new URL(PHOTON_SEARCH_URL);
+  searchUrl.searchParams.set("q", query);
+  searchUrl.searchParams.set("limit", String(MAX_GEOCODER_RESULTS));
+
+  const response = await fetch(searchUrl.toString(), {
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    throw createError("geocode_failed", "N\u00e3o foi poss\u00edvel validar o endere\u00e7o agora.", 502);
   }
 
-  const coordinates = {
-    lat: Number(firstResult.lat),
-    lon: Number(firstResult.lon)
-  };
+  const payload = await response.json();
+  return Array.isArray(payload?.features) ? payload.features : [];
+}
 
-  geocodeCache.set(cacheKey, coordinates);
-  return coordinates;
+async function geocodeQuery(query, address) {
+  const cacheKey = `${normalizeCompareText(query)}|${buildDeliveryAddressKey(address)}`;
+
+  if (geocodeCache.has(cacheKey)) {
+    return geocodeCache.get(cacheKey);
+  }
+
+  const providerResults = await Promise.allSettled([
+    searchNominatim(query),
+    searchPhoton(query)
+  ]);
+  const candidates = [];
+  let hadProviderError = false;
+
+  providerResults.forEach((result, index) => {
+    const provider = index === 0 ? "nominatim" : "photon";
+
+    if (result.status !== "fulfilled") {
+      hadProviderError = true;
+      return;
+    }
+
+    result.value
+      .map(item => normalizeCandidate(item, provider))
+      .filter(candidate => candidateMatchesAddress(candidate, address))
+      .forEach(candidate => candidates.push(candidate));
+  });
+
+  if (!candidates.length) {
+    if (hadProviderError) {
+      throw createError("geocode_failed", "N\u00e3o foi poss\u00edvel validar o endere\u00e7o agora.", 502);
+    }
+
+    geocodeCache.set(cacheKey, null);
+    return null;
+  }
+
+  const bestCandidate = candidates
+    .sort((left, right) => scoreCandidate(right, address) - scoreCandidate(left, address))[0];
+  const resolvedCoordinates = buildResolvedCoordinates(bestCandidate);
+
+  geocodeCache.set(cacheKey, resolvedCoordinates);
+  return resolvedCoordinates;
+}
+
+async function geocodeAddress(address) {
+  const queries = buildAddressQueries(address);
+
+  for (const query of queries) {
+    const coordinates = await geocodeQuery(query);
+    if (coordinates) {
+      return coordinates;
+    }
+  }
+
+  throw createError(
+    "address_not_found",
+    "N\u00e3o foi poss\u00edvel localizar esse endere\u00e7o automaticamente. Revise a rua, n\u00famero e CEP.",
+    422
+  );
 }
 
 async function getStoreCoordinates() {
   if (!storeCoordinatesPromise) {
-    storeCoordinatesPromise = geocodeAddress(STORE_ADDRESS);
+    storeCoordinatesPromise = Promise.resolve(STORE_COORDINATES);
   }
 
   return storeCoordinatesPromise;
@@ -512,8 +863,8 @@ async function buildDeliveryQuote(payload) {
     getStoreCoordinates(),
     geocodeAddress(officialAddress)
   ]);
-
-  const distanceKm = roundDistanceKm(await calculateRouteDistanceKm(storeCoordinates, customerCoordinates));
+  const rawDistanceKm = await calculateRouteDistanceKm(storeCoordinates, customerCoordinates);
+  const distanceKm = roundDistanceKm(rawDistanceKm + Number(customerCoordinates.distanceBufferKm || 0));
   const zone = resolveDeliveryZone(distanceKm);
 
   if (zone.value === "out_of_range") {
@@ -523,6 +874,8 @@ async function buildDeliveryQuote(payload) {
       zone: zone.value,
       zoneLabel: zone.label,
       distanceKm,
+      locationPrecision: customerCoordinates.precision,
+      geocoderSource: customerCoordinates.source,
       distanceLabel: zone.label,
       message: "Esse endere\u00e7o fica fora da rota autom\u00e1tica de entrega da Galaxy Burger. Acima de 5 km, trabalhamos apenas com retirada.",
       address: officialAddress
@@ -549,6 +902,8 @@ async function buildDeliveryQuote(payload) {
     zone: zone.value,
     zoneLabel: zone.label,
     distanceKm,
+    locationPrecision: customerCoordinates.precision,
+    geocoderSource: customerCoordinates.source,
     distanceLabel: zone.label,
     message: `Endere\u00e7o validado. Taxa confirmada em ${formatCurrency(zone.fee)} para ${zone.label.toLowerCase()}.`,
     address: officialAddress,

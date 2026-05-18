@@ -85,6 +85,8 @@ let deliveryState = {
   addressKey: "",
   expiresAt: "",
   distanceKm: 0,
+  locationPrecision: "",
+  geocoderSource: "",
   validatedAddress: null
 };
 
@@ -146,6 +148,35 @@ function formatDistanceKm(value) {
   const distance = Number(value || 0);
   if (!Number.isFinite(distance) || distance <= 0) return "";
   return `${distance.toFixed(1).replace(".", ",")} km`;
+}
+
+function formatGeocoderSourceLabel(value) {
+  const normalized = normalizeCompareText(value);
+
+  if (normalized === "photon") return "Photon";
+  if (normalized === "nominatim") return "Nominatim";
+  return "mapa";
+}
+
+function getDeliveryLocationMethodCopy({ precision = "", source = "", includeProvider = true } = {}) {
+  const normalizedPrecision = normalizeCompareText(precision);
+  const sourceLabel = includeProvider && source
+    ? ` (${formatGeocoderSourceLabel(source)})`
+    : "";
+
+  if (normalizedPrecision === "exact") {
+    return `Localiza\u00e7\u00e3o precisa: n\u00famero do endere\u00e7o confirmado${sourceLabel}.`;
+  }
+
+  if (normalizedPrecision === "street") {
+    return `Localiza\u00e7\u00e3o aproximada: ponto da rua confirmado${sourceLabel}. A taxa j\u00e1 considera margem de seguran\u00e7a.`;
+  }
+
+  if (normalizedPrecision) {
+    return `Localiza\u00e7\u00e3o validada pelo servidor${sourceLabel}.`;
+  }
+
+  return "";
 }
 
 function buildDeliveryAddressKey(values = {}) {
@@ -615,6 +646,8 @@ function validateAddressFields(showMessage = true) {
         addressKey: "",
         expiresAt: "",
         distanceKm: 0,
+        locationPrecision: "",
+        geocoderSource: "",
         validatedAddress: null
       });
     }
@@ -650,6 +683,8 @@ function clearDeliveryQuote(reasonMessage = DELIVERY_IDLE_MESSAGE) {
     addressKey: "",
     expiresAt: "",
     distanceKm: 0,
+    locationPrecision: "",
+    geocoderSource: "",
     validatedAddress: null
   });
 
@@ -775,6 +810,8 @@ async function requestDeliveryQuote({ showMessage = true, quietSuccess = false, 
     addressKey: "",
     expiresAt: "",
     distanceKm: 0,
+    locationPrecision: "",
+    geocoderSource: "",
     validatedAddress: null
   });
 
@@ -813,6 +850,8 @@ async function requestDeliveryQuote({ showMessage = true, quietSuccess = false, 
       addressKey: buildDeliveryAddressKey(validatedAddress),
       expiresAt: isOutOfRange ? "" : payload.quote?.expiresAt || "",
       distanceKm: Number(payload.distanceKm || 0),
+      locationPrecision: normalizeText(payload.locationPrecision),
+      geocoderSource: normalizeText(payload.geocoderSource),
       validatedAddress
     };
 
@@ -858,6 +897,8 @@ async function requestDeliveryQuote({ showMessage = true, quietSuccess = false, 
       addressKey: "",
       expiresAt: "",
       distanceKm: 0,
+      locationPrecision: "",
+      geocoderSource: "",
       validatedAddress: null
     });
     updateCartTotals();
@@ -957,6 +998,8 @@ async function lookupCep(isManual = false) {
       addressKey: "",
       expiresAt: "",
       distanceKm: 0,
+      locationPrecision: "",
+      geocoderSource: "",
       validatedAddress: null
     });
 
@@ -983,6 +1026,8 @@ async function handleCalculateDelivery() {
       addressKey: "",
       expiresAt: "",
       distanceKm: 0,
+      locationPrecision: "",
+      geocoderSource: "",
       validatedAddress: null
     });
     updateCartTotals();
@@ -1037,15 +1082,27 @@ function updateDeliveryUI() {
     if (isPickup) {
       fields.quoteSummary.textContent = "Retirada no balc\u00e3o, sem taxa de entrega.";
     } else if (deliveryState.status === "ready") {
+      const locationMethodCopy = getDeliveryLocationMethodCopy({
+        precision: deliveryState.locationPrecision,
+        source: deliveryState.geocoderSource
+      });
       const summaryParts = [
         "Endere\u00e7o validado pelo servidor.",
         deliveryState.distanceLabel || "",
         deliveryState.distanceKm ? `Dist\u00e2ncia estimada: ${formatDistanceKm(deliveryState.distanceKm)}.` : "",
+        locationMethodCopy,
         deliveryState.quoteCode ? `C\u00f3digo da cota\u00e7\u00e3o: ${deliveryState.quoteCode}.` : ""
       ].filter(Boolean);
       fields.quoteSummary.textContent = summaryParts.join(" ");
     } else if (deliveryState.status === "out_of_range") {
-      fields.quoteSummary.textContent = "Esse endere\u00e7o ficou fora da rota autom\u00e1tica de at\u00e9 5 km. Para seguir, escolha retirada.";
+      const locationMethodCopy = getDeliveryLocationMethodCopy({
+        precision: deliveryState.locationPrecision,
+        source: deliveryState.geocoderSource
+      });
+      fields.quoteSummary.textContent = [
+        "Esse endere\u00e7o ficou fora da rota autom\u00e1tica de at\u00e9 5 km. Para seguir, escolha retirada.",
+        locationMethodCopy
+      ].filter(Boolean).join(" ");
     } else if (deliveryState.status === "loading") {
       fields.quoteSummary.textContent = "A loja est\u00e1 validando o CEP e calculando a rota deste endere\u00e7o...";
     } else {
@@ -1071,7 +1128,12 @@ function updateDeliveryUI() {
     if (isPickup) {
       fields.totalNote.textContent = "Total final para retirada no local";
     } else if (deliveryState.status === "ready") {
-      fields.totalNote.textContent = `Taxa validada para este endere\u00e7o: ${deliveryState.distanceLabel}. Se o local mudar, a Galaxy Burger exige nova valida\u00e7\u00e3o.`;
+      const precisionNote = getDeliveryLocationMethodCopy({
+        precision: deliveryState.locationPrecision,
+        source: deliveryState.geocoderSource,
+        includeProvider: false
+      });
+      fields.totalNote.textContent = `Taxa validada para este endere\u00e7o: ${deliveryState.distanceLabel}. ${precisionNote} Se o local mudar, a Galaxy Burger exige nova valida\u00e7\u00e3o.`;
     } else if (deliveryState.status === "out_of_range") {
       fields.totalNote.textContent = "Endere\u00e7o fora da \u00e1rea de entrega. Selecione retirada para continuar.";
     } else if (deliveryState.status === "loading") {
@@ -1149,6 +1211,8 @@ function loadDeliveryData() {
         addressKey: "",
         expiresAt: "",
         distanceKm: 0,
+        locationPrecision: "",
+        geocoderSource: "",
         validatedAddress: null
       };
     }
@@ -1181,6 +1245,8 @@ function clearDeliveryData() {
     addressKey: "",
     expiresAt: "",
     distanceKm: 0,
+    locationPrecision: "",
+    geocoderSource: "",
     validatedAddress: null
   };
 }
@@ -1712,6 +1778,8 @@ function selectFulfillment(button) {
       addressKey: "",
       expiresAt: "",
       distanceKm: 0,
+      locationPrecision: "",
+      geocoderSource: "",
       validatedAddress: null
     });
   } else {
@@ -2160,6 +2228,14 @@ function getDeliveryQuoteStatusCopy(quote) {
   return "Taxa validada pelo servidor";
 }
 
+function getDeliveryQuotePrecisionCopy(quote, options = {}) {
+  return getDeliveryLocationMethodCopy({
+    precision: quote?.locationPrecision,
+    source: quote?.geocoderSource,
+    includeProvider: options.includeProvider !== false
+  });
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -2281,7 +2357,9 @@ function buildSharedOrderTicketUrl(orderDetails) {
           Number(orderDetails.deliveryQuote.distanceKm || 0),
           orderDetails.deliveryQuote.zone || "",
           orderDetails.deliveryQuote.zoneLabel || "",
-          orderDetails.deliveryQuote.addressKey || ""
+          orderDetails.deliveryQuote.addressKey || "",
+          orderDetails.deliveryQuote.locationPrecision || "",
+          orderDetails.deliveryQuote.geocoderSource || ""
         ]
       : [],
     i: Array.isArray(orderDetails.items)
@@ -2359,6 +2437,8 @@ function decodeSharedOrderTicketPayload(encodedTicket) {
           zone: normalizeText(rawQuote[4]),
           zoneLabel: normalizeText(rawQuote[5]),
           addressKey: normalizeText(rawQuote[6]),
+          locationPrecision: normalizeText(rawQuote[7]),
+          geocoderSource: normalizeText(rawQuote[8]),
           validationStatus: "loading"
         }
       : null;
@@ -2433,6 +2513,7 @@ function buildOrderTicketPreviewMarkup(orderDetails) {
           <p>${escapeHtml(`C\u00f3digo: ${orderDetails.deliveryQuote.code}`)}</p>
           ${orderDetails.deliveryQuote.zoneLabel ? `<p>${escapeHtml(orderDetails.deliveryQuote.zoneLabel)}</p>` : ""}
           ${orderDetails.deliveryQuote.distanceKm ? `<p>${escapeHtml(`Dist\u00e2ncia estimada: ${formatDistanceKm(orderDetails.deliveryQuote.distanceKm)}`)}</p>` : ""}
+          ${getDeliveryQuotePrecisionCopy(orderDetails.deliveryQuote) ? `<p>${escapeHtml(getDeliveryQuotePrecisionCopy(orderDetails.deliveryQuote))}</p>` : ""}
         </div>
       </section>
     `
@@ -2750,6 +2831,11 @@ function buildWhatsAppOrderMessage({
       "Validacao da entrega:",
       `${deliveryQuote.code}${deliveryQuote.zoneLabel ? ` | ${deliveryQuote.zoneLabel}` : ""}${deliveryQuote.distanceKm ? ` | ${formatDistanceKm(deliveryQuote.distanceKm)}` : ""}`
     );
+
+    const precisionLine = getDeliveryQuotePrecisionCopy(deliveryQuote, { includeProvider: false });
+    if (precisionLine) {
+      lines.push(precisionLine);
+    }
   }
 
   lines.push(
@@ -3293,6 +3379,8 @@ async function buildPendingOrderPreview() {
     zone: deliveryState.distanceRange,
     zoneLabel: deliveryState.distanceLabel,
     addressKey: deliveryState.addressKey,
+    locationPrecision: deliveryState.locationPrecision,
+    geocoderSource: deliveryState.geocoderSource,
     validationStatus: "verified"
   };
   const orderPreview = {
