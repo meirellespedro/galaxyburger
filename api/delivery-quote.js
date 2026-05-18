@@ -128,6 +128,7 @@ module.exports = async function handler(req, res) {
       if (!token) {
         res.status(200).json({
           ok: true,
+          status: "online",
           code: "delivery_quote_api_online",
           message: "API de entrega online. Use POST para calcular a taxa ou GET com token para validar uma cota\u00e7\u00e3o existente.",
           usage: {
@@ -161,6 +162,7 @@ module.exports = async function handler(req, res) {
 
       res.status(200).json({
         ok: true,
+        status: "verified",
         valid: true,
         quote: {
           code: quote.code,
@@ -177,6 +179,7 @@ module.exports = async function handler(req, res) {
 
     res.status(405).json({
       ok: false,
+      status: "error",
       code: "method_not_allowed",
       message: "M\u00e9todo n\u00e3o suportado."
     });
@@ -185,6 +188,7 @@ module.exports = async function handler(req, res) {
 
     res.status(statusCode).json({
       ok: false,
+      status: error.status || "error",
       code: error.code || "delivery_quote_failed",
       message: error.message || "N\u00e3o foi poss\u00edvel validar a entrega agora.",
       ...(error.officialAddress ? { officialAddress: error.officialAddress } : {}),
