@@ -60,7 +60,7 @@ const DELIVERY_QUOTE_EXPIRY_BUFFER_MS = 30 * 1000;
 const DELIVERY_IDLE_MESSAGE = "Informe o CEP, complete o endere\u00e7o e valide a entrega para calcular a taxa.";
 const CHECKOUT_LOG_PREFIX = "[Galaxy Burger checkout]";
 
-const DELIVERY_STORAGE_KEY = "galaxy_burguer_delivery_v10";
+const DELIVERY_STORAGE_KEY = "galaxy_burguer_delivery_v11";
 const LEGACY_DELIVERY_STORAGE_KEYS = [
   "galaxy_burguer_delivery",
   "galaxy_burguer_delivery_v3",
@@ -70,6 +70,7 @@ const LEGACY_DELIVERY_STORAGE_KEYS = [
   "galaxy_burguer_delivery_v7",
   "galaxy_burguer_delivery_v8",
   "galaxy_burguer_delivery_v9",
+  "galaxy_burguer_delivery_v10",
   "galaxy_burguer_store_coords_v1"
 ];
 
