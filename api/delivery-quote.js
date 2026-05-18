@@ -91,7 +91,24 @@ module.exports = async function handler(req, res) {
       const addressKey = normalizeText(req.query?.addressKey);
 
       if (!token) {
-        throw createError("missing_token", "Token de cota\u00e7\u00e3o ausente.", 400);
+        res.status(200).json({
+          ok: true,
+          code: "delivery_quote_api_online",
+          message: "API de entrega online. Use POST para calcular a taxa ou GET com token para validar uma cota\u00e7\u00e3o existente.",
+          usage: {
+            calculateQuote: {
+              method: "POST",
+              path: "/api/delivery-quote",
+              requiredFields: ["cep", "street", "number", "neighborhood", "city", "state"]
+            },
+            verifyQuote: {
+              method: "GET",
+              path: "/api/delivery-quote?token=SEU_TOKEN",
+              optionalFields: ["addressKey"]
+            }
+          }
+        });
+        return;
       }
 
       const quote = verifyQuoteToken(token);
