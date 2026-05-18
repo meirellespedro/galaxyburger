@@ -438,7 +438,8 @@ function areAddressTokensCompatible(left, right) {
     return true;
   }
 
-  const maxDistance = Math.max(left.length, right.length) >= 7 ? 1 : 0;
+  const maxTokenLength = Math.max(left.length, right.length);
+  const maxDistance = maxTokenLength >= 5 ? 1 : 0;
   return levenshteinDistanceWithin(left, right, maxDistance);
 }
 
