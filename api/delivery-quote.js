@@ -8,6 +8,7 @@ const QUOTE_TTL_MS = 15 * 60 * 1000;
 const DEFAULT_DEV_SECRET = "galaxy-burger-local-delivery-dev-secret";
 const USER_AGENT = "GalaxyBurgerDelivery/1.0 (+https://galaxyburger.vercel.app/)";
 const STREET_LEVEL_DISTANCE_BUFFER_KM = 0.35;
+const POSTCODE_LEVEL_DISTANCE_BUFFER_KM = 1.2;
 const MAX_GEOCODER_RESULTS = 5;
 const ADDRESS_STOP_WORDS = new Set([
   "rua",
@@ -694,6 +695,10 @@ function normalizeCandidate(result, provider) {
 }
 
 function candidateMatchesAddress(candidate, address) {
+  const submittedCep = normalizeCep(address.cep);
+  const sameNeighborhood = candidate.neighborhood
+    && normalizeCompareText(candidate.neighborhood) === normalizeCompareText(address.neighborhood);
+
   if (!Number.isFinite(candidate.lat) || !Number.isFinite(candidate.lon)) {
     return false;
   }
@@ -711,24 +716,28 @@ function candidateMatchesAddress(candidate, address) {
   }
 
   if (candidate.precision === "postcode") {
-    return false;
+    if (candidate.postcode !== submittedCep) {
+      return false;
+    }
+
+    if (candidate.neighborhood && !sameNeighborhood) {
+      return false;
+    }
+
+    return true;
   }
 
   if (!streetsLookCompatible(address.street, candidate.street)) {
     return false;
   }
 
-  if (candidate.postcode && candidate.postcode !== normalizeCep(address.cep)) {
-    const sameNeighborhood = candidate.neighborhood
-      && normalizeCompareText(candidate.neighborhood) === normalizeCompareText(address.neighborhood);
-
+  if (candidate.postcode && candidate.postcode !== submittedCep) {
     if (!sameNeighborhood) {
       return false;
     }
   }
 
   if (candidate.neighborhood) {
-    const sameNeighborhood = normalizeCompareText(candidate.neighborhood) === normalizeCompareText(address.neighborhood);
     const neighborhoodMentionedInStreet = normalizeCompareText(candidate.street).includes(normalizeCompareText(address.neighborhood));
 
     if (!sameNeighborhood && !neighborhoodMentionedInStreet) {
@@ -748,11 +757,12 @@ function scoreCandidate(candidate, address) {
 
   if (candidate.precision === "exact") score += 15;
   if (candidate.precision === "street") score += 8;
+  if (candidate.precision === "postcode") score += 2;
   if (candidate.postcode === normalizeCep(address.cep)) score += 6;
   if (candidate.neighborhood && normalizeCompareText(candidate.neighborhood) === normalizeCompareText(address.neighborhood)) score += 5;
   if (candidate.city && normalizeCompareText(candidate.city) === normalizeCompareText(address.city)) score += 4;
   if (candidate.state && statesLookCompatible(candidate.state, address.state)) score += 3;
-  if (streetsLookCompatible(candidate.street, address.street)) score += 8;
+  if (candidate.street && streetsLookCompatible(candidate.street, address.street)) score += 8;
   if (candidate.provider === "photon") score += 1;
 
   return score;
@@ -764,7 +774,11 @@ function buildResolvedCoordinates(candidate) {
     lon: candidate.lon,
     precision: candidate.precision,
     source: candidate.provider,
-    distanceBufferKm: candidate.precision === "street" ? STREET_LEVEL_DISTANCE_BUFFER_KM : 0
+    distanceBufferKm: candidate.precision === "street"
+      ? STREET_LEVEL_DISTANCE_BUFFER_KM
+      : candidate.precision === "postcode"
+        ? POSTCODE_LEVEL_DISTANCE_BUFFER_KM
+        : 0
   };
 }
 
@@ -948,10 +962,18 @@ async function buildDeliveryQuote(payload) {
   const officialAddress = buildOfficialAddress(submittedAddress, viaCepData);
   validateOfficialAddress(submittedAddress, officialAddress, viaCepData);
 
-  const [storeCoordinates, customerCoordinates] = await Promise.all([
-    getStoreCoordinates(),
-    geocodeAddress(officialAddress)
-  ]);
+  let customerCoordinates;
+
+  try {
+    customerCoordinates = await geocodeAddress(officialAddress);
+  } catch (error) {
+    if (error?.code === "address_not_found") {
+      error.officialAddress = officialAddress;
+    }
+    throw error;
+  }
+
+  const storeCoordinates = await getStoreCoordinates();
   const rawDistanceKm = await calculateRouteDistanceKm(storeCoordinates, customerCoordinates);
   const distanceKm = roundDistanceKm(rawDistanceKm + Number(customerCoordinates.distanceBufferKm || 0));
   const zone = resolveDeliveryZone(distanceKm);

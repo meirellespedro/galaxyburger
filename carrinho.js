@@ -172,6 +172,10 @@ function getDeliveryLocationMethodCopy({ precision = "", source = "", includePro
     return `Localiza\u00e7\u00e3o aproximada: ponto da rua confirmado${sourceLabel}. A taxa j\u00e1 considera margem de seguran\u00e7a.`;
   }
 
+  if (normalizedPrecision === "postcode") {
+    return `Localiza\u00e7\u00e3o aproximada por CEP${sourceLabel}. A taxa j\u00e1 considera uma margem de seguran\u00e7a maior.`;
+  }
+
   if (normalizedPrecision) {
     return `Localiza\u00e7\u00e3o validada pelo servidor${sourceLabel}.`;
   }
