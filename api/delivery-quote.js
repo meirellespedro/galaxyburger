@@ -24,6 +24,40 @@ const ADDRESS_STOP_WORDS = new Set([
   "alameda",
   "ladeira"
 ]);
+const BRAZILIAN_STATE_NAME_BY_CODE = Object.freeze({
+  AC: "Acre",
+  AL: "Alagoas",
+  AP: "Amapa",
+  AM: "Amazonas",
+  BA: "Bahia",
+  CE: "Ceara",
+  DF: "Distrito Federal",
+  ES: "Espirito Santo",
+  GO: "Goias",
+  MA: "Maranhao",
+  MT: "Mato Grosso",
+  MS: "Mato Grosso do Sul",
+  MG: "Minas Gerais",
+  PA: "Para",
+  PB: "Paraiba",
+  PR: "Parana",
+  PE: "Pernambuco",
+  PI: "Piaui",
+  RJ: "Rio de Janeiro",
+  RN: "Rio Grande do Norte",
+  RS: "Rio Grande do Sul",
+  RO: "Rondonia",
+  RR: "Roraima",
+  SC: "Santa Catarina",
+  SP: "Sao Paulo",
+  SE: "Sergipe",
+  TO: "Tocantins"
+});
+const BRAZILIAN_STATE_ALIAS_TO_CODE = Object.freeze(Object.entries(BRAZILIAN_STATE_NAME_BY_CODE).reduce((aliases, [code, name]) => {
+  aliases[normalizeCompareText(code)] = code;
+  aliases[normalizeCompareText(name)] = code;
+  return aliases;
+}, {}));
 
 const STORE_ADDRESS = Object.freeze({
   street: "Rua Embaixador Muniz Gordilho",
@@ -213,6 +247,34 @@ function normalizeStreetLabel(value) {
     .replace(/[.,/\\-]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function normalizeStateCode(value) {
+  const normalized = normalizeCompareText(value)
+    .replace(/[.]/g, "")
+    .trim();
+
+  return BRAZILIAN_STATE_ALIAS_TO_CODE[normalized] || normalizeText(value).toUpperCase();
+}
+
+function resolveStateDisplayName(value) {
+  const stateCode = normalizeStateCode(value);
+  return BRAZILIAN_STATE_NAME_BY_CODE[stateCode] || normalizeText(value);
+}
+
+function statesLookCompatible(left, right) {
+  if (!left || !right) {
+    return true;
+  }
+
+  const leftCode = normalizeStateCode(left);
+  const rightCode = normalizeStateCode(right);
+
+  if (leftCode && rightCode) {
+    return leftCode === rightCode;
+  }
+
+  return normalizeCompareText(left) === normalizeCompareText(right);
 }
 
 function normalizeCep(value) {
@@ -506,7 +568,7 @@ function validateOfficialAddress(submittedAddress, officialAddress, viaCepData) 
     );
   }
 
-  if (viaCepData.uf && normalizeText(submittedAddress.state).toUpperCase() !== normalizeText(viaCepData.uf).toUpperCase()) {
+  if (viaCepData.uf && !statesLookCompatible(submittedAddress.state, viaCepData.uf)) {
     throw createError(
       "cep_state_mismatch",
       "O CEP informado n\u00e3o corresponde ao estado digitado.",
@@ -534,21 +596,31 @@ function dedupeAddressQueries(queries) {
 }
 
 function buildAddressQueries(address) {
+  const stateVariants = dedupeAddressQueries([
+    normalizeText(address.state).toUpperCase(),
+    resolveStateDisplayName(address.state)
+  ]);
   const streetNumber = [address.street, address.number].filter(Boolean).join(", ");
   const streetOnly = normalizeText(address.street);
   const cep = formatCep(address.cep);
-  const cityState = [address.city, address.state].filter(Boolean).join(", ");
+  const queries = [];
 
-  return dedupeAddressQueries([
-    [streetNumber, address.neighborhood, address.city, address.state, cep, "Brasil"].filter(Boolean).join(", "),
-    [streetNumber, address.city, address.state, cep, "Brasil"].filter(Boolean).join(", "),
-    [streetOnly, address.neighborhood, address.city, address.state, cep, "Brasil"].filter(Boolean).join(", "),
-    [streetOnly, address.city, address.state, cep, "Brasil"].filter(Boolean).join(", "),
-    [streetOnly, address.neighborhood, address.city, address.state, "Brasil"].filter(Boolean).join(", "),
-    [streetOnly, address.city, address.state, "Brasil"].filter(Boolean).join(", "),
-    [cep, address.neighborhood, address.city, address.state, "Brasil"].filter(Boolean).join(", "),
-    [cep, cityState, "Brasil"].filter(Boolean).join(", ")
-  ]);
+  stateVariants.forEach(stateVariant => {
+    const cityState = [address.city, stateVariant].filter(Boolean).join(", ");
+
+    queries.push(
+      [streetNumber, address.neighborhood, address.city, stateVariant, cep, "Brasil"].filter(Boolean).join(", "),
+      [streetNumber, address.city, stateVariant, cep, "Brasil"].filter(Boolean).join(", "),
+      [streetOnly, address.neighborhood, address.city, stateVariant, cep, "Brasil"].filter(Boolean).join(", "),
+      [streetOnly, address.city, stateVariant, cep, "Brasil"].filter(Boolean).join(", "),
+      [streetOnly, address.neighborhood, address.city, stateVariant, "Brasil"].filter(Boolean).join(", "),
+      [streetOnly, address.city, stateVariant, "Brasil"].filter(Boolean).join(", "),
+      [cep, address.neighborhood, address.city, stateVariant, "Brasil"].filter(Boolean).join(", "),
+      [cep, cityState, "Brasil"].filter(Boolean).join(", ")
+    );
+  });
+
+  return dedupeAddressQueries(queries);
 }
 
 function getCandidateCity(value) {
@@ -630,7 +702,7 @@ function candidateMatchesAddress(candidate, address) {
     return false;
   }
 
-  if (candidate.state && normalizeCompareText(candidate.state) !== normalizeCompareText(address.state)) {
+  if (candidate.state && !statesLookCompatible(candidate.state, address.state)) {
     return false;
   }
 
@@ -679,7 +751,7 @@ function scoreCandidate(candidate, address) {
   if (candidate.postcode === normalizeCep(address.cep)) score += 6;
   if (candidate.neighborhood && normalizeCompareText(candidate.neighborhood) === normalizeCompareText(address.neighborhood)) score += 5;
   if (candidate.city && normalizeCompareText(candidate.city) === normalizeCompareText(address.city)) score += 4;
-  if (candidate.state && normalizeCompareText(candidate.state) === normalizeCompareText(address.state)) score += 3;
+  if (candidate.state && statesLookCompatible(candidate.state, address.state)) score += 3;
   if (streetsLookCompatible(candidate.street, address.street)) score += 8;
   if (candidate.provider === "photon") score += 1;
 
@@ -922,7 +994,7 @@ async function buildDeliveryQuote(payload) {
     locationPrecision: customerCoordinates.precision,
     geocoderSource: customerCoordinates.source,
     distanceLabel: zone.label,
-    message: `Endere\u00e7o validado. Taxa confirmada em ${formatCurrency(zone.fee)} para ${zone.label.toLowerCase()}.`,
+    message: `Endere\u00e7o validado. Taxa confirmada em ${formatCurrency(zone.fee)} na faixa ${zone.label}.`,
     address: officialAddress,
     quote: {
       token: createQuoteToken(quotePayload),
