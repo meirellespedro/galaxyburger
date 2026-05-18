@@ -1,16 +1,17 @@
 # Galaxy Burger
 
-Site estatico com checkout via WhatsApp e taxa de entrega manual por regiao.
+Site estatico com checkout via WhatsApp e taxa de entrega validada por uma funcao serverless da Vercel.
 
 ## Checkout atual
 
-- `Entrega`: endereco preenchido manualmente no checkout.
-- `CEP`: opcional, usado apenas para autocomplete simples via ViaCEP.
-- `Taxa por regiao`:
-  - `Campo Grande`: `R$ 5,00`
-  - `Outros bairros atendidos ate 5 km`: `R$ 10,00`
+- `Entrega`: endereco preenchido no checkout e validado automaticamente pela API `/api/delivery-quote`.
+- `CEP`: obrigatorio para validar a entrega.
+- `Taxa por distancia`:
+  - `Ate 3 km da base`: `R$ 5,00`
+  - `De 3 km ate 5 km da base`: `R$ 10,00`
   - `Acima de 5 km`: entrega indisponivel
 - `Retirada`: sem taxa.
+- `Seguranca`: a taxa nao e mais escolhida no navegador; o servidor valida CEP, rua e distancia antes de liberar o pedido.
 
 ## Arquivos principais
 
@@ -22,6 +23,13 @@ Site estatico com checkout via WhatsApp e taxa de entrega manual por regiao.
 
 - WhatsApp da loja: `STORE_WHATSAPP` em [carrinho.js](/c:/Users/pmeir/Desktop/hamburgeria/carrinho.js:4)
 - Chave Pix: `PIX_KEY` em [carrinho.js](/c:/Users/pmeir/Desktop/hamburgeria/carrinho.js:3)
+
+## Configuracao obrigatoria
+
+- Na Vercel, configure a env var `DELIVERY_QUOTE_SECRET` com uma chave forte e privada.
+- Sem essa env var em qualquer deploy publicado da Vercel, a validacao automatica da entrega nao libera pedidos.
+- Depois de subir alteracoes em `api/delivery-quote.js`, faca um novo deploy da Vercel. Sem esse deploy, `/api/delivery-quote` continua respondendo `404`.
+- Se abrir o `index.html` direto no navegador ou por um servidor estatico simples, a validacao so funciona se o checkout apontar para um deploy publicado com a API ativa.
 
 ## Publicacao
 

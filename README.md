@@ -1,6 +1,6 @@
 # Galaxy Burger
 
-Site estatico em HTML, CSS e JavaScript para a Galaxy Burger, pronto para deploy automatico na Vercel.
+Site em HTML, CSS e JavaScript para a Galaxy Burger, com checkout via WhatsApp e validacao serverless de taxa de entrega na Vercel.
 
 ## Stack
 
@@ -8,6 +8,7 @@ Site estatico em HTML, CSS e JavaScript para a Galaxy Burger, pronto para deploy
 - CSS
 - JavaScript vanilla
 - Deploy: Vercel
+- API serverless: `api/delivery-quote.js`
 
 ## Estrutura
 
@@ -25,6 +26,10 @@ Este projeto nao precisa de build step.
 - Root directory: `.`
 - Build command: vazio
 - Output directory: `.`
+
+## Variaveis de ambiente
+
+- `DELIVERY_QUOTE_SECRET`: obrigatoria em qualquer deploy publicado da Vercel para assinar e verificar as cotacoes de entrega.
 
 ## Fluxo profissional recomendado
 

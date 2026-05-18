@@ -832,7 +832,7 @@
           <button class="fulfillment-btn selected" type="button" data-fulfillment="delivery" onclick="selectFulfillment(this)">Entrega</button>
           <button class="fulfillment-btn" type="button" data-fulfillment="pickup" onclick="selectFulfillment(this)">Retirada</button>
         </div>
-        <p class="field-helper" id="fulfillment-helper">Entrega com taxa estimada em Campo Grande e bairros atendidos em at&eacute; 5 km da base, ou retirada direta no balc&atilde;o da Galaxy.</p>
+        <p class="field-helper" id="fulfillment-helper">Entrega com taxa validada automaticamente pelo endere&ccedil;o, ou retirada direta no balc&atilde;o da Galaxy.</p>
 
         <label class="field-label" for="customer-name">Seu nome</label>
         <input id="customer-name" type="text" placeholder="Ex: Beatriz" autocomplete="name">
@@ -842,7 +842,7 @@
 
         <div id="delivery-address-group">
           <div class="address-field address-field-full">
-            <p class="field-helper delivery-manual-helper" id="delivery-manual-helper">Preencha seu endere&ccedil;o manualmente. Se quiser, voc&ecirc; ainda pode usar o CEP para agilizar rua, bairro, cidade e estado.</p>
+            <p class="field-helper delivery-manual-helper" id="delivery-manual-helper">Informe um CEP real e complete o endere&ccedil;o. A taxa de entrega &eacute; calculada automaticamente pela loja a partir desse endere&ccedil;o validado.</p>
           </div>
 
           <div class="address-grid address-grid-main">
@@ -899,27 +899,22 @@
           <input id="customer-address" type="hidden" value="">
 
           <div class="delivery-fee-panel" id="delivery-fee-panel" aria-live="polite">
-            <span class="field-label delivery-fee-title">Taxa estimada de entrega</span>
+            <span class="field-label delivery-fee-title">Taxa validada de entrega</span>
             <p class="field-helper delivery-range-store">Origem: Rua Embaixador Muniz Gordilho, 199 - Campo Grande/RJ</p>
-            <label class="field-label" for="delivery-distance-range">Selecione a faixa estimada do seu endere&ccedil;o</label>
-            <select id="delivery-distance-range" class="delivery-distance-select">
-              <option value="">Selecione uma faixa estimada</option>
-              <option value="campo_grande">Campo Grande - estimativa R$ 5,00</option>
-              <option value="nearby_area">Outros bairros atendidos at&eacute; 5 km - estimativa R$ 10,00</option>
-              <option value="outside_area">Fora da &aacute;rea de entrega - apenas retirada</option>
-            </select>
-            <ul class="delivery-policy-list" aria-label="Pol&iacute;tica tempor&aacute;ria de entrega">
-              <li>Campo Grande: estimativa de R$ 5,00</li>
-              <li>Demais bairros atendidos at&eacute; 5 km: estimativa de R$ 10,00</li>
+            <input id="delivery-distance-range" type="hidden" value="">
+            <div id="delivery-quote-summary" class="delivery-quote-summary">Informe o CEP, complete o endere&ccedil;o e valide a entrega para calcular a taxa.</div>
+            <ul class="delivery-policy-list" aria-label="Pol&iacute;tica autom&aacute;tica de entrega">
+              <li>At&eacute; 3 km da base: R$ 5,00</li>
+              <li>De 3 km at&eacute; 5 km da base: R$ 10,00</li>
               <li>Acima de 5 km: entrega indispon&iacute;vel e retirada recomendada</li>
             </ul>
-            <p class="field-helper delivery-range-hint">A taxa exibida &eacute; uma estimativa operacional. A Galaxy Burger valida o endere&ccedil;o completo antes do preparo e pode ajustar a taxa ou recusar a entrega se o local estiver fora da &aacute;rea atendida.</p>
+            <p class="field-helper delivery-range-hint">A taxa n&atilde;o &eacute; escolhida pelo cliente. A Galaxy Burger valida o CEP, confere o endere&ccedil;o e calcula a entrega automaticamente antes do envio do pedido.</p>
             <label class="delivery-estimate-terms" id="delivery-estimate-terms">
               <input id="delivery-estimate-ack" type="checkbox">
-              <span>Entendo que a taxa mostrada &eacute; estimada e que o pedido ser&aacute; enviado para a hamburgueria, sujeito &agrave; confirma&ccedil;&atilde;o final da loja pelo WhatsApp.</span>
+              <span>Entendo que o pedido s&oacute; pode seguir com a taxa validada para este endere&ccedil;o e que qualquer mudan&ccedil;a no local exige nova valida&ccedil;&atilde;o.</span>
             </label>
-            <p class="field-helper" id="delivery-fee-feedback">Preencha o endere&ccedil;o, selecione a faixa estimada e confirme a taxa para atualizar o total.</p>
-            <button id="calculate-delivery-btn" class="btn-primary calculate-delivery-btn" type="button">Confirmar taxa estimada</button>
+            <p class="field-helper" id="delivery-fee-feedback">Preencha o endere&ccedil;o e valide a entrega para atualizar o total.</p>
+            <button id="calculate-delivery-btn" class="btn-primary calculate-delivery-btn" type="button">Validar endere&ccedil;o e calcular taxa</button>
           </div>
         </div>
 
@@ -1009,7 +1004,7 @@
           <div class="cart-total-copy">
             <span>Subtotal dos produtos</span>
             <strong id="modal-cart-subtotal">R$ 0,00</strong>
-            <span class="delivery-fee-line" id="modal-delivery-fee-line">Entrega estimada: R$ 0,00</span>
+            <span class="delivery-fee-line" id="modal-delivery-fee-line">Entrega validada: R$ 0,00</span>
           </div>
           <div class="cart-total-highlight">
             <span id="modal-cart-total-label">Total estimado do pedido</span>

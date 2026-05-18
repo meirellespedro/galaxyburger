@@ -2197,6 +2197,16 @@ body.ticket-view-active .order-ticket-modal-content {
   margin-bottom: 12px;
 }
 
+.delivery-quote-summary {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  color: var(--text);
+  line-height: 1.5;
+}
+
 .delivery-policy-list {
   margin: 12px 0 0;
   padding-left: 18px;
