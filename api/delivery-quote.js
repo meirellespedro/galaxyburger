@@ -789,7 +789,7 @@ async function geocodeAddress(address) {
   const queries = buildAddressQueries(address);
 
   for (const query of queries) {
-    const coordinates = await geocodeQuery(query);
+    const coordinates = await geocodeQuery(query, address);
     if (coordinates) {
       return coordinates;
     }
