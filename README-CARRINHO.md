@@ -27,7 +27,8 @@ Site estatico com checkout via WhatsApp e taxa de entrega validada por uma funca
 ## Configuracao obrigatoria
 
 - Na Vercel, configure a env var `DELIVERY_QUOTE_SECRET` com uma chave forte e privada.
-- Sem essa env var em qualquer deploy publicado da Vercel, a validacao automatica da entrega nao libera pedidos.
+- Na Vercel, configure a env var `GOOGLE_MAPS_API_KEY` com uma chave de servidor do Google Maps com acesso a `Geocoding API` e `Routes API`.
+- Sem essas env vars em qualquer deploy publicado da Vercel, a validacao automatica da entrega nao libera pedidos.
 - Depois de subir alteracoes em `api/delivery-quote.js`, faca um novo deploy da Vercel. Sem esse deploy, `/api/delivery-quote` continua respondendo `404`.
 - Se abrir o `index.html` direto no navegador ou por um servidor estatico simples, a validacao so funciona se o checkout apontar para um deploy publicado com a API ativa.
 

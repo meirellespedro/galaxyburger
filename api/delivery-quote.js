@@ -1,15 +1,14 @@
 const { createHmac, timingSafeEqual } = require("crypto");
 
 const VIA_CEP_BASE_URL = "https://viacep.com.br/ws";
-const NOMINATIM_SEARCH_URL = "https://nominatim.openstreetmap.org/search";
-const PHOTON_SEARCH_URL = "https://photon.komoot.io/api/";
-const OSRM_ROUTE_URL = "https://router.project-osrm.org/route/v1/driving";
+const GOOGLE_GEOCODING_URL = "https://maps.googleapis.com/maps/api/geocode/json";
+const GOOGLE_ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes";
+const REQUEST_TIMEOUT_MS = 12000;
 const QUOTE_TTL_MS = 15 * 60 * 1000;
 const DEFAULT_DEV_SECRET = "galaxy-burger-local-delivery-dev-secret";
-const USER_AGENT = "GalaxyBurgerDelivery/1.0 (+https://galaxyburger.vercel.app/)";
-const STREET_LEVEL_DISTANCE_BUFFER_KM = 0.35;
-const POSTCODE_LEVEL_DISTANCE_BUFFER_KM = 1.2;
-const MAX_GEOCODER_RESULTS = 5;
+const USER_AGENT = "GalaxyBurgerDelivery/2.0 (+https://galaxyburger.vercel.app/)";
+const MAPS_LANGUAGE = "pt-BR";
+const MAPS_REGION = "br";
 const ADDRESS_STOP_WORDS = new Set([
   "rua",
   "r",
@@ -20,10 +19,17 @@ const ADDRESS_STOP_WORDS = new Set([
   "estrada",
   "estr",
   "rodovia",
-  "praça",
+  "praca",
   "praca",
   "alameda",
   "ladeira"
+]);
+const INVALID_HOUSE_NUMBER_VALUES = new Set([
+  "s/n",
+  "sn",
+  "sem numero",
+  "sem numero.",
+  "sem numero,"
 ]);
 const BRAZILIAN_STATE_NAME_BY_CODE = Object.freeze({
   AC: "Acre",
@@ -69,16 +75,10 @@ const STORE_ADDRESS = Object.freeze({
   cep: "23070010",
   country: "Brasil"
 });
-// A base da loja fica fixa para não depender da divergência entre o CEP oficial
-// e a grafia da rua indexada pelos provedores de mapa externos.
-const STORE_COORDINATES = Object.freeze({
+const STORE_LOCATION = Object.freeze({
   lat: -22.9024174,
-  lon: -43.5777858,
-  precision: "street",
-  source: "fixed_store_coordinates",
-  distanceBufferKm: 0
+  lng: -43.5777858
 });
-
 const DELIVERY_ZONES = Object.freeze([
   Object.freeze({
     value: "local",
@@ -95,7 +95,7 @@ const DELIVERY_ZONES = Object.freeze([
 ]);
 
 const geocodeCache = new Map();
-let storeCoordinatesPromise = null;
+const routeCache = new Map();
 
 module.exports = async function handler(req, res) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -170,6 +170,9 @@ module.exports = async function handler(req, res) {
           zone: quote.zone,
           zoneLabel: quote.zoneLabel,
           distanceKm: quote.distanceKm,
+          routeDistanceKm: quote.routeDistanceKm,
+          locationPrecision: quote.locationPrecision,
+          geocoderSource: quote.geocoderSource,
           addressKey: quote.addressKey,
           expiresAt: new Date(Number(quote.expiresAt || 0)).toISOString()
         }
@@ -191,8 +194,7 @@ module.exports = async function handler(req, res) {
       status: error.status || "error",
       code: error.code || "delivery_quote_failed",
       message: error.message || "N\u00e3o foi poss\u00edvel validar a entrega agora.",
-      ...(error.officialAddress ? { officialAddress: error.officialAddress } : {}),
-      ...(error.status ? { status: error.status } : {})
+      ...(error.officialAddress ? { officialAddress: error.officialAddress } : {})
     });
   }
 };
@@ -299,6 +301,10 @@ function formatCurrency(value) {
   });
 }
 
+function roundDistanceKm(value) {
+  return Math.round(Number(value || 0) * 10) / 10;
+}
+
 function buildDeliveryAddressKey(values = {}) {
   return [
     normalizeCep(values.cep),
@@ -327,6 +333,23 @@ function getQuoteSecret() {
   }
 
   return DEFAULT_DEV_SECRET;
+}
+
+function getMapsApiKey() {
+  const apiKey = normalizeText(
+    process.env.GOOGLE_MAPS_API_KEY
+    || process.env.GOOGLE_MAPS_SERVER_API_KEY
+  );
+
+  if (!apiKey) {
+    throw createError(
+      "missing_maps_api_key",
+      "A integra\u00e7\u00e3o de mapas da entrega n\u00e3o foi configurada corretamente no servidor.",
+      500
+    );
+  }
+
+  return apiKey;
 }
 
 function encodeBase64Url(value) {
@@ -392,30 +415,30 @@ function verifyQuoteToken(token) {
   }
 }
 
-function streetsLookCompatible(submittedStreet, officialStreet) {
-  const submitted = normalizeStreetLabel(submittedStreet);
-  const official = normalizeStreetLabel(officialStreet);
+function streetsLookCompatible(left, right) {
+  const normalizedLeft = normalizeStreetLabel(left);
+  const normalizedRight = normalizeStreetLabel(right);
 
-  if (!submitted || !official) {
+  if (!normalizedLeft || !normalizedRight) {
     return true;
   }
 
-  if (submitted.includes(official) || official.includes(submitted)) {
+  if (normalizedLeft.includes(normalizedRight) || normalizedRight.includes(normalizedLeft)) {
     return true;
   }
 
-  const submittedTokens = tokenizeComparableAddressText(submitted);
-  const officialTokens = tokenizeComparableAddressText(official);
+  const leftTokens = tokenizeComparableAddressText(normalizedLeft);
+  const rightTokens = tokenizeComparableAddressText(normalizedRight);
 
-  if (!submittedTokens.length || !officialTokens.length) {
+  if (!leftTokens.length || !rightTokens.length) {
     return false;
   }
 
-  const matchedTokens = submittedTokens.filter(submittedToken =>
-    officialTokens.some(officialToken => areAddressTokensCompatible(submittedToken, officialToken))
+  const matchedTokens = leftTokens.filter(leftToken =>
+    rightTokens.some(rightToken => areAddressTokensCompatible(leftToken, rightToken))
   );
 
-  return matchedTokens.length / submittedTokens.length >= 0.75;
+  return matchedTokens.length / leftTokens.length >= 0.75;
 }
 
 function tokenizeComparableAddressText(value) {
@@ -481,6 +504,24 @@ function levenshteinDistanceWithin(left, right, maxDistance) {
   return previousRow[right.length] <= maxDistance;
 }
 
+function numbersLookCompatible(left, right) {
+  const normalizedLeft = normalizeCompareText(left).replace(/\s+/g, "");
+  const normalizedRight = normalizeCompareText(right).replace(/\s+/g, "");
+
+  if (!normalizedLeft || !normalizedRight) {
+    return false;
+  }
+
+  if (normalizedLeft === normalizedRight) {
+    return true;
+  }
+
+  const leftDigits = normalizedLeft.replace(/\D/g, "");
+  const rightDigits = normalizedRight.replace(/\D/g, "");
+
+  return Boolean(leftDigits) && leftDigits === rightDigits;
+}
+
 function sanitizeSubmittedAddress(payload = {}) {
   return {
     cep: normalizeCep(payload.cep),
@@ -499,24 +540,52 @@ function assertSubmittedAddress(address) {
 
   const requiredFields = [
     ["street", "Informe a rua."],
-    ["number", "Informe o n\u00famero."],
+    ["number", "Informe o n\u00famero da resid\u00eancia."],
     ["neighborhood", "Informe o bairro."],
     ["city", "Informe a cidade."],
     ["state", "Informe o estado."]
   ];
-
   const missing = requiredFields.find(([field]) => !address[field]);
+
   if (missing) {
     throw createError("missing_address_field", missing[1], 422);
+  }
+
+  if (INVALID_HOUSE_NUMBER_VALUES.has(normalizeCompareText(address.number))) {
+    throw createError("invalid_house_number", "Informe o n\u00famero da resid\u00eancia para calcular a entrega.", 422);
+  }
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMessage = "A consulta externa demorou mais do que o esperado.") {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw createError("maps_timeout", timeoutMessage, 504);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
 async function fetchViaCepData(cep) {
-  const response = await fetch(`${VIA_CEP_BASE_URL}/${normalizeCep(cep)}/json/`, {
-    headers: {
-      "User-Agent": USER_AGENT
-    }
-  });
+  const response = await fetchWithTimeout(
+    `${VIA_CEP_BASE_URL}/${normalizeCep(cep)}/json/`,
+    {
+      headers: {
+        "User-Agent": USER_AGENT
+      }
+    },
+    "A valida\u00e7\u00e3o do CEP demorou mais do que o esperado."
+  );
 
   if (!response.ok) {
     throw createError("via_cep_failed", "N\u00e3o foi poss\u00edvel validar o CEP agora.", 502);
@@ -601,110 +670,182 @@ function dedupeAddressQueries(queries) {
   return uniqueQueries;
 }
 
-function buildAddressQueries(address) {
+function buildGoogleGeocodeQueries(address) {
   const stateVariants = dedupeAddressQueries([
     normalizeText(address.state).toUpperCase(),
     resolveStateDisplayName(address.state)
   ]);
   const streetNumber = [address.street, address.number].filter(Boolean).join(", ");
-  const streetOnly = normalizeText(address.street);
   const cep = formatCep(address.cep);
   const queries = [];
 
   stateVariants.forEach(stateVariant => {
-    const cityState = [address.city, stateVariant].filter(Boolean).join(", ");
-
     queries.push(
       [streetNumber, address.neighborhood, address.city, stateVariant, cep, "Brasil"].filter(Boolean).join(", "),
       [streetNumber, address.city, stateVariant, cep, "Brasil"].filter(Boolean).join(", "),
-      [streetOnly, address.neighborhood, address.city, stateVariant, cep, "Brasil"].filter(Boolean).join(", "),
-      [streetOnly, address.city, stateVariant, cep, "Brasil"].filter(Boolean).join(", "),
-      [streetOnly, address.neighborhood, address.city, stateVariant, "Brasil"].filter(Boolean).join(", "),
-      [streetOnly, address.city, stateVariant, "Brasil"].filter(Boolean).join(", "),
-      [cep, address.neighborhood, address.city, stateVariant, "Brasil"].filter(Boolean).join(", "),
-      [cep, cityState, "Brasil"].filter(Boolean).join(", ")
+      [streetNumber, address.neighborhood, address.city, stateVariant, "Brasil"].filter(Boolean).join(", "),
+      [streetNumber, address.city, stateVariant, "Brasil"].filter(Boolean).join(", ")
     );
   });
 
   return dedupeAddressQueries(queries);
 }
 
-function getCandidateCity(value) {
-  return normalizeText(value);
+function buildGoogleGeocodeUrl(query, address) {
+  const url = new URL(GOOGLE_GEOCODING_URL);
+  url.searchParams.set("address", query);
+  url.searchParams.set("key", getMapsApiKey());
+  url.searchParams.set("language", MAPS_LANGUAGE);
+  url.searchParams.set("region", MAPS_REGION);
+  url.searchParams.set(
+    "components",
+    [
+      "country:BR",
+      address.cep ? `postal_code:${formatCep(address.cep)}` : "",
+      address.city ? `locality:${address.city}` : "",
+      address.state ? `administrative_area:${normalizeStateCode(address.state)}` : ""
+    ].filter(Boolean).join("|")
+  );
+  return url.toString();
 }
 
-function getCandidateNeighborhood(value) {
-  return normalizeText(value);
+function mapGoogleGeocodeStatus(status, errorMessage = "") {
+  if (status === "OK") {
+    return;
+  }
+
+  if (status === "ZERO_RESULTS") {
+    return;
+  }
+
+  if (status === "OVER_DAILY_LIMIT" || status === "REQUEST_DENIED") {
+    throw createError(
+      "maps_configuration_error",
+      "A integra\u00e7\u00e3o de mapas da entrega n\u00e3o foi configurada corretamente no servidor.",
+      500,
+      { providerMessage: errorMessage }
+    );
+  }
+
+  if (status === "OVER_QUERY_LIMIT") {
+    throw createError(
+      "maps_rate_limited",
+      "O servi\u00e7o de mapas atingiu o limite tempor\u00e1rio de consultas. Tente novamente em instantes.",
+      503,
+      { providerMessage: errorMessage }
+    );
+  }
+
+  throw createError(
+    "geocode_failed",
+    "N\u00e3o foi poss\u00edvel validar esse endere\u00e7o agora.",
+    502,
+    { providerMessage: errorMessage, providerStatus: status }
+  );
 }
 
-function getCandidateStreet(value) {
-  return normalizeText(value);
+async function searchGoogleGeocode(query, address) {
+  const response = await fetchWithTimeout(
+    buildGoogleGeocodeUrl(query, address),
+    {
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept: "application/json"
+      }
+    },
+    "A localiza\u00e7\u00e3o do endere\u00e7o demorou mais do que o esperado."
+  );
+
+  let payload = null;
+
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    throw createError(
+      "geocode_failed",
+      "N\u00e3o foi poss\u00edvel validar esse endere\u00e7o agora.",
+      502,
+      { providerStatus: payload?.status, providerMessage: payload?.error_message }
+    );
+  }
+
+  mapGoogleGeocodeStatus(payload?.status, payload?.error_message || "");
+  return Array.isArray(payload?.results) ? payload.results : [];
 }
 
-function inferCandidatePrecision(rawType, houseNumber = "") {
-  const type = normalizeCompareText(rawType);
+function findAddressComponent(components, types) {
+  return components.find(component => types.every(type => component.types?.includes(type))) || null;
+}
 
-  if (houseNumber || type === "house" || type === "building") {
+function findAddressComponentText(components, typeGroups, field = "long_name") {
+  for (const types of typeGroups) {
+    const match = findAddressComponent(components, types);
+    const value = normalizeText(match?.[field]);
+    if (value) {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+function normalizeGoogleCandidate(result) {
+  const components = Array.isArray(result?.address_components) ? result.address_components : [];
+  const location = result?.geometry?.location || {};
+  const city = findAddressComponentText(components, [
+    ["locality"],
+    ["administrative_area_level_2"]
+  ]);
+
+  return {
+    lat: Number(location.lat),
+    lng: Number(location.lng),
+    formattedAddress: normalizeText(result?.formatted_address),
+    placeId: normalizeText(result?.place_id),
+    partialMatch: Boolean(result?.partial_match),
+    locationType: normalizeText(result?.geometry?.location_type),
+    streetNumber: findAddressComponentText(components, [["street_number"]]),
+    route: findAddressComponentText(components, [["route"]]),
+    neighborhood: findAddressComponentText(components, [
+      ["sublocality_level_1", "sublocality", "political"],
+      ["sublocality", "political"],
+      ["neighborhood", "political"]
+    ]),
+    city,
+    state: findAddressComponentText(components, [["administrative_area_level_1"]], "short_name"),
+    postcode: normalizeCep(findAddressComponentText(components, [["postal_code"]])),
+    countryCode: normalizeCompareText(findAddressComponentText(components, [["country"]], "short_name"))
+  };
+}
+
+function resolveCandidatePrecision(candidate) {
+  const locationType = normalizeCompareText(candidate.locationType);
+
+  if (candidate.streetNumber && (locationType === "rooftop" || locationType === "range_interpolated")) {
     return "exact";
   }
 
-  if (type === "street" || type === "road" || type === "residential") {
+  if (locationType === "geometric_center") {
     return "street";
   }
 
-  if (type === "postcode" || type === "postal_code" || type === "other") {
-    return "postcode";
+  if (locationType === "approximate") {
+    return "approximate";
+  }
+
+  if (candidate.streetNumber) {
+    return "exact";
   }
 
   return "street";
 }
 
-function normalizeCandidate(result, provider) {
-  if (provider === "nominatim") {
-    const address = result?.address || {};
-    const houseNumber = normalizeText(address.house_number || "");
-
-    return {
-      provider,
-      lat: Number(result?.lat),
-      lon: Number(result?.lon),
-      street: getCandidateStreet(address.road || address.pedestrian || address.footway || address.cycleway || address.path || result?.name || ""),
-      neighborhood: getCandidateNeighborhood(address.suburb || address.neighbourhood || address.neighborhood || address.city_district || address.quarter || ""),
-      city: getCandidateCity(address.city || address.town || address.village || address.municipality || address.county || ""),
-      state: normalizeText(address.state || address.region || ""),
-      postcode: normalizeCep(address.postcode || ""),
-      countryCode: normalizeCompareText(address.country_code || ""),
-      precision: inferCandidatePrecision(result?.addresstype || result?.type || "", houseNumber),
-      houseNumber,
-      raw: result
-    };
-  }
-
-  const properties = result?.properties || {};
-  const houseNumber = normalizeText(properties.housenumber || "");
-
-  return {
-    provider,
-    lat: Number(result?.geometry?.coordinates?.[1]),
-    lon: Number(result?.geometry?.coordinates?.[0]),
-    street: getCandidateStreet(properties.street || properties.name || ""),
-    neighborhood: getCandidateNeighborhood(properties.district || properties.suburb || properties.locality || ""),
-    city: getCandidateCity(properties.city || properties.county || ""),
-    state: normalizeText(properties.state || ""),
-    postcode: normalizeCep(properties.postcode || ""),
-    countryCode: normalizeCompareText(properties.countrycode || ""),
-    precision: inferCandidatePrecision(properties.type || "", houseNumber),
-    houseNumber,
-    raw: result
-  };
-}
-
 function candidateMatchesAddress(candidate, address) {
-  const submittedCep = normalizeCep(address.cep);
-  const sameNeighborhood = candidate.neighborhood
-    && normalizeCompareText(candidate.neighborhood) === normalizeCompareText(address.neighborhood);
-
-  if (!Number.isFinite(candidate.lat) || !Number.isFinite(candidate.lon)) {
+  if (!Number.isFinite(candidate.lat) || !Number.isFinite(candidate.lng)) {
     return false;
   }
 
@@ -720,34 +861,16 @@ function candidateMatchesAddress(candidate, address) {
     return false;
   }
 
-  if (candidate.precision === "postcode") {
-    if (candidate.postcode !== submittedCep) {
-      return false;
-    }
-
-    if (candidate.neighborhood && !sameNeighborhood) {
-      return false;
-    }
-
-    return true;
-  }
-
-  if (!streetsLookCompatible(address.street, candidate.street)) {
+  if (candidate.postcode && candidate.postcode !== normalizeCep(address.cep)) {
     return false;
   }
 
-  if (candidate.postcode && candidate.postcode !== submittedCep) {
-    if (!sameNeighborhood) {
-      return false;
-    }
+  if (!streetsLookCompatible(address.street, candidate.route)) {
+    return false;
   }
 
-  if (candidate.neighborhood) {
-    const neighborhoodMentionedInStreet = normalizeCompareText(candidate.street).includes(normalizeCompareText(address.neighborhood));
-
-    if (!sameNeighborhood && !neighborhoodMentionedInStreet) {
-      return false;
-    }
+  if (candidate.streetNumber && !numbersLookCompatible(address.number, candidate.streetNumber)) {
+    return false;
   }
 
   return true;
@@ -760,190 +883,158 @@ function scoreCandidate(candidate, address) {
     score += 100;
   }
 
-  if (candidate.precision === "exact") score += 15;
-  if (candidate.precision === "street") score += 8;
-  if (candidate.precision === "postcode") score += 2;
-  if (candidate.postcode === normalizeCep(address.cep)) score += 6;
-  if (candidate.neighborhood && normalizeCompareText(candidate.neighborhood) === normalizeCompareText(address.neighborhood)) score += 5;
-  if (candidate.city && normalizeCompareText(candidate.city) === normalizeCompareText(address.city)) score += 4;
-  if (candidate.state && statesLookCompatible(candidate.state, address.state)) score += 3;
-  if (candidate.street && streetsLookCompatible(candidate.street, address.street)) score += 8;
-  if (candidate.provider === "photon") score += 1;
+  const precision = resolveCandidatePrecision(candidate);
+
+  if (precision === "exact") score += 18;
+  if (precision === "street") score += 10;
+  if (precision === "approximate") score += 2;
+  if (!candidate.partialMatch) score += 8;
+  if (candidate.postcode === normalizeCep(address.cep)) score += 8;
+  if (candidate.city && normalizeCompareText(candidate.city) === normalizeCompareText(address.city)) score += 6;
+  if (candidate.state && statesLookCompatible(candidate.state, address.state)) score += 5;
+  if (candidate.route && streetsLookCompatible(candidate.route, address.street)) score += 10;
+  if (candidate.streetNumber && numbersLookCompatible(candidate.streetNumber, address.number)) score += 10;
+  if (candidate.neighborhood && normalizeCompareText(candidate.neighborhood) === normalizeCompareText(address.neighborhood)) score += 4;
 
   return score;
 }
 
-function buildResolvedCoordinates(candidate) {
-  return {
-    lat: candidate.lat,
-    lon: candidate.lon,
-    precision: candidate.precision,
-    source: candidate.provider,
-    distanceBufferKm: candidate.precision === "street"
-      ? STREET_LEVEL_DISTANCE_BUFFER_KM
-      : candidate.precision === "postcode"
-        ? POSTCODE_LEVEL_DISTANCE_BUFFER_KM
-        : 0
-  };
-}
-
-async function searchNominatim(query) {
-  const searchUrl = new URL(NOMINATIM_SEARCH_URL);
-  searchUrl.searchParams.set("format", "jsonv2");
-  searchUrl.searchParams.set("addressdetails", "1");
-  searchUrl.searchParams.set("countrycodes", "br");
-  searchUrl.searchParams.set("limit", String(MAX_GEOCODER_RESULTS));
-  searchUrl.searchParams.set("accept-language", "pt-BR");
-  searchUrl.searchParams.set("q", query);
-
-  const response = await fetch(searchUrl.toString(), {
-    headers: {
-      "User-Agent": USER_AGENT,
-      Accept: "application/json"
-    }
-  });
-
-  if (!response.ok) {
-    throw createError("geocode_failed", "N\u00e3o foi poss\u00edvel validar o endere\u00e7o agora.", 502);
-  }
-
-  const results = await response.json();
-  return Array.isArray(results) ? results : [];
-}
-
-async function searchPhoton(query) {
-  const searchUrl = new URL(PHOTON_SEARCH_URL);
-  searchUrl.searchParams.set("q", query);
-  searchUrl.searchParams.set("limit", String(MAX_GEOCODER_RESULTS));
-
-  const response = await fetch(searchUrl.toString(), {
-    headers: {
-      "User-Agent": USER_AGENT,
-      Accept: "application/json"
-    }
-  });
-
-  if (!response.ok) {
-    throw createError("geocode_failed", "N\u00e3o foi poss\u00edvel validar o endere\u00e7o agora.", 502);
-  }
-
-  const payload = await response.json();
-  return Array.isArray(payload?.features) ? payload.features : [];
-}
-
-async function geocodeQuery(query, address) {
-  const cacheKey = `${normalizeCompareText(query)}|${buildDeliveryAddressKey(address)}`;
+async function geocodeAddress(address) {
+  const cacheKey = buildDeliveryAddressKey(address);
 
   if (geocodeCache.has(cacheKey)) {
     return geocodeCache.get(cacheKey);
   }
 
-  const providerResults = await Promise.allSettled([
-    searchNominatim(query),
-    searchPhoton(query)
-  ]);
+  const queries = buildGoogleGeocodeQueries(address);
   const candidates = [];
-  let hadProviderError = false;
-
-  providerResults.forEach((result, index) => {
-    const provider = index === 0 ? "nominatim" : "photon";
-
-    if (result.status !== "fulfilled") {
-      hadProviderError = true;
-      return;
-    }
-
-    result.value
-      .map(item => normalizeCandidate(item, provider))
-      .filter(candidate => candidateMatchesAddress(candidate, address))
-      .forEach(candidate => candidates.push(candidate));
-  });
-
-  if (!candidates.length) {
-    if (hadProviderError) {
-      throw createError("geocode_failed", "N\u00e3o foi poss\u00edvel validar o endere\u00e7o agora.", 502);
-    }
-
-    geocodeCache.set(cacheKey, null);
-    return null;
-  }
-
-  const bestCandidate = candidates
-    .sort((left, right) => scoreCandidate(right, address) - scoreCandidate(left, address))[0];
-  const resolvedCoordinates = buildResolvedCoordinates(bestCandidate);
-
-  geocodeCache.set(cacheKey, resolvedCoordinates);
-  return resolvedCoordinates;
-}
-
-async function geocodeAddress(address) {
-  const queries = buildAddressQueries(address);
 
   for (const query of queries) {
-    const coordinates = await geocodeQuery(query, address);
-    if (coordinates) {
-      return coordinates;
+    const results = await searchGoogleGeocode(query, address);
+
+    results
+      .map(normalizeGoogleCandidate)
+      .filter(candidate => candidateMatchesAddress(candidate, address))
+      .forEach(candidate => candidates.push(candidate));
+
+    const hasHighConfidenceCandidate = candidates.some(candidate => {
+      const precision = resolveCandidatePrecision(candidate);
+      return precision === "exact" && candidate.streetNumber && numbersLookCompatible(candidate.streetNumber, address.number);
+    });
+
+    if (hasHighConfidenceCandidate) {
+      break;
     }
   }
 
-  throw createError(
-    "address_not_found",
-    "N\u00e3o foi poss\u00edvel localizar esse endere\u00e7o automaticamente. Revise a rua, n\u00famero e CEP.",
-    422
-  );
-}
-
-async function getStoreCoordinates() {
-  if (!storeCoordinatesPromise) {
-    storeCoordinatesPromise = Promise.resolve(STORE_COORDINATES);
+  if (!candidates.length) {
+    throw createError(
+      "address_not_found",
+      "N\u00e3o foi poss\u00edvel localizar esse endere\u00e7o automaticamente. Revise a rua, n\u00famero e CEP.",
+      422
+    );
   }
 
-  return storeCoordinatesPromise;
+  const bestCandidate = candidates.sort((left, right) => scoreCandidate(right, address) - scoreCandidate(left, address))[0];
+  const resolved = {
+    lat: bestCandidate.lat,
+    lng: bestCandidate.lng,
+    precision: resolveCandidatePrecision(bestCandidate),
+    source: "google_maps",
+    placeId: bestCandidate.placeId,
+    formattedAddress: bestCandidate.formattedAddress
+  };
+
+  geocodeCache.set(cacheKey, resolved);
+  return resolved;
 }
 
-function roundDistanceKm(value) {
-  return Math.round(Number(value || 0) * 10) / 10;
-}
-
-function calculateHaversineDistanceKm(origin, destination) {
-  const toRad = degrees => degrees * Math.PI / 180;
-  const earthRadiusKm = 6371;
-  const dLat = toRad(destination.lat - origin.lat);
-  const dLon = toRad(destination.lon - origin.lon);
-  const lat1 = toRad(origin.lat);
-  const lat2 = toRad(destination.lat);
-
-  const a = Math.sin(dLat / 2) ** 2
-    + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return earthRadiusKm * c;
+function buildRouteCacheKey(origin, destination) {
+  return [
+    Number(origin.lat).toFixed(6),
+    Number(origin.lng).toFixed(6),
+    Number(destination.lat).toFixed(6),
+    Number(destination.lng).toFixed(6)
+  ].join("|");
 }
 
 async function calculateRouteDistanceKm(origin, destination) {
-  const routeUrl = `${OSRM_ROUTE_URL}/${origin.lon},${origin.lat};${destination.lon},${destination.lat}?overview=false&alternatives=false&steps=false`;
+  const cacheKey = buildRouteCacheKey(origin, destination);
 
-  try {
-    const response = await fetch(routeUrl, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "application/json"
-      }
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      const distanceMeters = Number(data?.routes?.[0]?.distance || 0);
-
-      if (distanceMeters > 0) {
-        return distanceMeters / 1000;
-      }
-    }
-  } catch {
-    // Se o roteador falhar, caimos no fallback logo abaixo.
+  if (routeCache.has(cacheKey)) {
+    return routeCache.get(cacheKey);
   }
 
-  return calculateHaversineDistanceKm(origin, destination) * 1.25;
+  const response = await fetchWithTimeout(
+    GOOGLE_ROUTES_URL,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": USER_AGENT,
+        Accept: "application/json",
+        "X-Goog-Api-Key": getMapsApiKey(),
+        "X-Goog-FieldMask": "routes.distanceMeters,routes.duration"
+      },
+      body: JSON.stringify({
+        origin: {
+          location: {
+            latLng: {
+              latitude: origin.lat,
+              longitude: origin.lng
+            }
+          }
+        },
+        destination: {
+          location: {
+            latLng: {
+              latitude: destination.lat,
+              longitude: destination.lng
+            }
+          }
+        },
+        travelMode: "DRIVE",
+        routingPreference: "TRAFFIC_UNAWARE",
+        languageCode: MAPS_LANGUAGE,
+        units: "METRIC",
+        computeAlternativeRoutes: false
+      })
+    },
+    "O c\u00e1lculo da rota demorou mais do que o esperado."
+  );
+
+  let payload = null;
+
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    const providerStatus = normalizeText(payload?.error?.status);
+
+    if (providerStatus === "RESOURCE_EXHAUSTED") {
+      throw createError("maps_rate_limited", "O servi\u00e7o de mapas atingiu o limite tempor\u00e1rio de consultas. Tente novamente em instantes.", 503);
+    }
+
+    if (providerStatus === "PERMISSION_DENIED" || providerStatus === "UNAUTHENTICATED") {
+      throw createError("maps_configuration_error", "A integra\u00e7\u00e3o de mapas da entrega n\u00e3o foi configurada corretamente no servidor.", 500);
+    }
+
+    throw createError("route_failed", "N\u00e3o foi poss\u00edvel calcular a rota de entrega agora.", 502);
+  }
+
+  const route = Array.isArray(payload?.routes) ? payload.routes[0] : null;
+  const distanceMeters = Number(route?.distanceMeters || 0);
+
+  if (!route || !Number.isFinite(distanceMeters) || distanceMeters <= 0) {
+    throw createError("route_not_found", "N\u00e3o foi poss\u00edvel calcular a rota de entrega para esse endere\u00e7o.", 422);
+  }
+
+  const distanceKm = distanceMeters / 1000;
+  routeCache.set(cacheKey, distanceKm);
+  return distanceKm;
 }
 
 function resolveDeliveryZone(distanceKm) {
@@ -959,6 +1050,16 @@ function buildQuoteCode(addressKey, issuedAt) {
   return `GB-${rawCode.slice(0, 8)}`;
 }
 
+function buildValidatedMessage(zone, distanceKm, precision) {
+  const precisionCopy = precision === "exact"
+    ? "ponto exato confirmado"
+    : precision === "street"
+      ? "ponto da rua confirmado"
+      : "ponto aproximado confirmado";
+
+  return `Endere\u00e7o validado. Dist\u00e2ncia real calculada: ${distanceKm.toFixed(1).replace(".", ",")} km, com ${precisionCopy}. Taxa confirmada em ${formatCurrency(zone.fee)}.`;
+}
+
 async function buildDeliveryQuote(payload) {
   const submittedAddress = sanitizeSubmittedAddress(payload);
   assertSubmittedAddress(submittedAddress);
@@ -967,20 +1068,20 @@ async function buildDeliveryQuote(payload) {
   const officialAddress = buildOfficialAddress(submittedAddress, viaCepData);
   validateOfficialAddress(submittedAddress, officialAddress, viaCepData);
 
-  let customerCoordinates;
+  let customerLocation;
 
   try {
-    customerCoordinates = await geocodeAddress(officialAddress);
+    customerLocation = await geocodeAddress(officialAddress);
   } catch (error) {
     if (error?.code === "address_not_found") {
       error.officialAddress = officialAddress;
     }
+
     throw error;
   }
 
-  const storeCoordinates = await getStoreCoordinates();
-  const rawDistanceKm = await calculateRouteDistanceKm(storeCoordinates, customerCoordinates);
-  const distanceKm = roundDistanceKm(rawDistanceKm + Number(customerCoordinates.distanceBufferKm || 0));
+  const routeDistanceKm = await calculateRouteDistanceKm(STORE_LOCATION, customerLocation);
+  const distanceKm = roundDistanceKm(routeDistanceKm);
   const zone = resolveDeliveryZone(distanceKm);
 
   if (zone.value === "out_of_range") {
@@ -990,10 +1091,11 @@ async function buildDeliveryQuote(payload) {
       zone: zone.value,
       zoneLabel: zone.label,
       distanceKm,
-      locationPrecision: customerCoordinates.precision,
-      geocoderSource: customerCoordinates.source,
+      routeDistanceKm: distanceKm,
+      locationPrecision: customerLocation.precision,
+      geocoderSource: customerLocation.source,
       distanceLabel: zone.label,
-      message: "Esse endere\u00e7o fica fora da rota autom\u00e1tica de entrega da Galaxy Burger. Acima de 5 km, trabalhamos apenas com retirada.",
+      message: "No momento n\u00e3o entregamos para essa regi\u00e3o.",
       address: officialAddress
     };
   }
@@ -1007,6 +1109,9 @@ async function buildDeliveryQuote(payload) {
     zone: zone.value,
     zoneLabel: zone.label,
     distanceKm,
+    routeDistanceKm: distanceKm,
+    locationPrecision: customerLocation.precision,
+    geocoderSource: customerLocation.source,
     addressKey,
     issuedAt,
     expiresAt
@@ -1018,10 +1123,11 @@ async function buildDeliveryQuote(payload) {
     zone: zone.value,
     zoneLabel: zone.label,
     distanceKm,
-    locationPrecision: customerCoordinates.precision,
-    geocoderSource: customerCoordinates.source,
+    routeDistanceKm: distanceKm,
+    locationPrecision: customerLocation.precision,
+    geocoderSource: customerLocation.source,
     distanceLabel: zone.label,
-    message: `Endere\u00e7o validado. Taxa confirmada em ${formatCurrency(zone.fee)} na faixa ${zone.label}.`,
+    message: buildValidatedMessage(zone, distanceKm, customerLocation.precision),
     address: officialAddress,
     quote: {
       token: createQuoteToken(quotePayload),

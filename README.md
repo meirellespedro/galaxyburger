@@ -30,6 +30,7 @@ Este projeto nao precisa de build step.
 ## Variaveis de ambiente
 
 - `DELIVERY_QUOTE_SECRET`: obrigatoria em qualquer deploy publicado da Vercel para assinar e verificar as cotacoes de entrega.
+- `GOOGLE_MAPS_API_KEY`: obrigatoria para a API serverless geocodificar o endereco do cliente e calcular a rota real de entrega com Google Maps.
 
 ## Fluxo profissional recomendado
 

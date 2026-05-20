@@ -57,10 +57,13 @@ const MAX_WHATSAPP_URL_LENGTH = 1800;
 const WHATSAPP_FALLBACK_DELAY_MS = 700;
 const WHATSAPP_OPEN_CHECK_DELAY_MS = 1800;
 const DELIVERY_QUOTE_EXPIRY_BUFFER_MS = 30 * 1000;
+const DELIVERY_REQUEST_TIMEOUT_MS = 12000;
+const VIA_CEP_REQUEST_TIMEOUT_MS = 8000;
+const DELIVERY_AUTO_CALCULATE_DEBOUNCE_MS = 700;
 const DELIVERY_IDLE_MESSAGE = "Informe o CEP, complete o endere\u00e7o e valide a entrega para calcular a taxa.";
 const CHECKOUT_LOG_PREFIX = "[Galaxy Burger checkout]";
 
-const DELIVERY_STORAGE_KEY = "galaxy_burguer_delivery_v11";
+const DELIVERY_STORAGE_KEY = "galaxy_burguer_delivery_v12";
 const LEGACY_DELIVERY_STORAGE_KEYS = [
   "galaxy_burguer_delivery",
   "galaxy_burguer_delivery_v3",
@@ -71,25 +74,11 @@ const LEGACY_DELIVERY_STORAGE_KEYS = [
   "galaxy_burguer_delivery_v8",
   "galaxy_burguer_delivery_v9",
   "galaxy_burguer_delivery_v10",
+  "galaxy_burguer_delivery_v11",
   "galaxy_burguer_store_coords_v1"
 ];
 
-let deliveryState = {
-  status: "idle",
-  fee: 0,
-  distanceLabel: "",
-  distanceRange: "",
-  address: "",
-  message: DELIVERY_IDLE_MESSAGE,
-  quoteCode: "",
-  quoteToken: "",
-  addressKey: "",
-  expiresAt: "",
-  distanceKm: 0,
-  locationPrecision: "",
-  geocoderSource: "",
-  validatedAddress: null
-};
+let deliveryState = createDeliveryState();
 
 const viaCepCache = new Map();
 const DELIVERY_ZONE_LABELS = Object.freeze({
@@ -112,6 +101,9 @@ let pendingOrderPreview = null;
 let orderTicketModalMode = "checkout";
 let cartModalHiddenForOrderTicket = false;
 let activeWhatsAppAttempt = null;
+let activeDeliveryQuoteRequest = null;
+let activeViaCepLookup = null;
+let deliveryAutoQuoteTimer = 0;
 
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString("pt-BR", {
@@ -141,6 +133,51 @@ function normalizeCompareText(value) {
     .toLowerCase();
 }
 
+function createDeliveryState(overrides = {}) {
+  return {
+    status: "idle",
+    fee: 0,
+    distanceLabel: "",
+    distanceRange: "",
+    address: "",
+    message: DELIVERY_IDLE_MESSAGE,
+    quoteCode: "",
+    quoteToken: "",
+    addressKey: "",
+    expiresAt: "",
+    distanceKm: 0,
+    routeDistanceKm: 0,
+    locationPrecision: "",
+    geocoderSource: "",
+    validatedAddress: null,
+    ...overrides
+  };
+}
+
+function createTimedRequest(timeoutMs) {
+  const controller = new AbortController();
+  const request = {
+    controller,
+    didTimeout: false,
+    cancelReason: ""
+  };
+
+  request.timeoutId = window.setTimeout(() => {
+    request.didTimeout = true;
+    controller.abort();
+  }, timeoutMs);
+
+  request.cleanup = () => {
+    window.clearTimeout(request.timeoutId);
+  };
+
+  return request;
+}
+
+function isAbortError(error) {
+  return error?.name === "AbortError";
+}
+
 function isCampoGrandeNeighborhood(value) {
   return normalizeCompareText(value) === "campo grande";
 }
@@ -154,6 +191,7 @@ function formatDistanceKm(value) {
 function formatGeocoderSourceLabel(value) {
   const normalized = normalizeCompareText(value);
 
+  if (normalized === "google_maps" || normalized === "googlemaps" || normalized === "google") return "Google Maps";
   if (normalized === "photon") return "Photon";
   if (normalized === "nominatim") return "Nominatim";
   return "mapa";
@@ -170,11 +208,11 @@ function getDeliveryLocationMethodCopy({ precision = "", source = "", includePro
   }
 
   if (normalizedPrecision === "street") {
-    return `Localiza\u00e7\u00e3o aproximada: ponto da rua confirmado${sourceLabel}. A taxa j\u00e1 considera margem de seguran\u00e7a.`;
+    return `Localiza\u00e7\u00e3o validada: ponto da rua confirmado${sourceLabel}.`;
   }
 
-  if (normalizedPrecision === "postcode") {
-    return `Localiza\u00e7\u00e3o aproximada por CEP${sourceLabel}. A taxa j\u00e1 considera uma margem de seguran\u00e7a maior.`;
+  if (normalizedPrecision === "approximate") {
+    return `Localiza\u00e7\u00e3o aproximada validada${sourceLabel}.`;
   }
 
   if (normalizedPrecision) {
@@ -206,6 +244,79 @@ function isDeliveryQuoteFresh(state = deliveryState) {
   }
 
   return expiresAt - DELIVERY_QUOTE_EXPIRY_BUFFER_MS > Date.now();
+}
+
+function hasCompleteDeliveryAddress(values = getDeliveryValues()) {
+  return (
+    normalizeCep(values.cep).length === 8
+    && Boolean(normalizeText(values.street))
+    && Boolean(normalizeText(values.number))
+    && Boolean(normalizeText(values.neighborhood))
+    && Boolean(normalizeText(values.city))
+    && Boolean(normalizeText(values.state))
+  );
+}
+
+function clearScheduledAutoDeliveryQuote() {
+  if (deliveryAutoQuoteTimer) {
+    window.clearTimeout(deliveryAutoQuoteTimer);
+    deliveryAutoQuoteTimer = 0;
+  }
+}
+
+function cancelActiveDeliveryQuoteRequest(reason = "cancelled") {
+  if (!activeDeliveryQuoteRequest) {
+    return;
+  }
+
+  activeDeliveryQuoteRequest.cancelReason = reason;
+  activeDeliveryQuoteRequest.controller.abort();
+  activeDeliveryQuoteRequest.cleanup();
+  activeDeliveryQuoteRequest = null;
+}
+
+function cancelActiveViaCepLookup(reason = "cancelled") {
+  if (!activeViaCepLookup) {
+    return;
+  }
+
+  activeViaCepLookup.cancelReason = reason;
+  activeViaCepLookup.controller.abort();
+  activeViaCepLookup.cleanup();
+  activeViaCepLookup = null;
+}
+
+function scheduleAutoDeliveryQuote(reason = "address_change") {
+  clearScheduledAutoDeliveryQuote();
+
+  if (getCurrentFulfillmentMode() === "pickup") {
+    return;
+  }
+
+  const values = getDeliveryValues();
+  if (!hasCompleteDeliveryAddress(values)) {
+    return;
+  }
+
+  const nextAddressKey = buildDeliveryAddressKey(values);
+  if (
+    deliveryState.status === "ready"
+    && deliveryState.addressKey === nextAddressKey
+    && isDeliveryQuoteFresh(deliveryState)
+  ) {
+    return;
+  }
+
+  deliveryAutoQuoteTimer = window.setTimeout(() => {
+    deliveryAutoQuoteTimer = 0;
+    requestDeliveryQuote({
+      showMessage: false,
+      quietSuccess: true,
+      reason
+    }).catch(error => {
+      logCheckoutWarn("Falha silenciosa ao recalcular entrega.", error);
+    });
+  }, DELIVERY_AUTO_CALCULATE_DEBOUNCE_MS);
 }
 
 function resolveDeliveryQuoteApiUrl() {
@@ -640,21 +751,12 @@ function validateAddressFields(showMessage = true) {
     if (showMessage) {
       logCheckoutWarn("Checkout bloqueado: endere\u00e7o incompleto.", { missingField: missing.field?.id || "unknown" });
       showToast(missing.message);
-      setDeliveryState({
+      setDeliveryState(createDeliveryState({
         status: "idle",
-        fee: 0,
-        distanceLabel: "",
         distanceRange: values.distanceRange || "",
+        address: syncDeliveryAddressField(),
         message: missing.message,
-        quoteCode: "",
-        quoteToken: "",
-        addressKey: "",
-        expiresAt: "",
-        distanceKm: 0,
-        locationPrecision: "",
-        geocoderSource: "",
-        validatedAddress: null
-      });
+      }));
     }
 
     return false;
@@ -666,6 +768,9 @@ function validateAddressFields(showMessage = true) {
 function clearDeliveryQuote(reasonMessage = DELIVERY_IDLE_MESSAGE) {
   const fields = getDeliveryFields();
 
+  clearScheduledAutoDeliveryQuote();
+  cancelActiveDeliveryQuoteRequest("state_reset");
+
   if (fields.distanceRange) {
     fields.distanceRange.value = "";
     clearFieldInvalid(fields.distanceRange);
@@ -676,22 +781,10 @@ function clearDeliveryQuote(reasonMessage = DELIVERY_IDLE_MESSAGE) {
     clearEstimateTermsInvalid(fields.estimateTerms, fields.estimateAck);
   }
 
-  setDeliveryState({
-    status: "idle",
-    fee: 0,
-    distanceLabel: "",
-    distanceRange: "",
+  setDeliveryState(createDeliveryState({
     address: syncDeliveryAddressField(),
     message: reasonMessage,
-    quoteCode: "",
-    quoteToken: "",
-    addressKey: "",
-    expiresAt: "",
-    distanceKm: 0,
-    locationPrecision: "",
-    geocoderSource: "",
-    validatedAddress: null
-  });
+  }));
 
   updateCartTotals();
 }
@@ -706,9 +799,81 @@ function applyValidatedAddressToFields(address = {}) {
   if (fields.state && address.state) fields.state.value = address.state;
 }
 
-async function fetchDeliveryQuote(values) {
+function createDeliveryRequestError(message, code, status = 500, payload = null) {
+  const error = new Error(message);
+  error.code = code;
+  error.status = status;
+  error.payload = payload;
+  return error;
+}
+
+function normalizeDeliveryQuotePayload(payload, values) {
+  const status = payload?.status === "out_of_range" ? "out_of_range" : "ready";
+  const isOutOfRange = status === "out_of_range";
+  const fee = Number(payload?.fee);
+  const distanceKm = Number(payload?.distanceKm);
+  const routeDistanceKm = Number(payload?.routeDistanceKm || payload?.distanceKm);
+
+  if (!Number.isFinite(distanceKm) || distanceKm <= 0) {
+    throw createDeliveryRequestError(
+      "A resposta da entrega voltou sem uma dist\u00e2ncia v\u00e1lida.",
+      "delivery_quote_invalid_distance",
+      502,
+      payload
+    );
+  }
+
+  if (!Number.isFinite(routeDistanceKm) || routeDistanceKm <= 0) {
+    throw createDeliveryRequestError(
+      "A resposta da entrega voltou sem uma rota v\u00e1lida.",
+      "delivery_quote_invalid_route",
+      502,
+      payload
+    );
+  }
+
+  if (!isOutOfRange) {
+    if (!Number.isFinite(fee) || fee <= 0) {
+      throw createDeliveryRequestError(
+        "A resposta da entrega voltou sem uma taxa v\u00e1lida.",
+        "delivery_quote_invalid_fee",
+        502,
+        payload
+      );
+    }
+
+    if (!payload?.quote?.token || !payload?.quote?.code || !payload?.quote?.expiresAt) {
+      throw createDeliveryRequestError(
+        "A resposta da entrega voltou sem a valida\u00e7\u00e3o completa da taxa.",
+        "delivery_quote_invalid_token",
+        502,
+        payload
+      );
+    }
+  }
+
+  const validatedAddress = {
+    ...values,
+    ...(payload?.address || {})
+  };
+
+  validatedAddress.complement = values.complement;
+  validatedAddress.reference = values.reference;
+
+  return {
+    status,
+    isOutOfRange,
+    fee: isOutOfRange ? 0 : fee,
+    distanceKm,
+    routeDistanceKm,
+    validatedAddress
+  };
+}
+
+async function fetchDeliveryQuote(values, { signal } = {}) {
   const response = await fetch(resolveDeliveryQuoteApiUrl(), {
     method: "POST",
+    signal,
     headers: {
       "Content-Type": "application/json"
     },
@@ -749,18 +914,37 @@ async function fetchDeliveryQuote(values) {
   return payload;
 }
 
-async function verifyDeliveryQuoteToken(token, addressKey = "") {
+async function verifyDeliveryQuoteToken(token, addressKey = "", { signal } = {}) {
   const url = new URL(resolveDeliveryQuoteApiUrl(), window.location.origin);
   url.searchParams.set("token", token);
   if (addressKey) {
     url.searchParams.set("addressKey", addressKey);
   }
 
-  const response = await fetch(url.toString(), {
-    headers: {
-      Accept: "application/json"
+  const timedRequest = signal ? null : createTimedRequest(DELIVERY_REQUEST_TIMEOUT_MS);
+
+  let response;
+
+  try {
+    response = await fetch(url.toString(), {
+      signal: signal || timedRequest?.controller.signal,
+      headers: {
+        Accept: "application/json"
+      }
+    });
+  } catch (error) {
+    if (timedRequest?.didTimeout && isAbortError(error)) {
+      throw createDeliveryRequestError(
+        "A confirma\u00e7\u00e3o da taxa demorou mais do que o esperado.",
+        "delivery_quote_verify_timeout",
+        504
+      );
     }
-  });
+
+    throw error;
+  } finally {
+    timedRequest?.cleanup();
+  }
 
   let payload = null;
 
@@ -790,6 +974,8 @@ async function verifyDeliveryQuoteToken(token, addressKey = "") {
 }
 
 async function requestDeliveryQuote({ showMessage = true, quietSuccess = false, reason = "manual" } = {}) {
+  clearScheduledAutoDeliveryQuote();
+
   if (getCurrentFulfillmentMode() === "pickup") {
     return deliveryState;
   }
@@ -800,120 +986,144 @@ async function requestDeliveryQuote({ showMessage = true, quietSuccess = false, 
 
   const fields = getDeliveryFields();
   const values = getDeliveryValues();
+  const requestKey = buildDeliveryAddressKey(values);
 
-  setDeliveryState({
+  if (
+    deliveryState.status === "ready"
+    && deliveryState.addressKey === requestKey
+    && isDeliveryQuoteFresh(deliveryState)
+  ) {
+    return deliveryState;
+  }
+
+  if (activeDeliveryQuoteRequest?.key === requestKey) {
+    return activeDeliveryQuoteRequest.promise;
+  }
+
+  cancelActiveDeliveryQuoteRequest("superseded");
+
+  const request = createTimedRequest(DELIVERY_REQUEST_TIMEOUT_MS);
+  request.key = requestKey;
+  activeDeliveryQuoteRequest = request;
+
+  setDeliveryState(createDeliveryState({
     status: "loading",
-    fee: 0,
-    distanceLabel: "",
-    distanceRange: "",
     address: syncDeliveryAddressField(),
     message: reason === "finalize"
-      ? "Validando o endere\u00e7o final para fechar a entrega..."
-      : "Validando o endere\u00e7o e calculando a taxa...",
-    quoteCode: "",
-    quoteToken: "",
-    addressKey: "",
-    expiresAt: "",
-    distanceKm: 0,
-    locationPrecision: "",
-    geocoderSource: "",
-    validatedAddress: null
-  });
+      ? "Calculando taxa de entrega..."
+      : "Calculando taxa de entrega...",
+  }));
 
-  try {
-    const payload = await fetchDeliveryQuote(values);
-    const isOutOfRange = payload.status === "out_of_range";
-    const validatedAddress = {
-      ...values,
-      ...(payload.address || {})
-    };
+  request.promise = (async () => {
+    try {
+      const payload = await fetchDeliveryQuote(values, {
+        signal: request.controller.signal
+      });
+      const normalizedPayload = normalizeDeliveryQuotePayload(payload, values);
 
-    validatedAddress.complement = values.complement;
-    validatedAddress.reference = values.reference;
+      if (
+        activeDeliveryQuoteRequest !== request
+        || getCurrentFulfillmentMode() === "pickup"
+        || buildDeliveryAddressKey(getDeliveryValues()) !== requestKey
+      ) {
+        return null;
+      }
 
-    applyValidatedAddressToFields(validatedAddress);
-    syncDeliveryAddressField();
-
-    if (fields.distanceRange) {
-      fields.distanceRange.value = payload.zone || "";
-    }
-
-    if (fields.estimateAck) {
-      fields.estimateAck.checked = !isOutOfRange;
-      clearEstimateTermsInvalid(fields.estimateTerms, fields.estimateAck);
-    }
-
-    const nextState = {
-      status: payload.status || (isOutOfRange ? "out_of_range" : "ready"),
-      fee: isOutOfRange ? 0 : Number(payload.fee || 0),
-      distanceLabel: payload.distanceLabel || DELIVERY_ZONE_LABELS[payload.zone] || "",
-      distanceRange: payload.zone || "",
-      address: syncDeliveryAddressField(),
-      message: payload.message || DELIVERY_IDLE_MESSAGE,
-      quoteCode: isOutOfRange ? "" : payload.quote?.code || "",
-      quoteToken: isOutOfRange ? "" : payload.quote?.token || "",
-      addressKey: buildDeliveryAddressKey(validatedAddress),
-      expiresAt: isOutOfRange ? "" : payload.quote?.expiresAt || "",
-      distanceKm: Number(payload.distanceKm || 0),
-      locationPrecision: normalizeText(payload.locationPrecision),
-      geocoderSource: normalizeText(payload.geocoderSource),
-      validatedAddress
-    };
-
-    setDeliveryState(nextState);
-    updateCartTotals();
-
-    if (!quietSuccess && showMessage) {
-      showToast(payload.message || "Endere\u00e7o validado com sucesso.");
-    }
-
-    return nextState;
-  } catch (error) {
-    const payload = error.payload || {};
-    const message = payload.message
-      || (error.code === "delivery_quote_route_missing"
-        ? "A API de entrega ainda n\u00e3o est\u00e1 publicada neste ambiente. Fa\u00e7a um novo deploy na Vercel para liberar a valida\u00e7\u00e3o."
-        : "")
-      || (!/^https?:\/\//i.test(String(window?.location?.href || "").trim())
-        ? "Este teste local precisa do deploy da Vercel ou de um servidor com a API /api/delivery-quote ativa."
-        : "")
-      || (error.name === "TypeError" ? "N\u00e3o foi poss\u00edvel validar a entrega agora." : error.message)
-      || "N\u00e3o foi poss\u00edvel validar a entrega agora.";
-
-    if (payload.officialAddress) {
-      applyValidatedAddressToFields(payload.officialAddress);
+      applyValidatedAddressToFields(normalizedPayload.validatedAddress);
       syncDeliveryAddressField();
+
+      if (fields.distanceRange) {
+        fields.distanceRange.value = payload.zone || "";
+      }
+
+      if (fields.estimateAck) {
+        fields.estimateAck.checked = !normalizedPayload.isOutOfRange;
+        clearEstimateTermsInvalid(fields.estimateTerms, fields.estimateAck);
+      }
+
+      const nextState = createDeliveryState({
+        status: normalizedPayload.status,
+        fee: normalizedPayload.fee,
+        distanceLabel: payload.distanceLabel || DELIVERY_ZONE_LABELS[payload.zone] || "",
+        distanceRange: payload.zone || "",
+        address: syncDeliveryAddressField(),
+        message: payload.message || DELIVERY_IDLE_MESSAGE,
+        quoteCode: normalizedPayload.isOutOfRange ? "" : payload.quote?.code || "",
+        quoteToken: normalizedPayload.isOutOfRange ? "" : payload.quote?.token || "",
+        addressKey: buildDeliveryAddressKey(normalizedPayload.validatedAddress),
+        expiresAt: normalizedPayload.isOutOfRange ? "" : payload.quote?.expiresAt || "",
+        distanceKm: normalizedPayload.distanceKm,
+        routeDistanceKm: normalizedPayload.routeDistanceKm,
+        locationPrecision: normalizeText(payload.locationPrecision),
+        geocoderSource: normalizeText(payload.geocoderSource),
+        validatedAddress: normalizedPayload.validatedAddress
+      });
+
+      setDeliveryState(nextState);
+      updateCartTotals();
+
+      if (!quietSuccess && showMessage) {
+        showToast(payload.message || "Endere\u00e7o validado com sucesso.");
+      }
+
+      return nextState;
+    } catch (error) {
+      const payload = error.payload || {};
+      const wasCancelled = isAbortError(error) && !request.didTimeout;
+
+      if (
+        activeDeliveryQuoteRequest !== request
+        || wasCancelled
+        || getCurrentFulfillmentMode() === "pickup"
+        || buildDeliveryAddressKey(getDeliveryValues()) !== requestKey
+      ) {
+        return null;
+      }
+
+      const message = request.didTimeout
+        ? "A valida\u00e7\u00e3o da entrega demorou mais do que o esperado. Confira sua conex\u00e3o e tente novamente."
+        : payload.message
+          || (error.code === "delivery_quote_route_missing"
+            ? "A API de entrega ainda n\u00e3o est\u00e1 publicada neste ambiente. Fa\u00e7a um novo deploy na Vercel para liberar a valida\u00e7\u00e3o."
+            : "")
+          || (!/^https?:\/\//i.test(String(window?.location?.href || "").trim())
+            ? "Este teste local precisa do deploy da Vercel ou de um servidor com a API /api/delivery-quote ativa."
+            : "")
+          || (error.name === "TypeError" ? "N\u00e3o foi poss\u00edvel validar a entrega agora." : error.message)
+          || "N\u00e3o foi poss\u00edvel validar a entrega agora.";
+
+      if (payload.officialAddress) {
+        applyValidatedAddressToFields(payload.officialAddress);
+        syncDeliveryAddressField();
+      }
+
+      if (fields.estimateAck) {
+        fields.estimateAck.checked = false;
+        clearEstimateTermsInvalid(fields.estimateTerms, fields.estimateAck);
+      }
+
+      setDeliveryState(createDeliveryState({
+        status: payload.status === "out_of_range" ? "out_of_range" : "error",
+        address: syncDeliveryAddressField(),
+        message,
+      }));
+      updateCartTotals();
+
+      if (showMessage) {
+        showToast(message);
+      }
+
+      return null;
+    } finally {
+      if (activeDeliveryQuoteRequest === request) {
+        activeDeliveryQuoteRequest = null;
+      }
+
+      request.cleanup();
     }
+  })();
 
-    if (fields.estimateAck) {
-      fields.estimateAck.checked = false;
-      clearEstimateTermsInvalid(fields.estimateTerms, fields.estimateAck);
-    }
-
-    setDeliveryState({
-      status: payload.status === "out_of_range" ? "out_of_range" : "error",
-      fee: 0,
-      distanceLabel: "",
-      distanceRange: "",
-      address: syncDeliveryAddressField(),
-      message,
-      quoteCode: "",
-      quoteToken: "",
-      addressKey: "",
-      expiresAt: "",
-      distanceKm: 0,
-      locationPrecision: "",
-      geocoderSource: "",
-      validatedAddress: null
-    });
-    updateCartTotals();
-
-    if (showMessage) {
-      showToast(message);
-    }
-
-    return null;
-  }
+  return request.promise;
 }
 
 function validateDeliveryEstimateAcceptance(showMessage = true) {
@@ -935,14 +1145,16 @@ function validateDeliveryEstimateAcceptance(showMessage = true) {
   return false;
 }
 
-async function fetchViaCepData(cep) {
+async function fetchViaCepData(cep, { signal } = {}) {
   const cleanCep = normalizeCep(cep);
 
   if (viaCepCache.has(cleanCep)) {
     return viaCepCache.get(cleanCep);
   }
 
-  const response = await fetch(`${VIA_CEP_BASE_URL}/${cleanCep}/json/`);
+  const response = await fetch(`${VIA_CEP_BASE_URL}/${cleanCep}/json/`, {
+    signal
+  });
 
   if (!response.ok) {
     throw new Error("via_cep_failed");
@@ -965,6 +1177,7 @@ async function lookupCep(isManual = false) {
   if (!fields.cep) return;
 
   fields.cep.value = formatCep(cep);
+  cancelActiveViaCepLookup("superseded");
 
   if (cep.length !== 8) {
     clearDeliveryQuote("Digite um CEP v\u00e1lido com 8 n\u00fameros.");
@@ -973,13 +1186,26 @@ async function lookupCep(isManual = false) {
     return;
   }
 
+  const request = createTimedRequest(VIA_CEP_REQUEST_TIMEOUT_MS);
+  request.cep = cep;
+  activeViaCepLookup = request;
+
   if (fields.searchCepButton) {
     fields.searchCepButton.disabled = true;
     fields.searchCepButton.textContent = "Buscando...";
   }
 
   try {
-    const data = await fetchViaCepData(cep);
+    const data = await fetchViaCepData(cep, {
+      signal: request.controller.signal
+    });
+
+    if (
+      activeViaCepLookup !== request
+      || normalizeCep(fields.cep?.value) !== cep
+    ) {
+      return;
+    }
 
     if (fields.street) fields.street.value = data.logradouro || "";
     if (fields.neighborhood) fields.neighborhood.value = data.bairro || "";
@@ -988,28 +1214,38 @@ async function lookupCep(isManual = false) {
 
     syncDeliveryAddressField();
     clearDeliveryQuote("CEP localizado. Revise o endere\u00e7o e valide a entrega.");
+    scheduleAutoDeliveryQuote("cep_lookup");
 
     saveDeliveryData();
   } catch (error) {
-    setDeliveryState({
+    const wasCancelled = isAbortError(error) && !request.didTimeout;
+
+    if (
+      activeViaCepLookup !== request
+      || wasCancelled
+      || normalizeCep(fields.cep?.value) !== cep
+    ) {
+      return;
+    }
+
+    setDeliveryState(createDeliveryState({
       status: "error",
-      fee: 0,
       address: syncDeliveryAddressField(),
-      message: error.message === "cep_not_found"
-        ? "CEP n\u00e3o encontrado."
-        : "N\u00e3o foi poss\u00edvel buscar o CEP agora.",
-      quoteCode: "",
-      quoteToken: "",
-      addressKey: "",
-      expiresAt: "",
-      distanceKm: 0,
-      locationPrecision: "",
-      geocoderSource: "",
-      validatedAddress: null
-    });
+      message: request.didTimeout
+        ? "A busca do CEP demorou mais do que o esperado. Tente novamente."
+        : error.message === "cep_not_found"
+          ? "CEP n\u00e3o encontrado."
+          : "N\u00e3o foi poss\u00edvel buscar o CEP agora."
+    }));
 
     showToast(deliveryState.message);
   } finally {
+    if (activeViaCepLookup === request) {
+      activeViaCepLookup = null;
+    }
+
+    request.cleanup();
+
     if (fields.searchCepButton) {
       fields.searchCepButton.disabled = false;
       fields.searchCepButton.textContent = "Buscar CEP";
@@ -1018,23 +1254,14 @@ async function lookupCep(isManual = false) {
 }
 
 async function handleCalculateDelivery() {
+  clearScheduledAutoDeliveryQuote();
+
   if (getCurrentFulfillmentMode() === "pickup") {
-    setDeliveryState({
+    setDeliveryState(createDeliveryState({
       status: "pickup",
-      fee: 0,
-      distanceLabel: "",
-      distanceRange: "",
       address: STORE_ADDRESS,
       message: "Retirada no balc\u00e3o, sem taxa de entrega.",
-      quoteCode: "",
-      quoteToken: "",
-      addressKey: "",
-      expiresAt: "",
-      distanceKm: 0,
-      locationPrecision: "",
-      geocoderSource: "",
-      validatedAddress: null
-    });
+    }));
     updateCartTotals();
     return;
   }
@@ -1043,10 +1270,7 @@ async function handleCalculateDelivery() {
 }
 
 function setDeliveryState(nextState) {
-  deliveryState = {
-    ...deliveryState,
-    ...nextState
-  };
+  deliveryState = createDeliveryState(nextState);
 
   updateDeliveryUI();
   saveDeliveryData();
@@ -1073,7 +1297,7 @@ function updateDeliveryUI() {
     fields.calculateDeliveryButton.disabled = deliveryState.status === "loading";
     fields.calculateDeliveryButton.textContent =
       deliveryState.status === "loading"
-        ? "Validando..."
+        ? "Calculando taxa de entrega..."
         : deliveryState.status === "ready"
           ? "Taxa validada"
           : deliveryState.status === "out_of_range"
@@ -1094,7 +1318,7 @@ function updateDeliveryUI() {
       const summaryParts = [
         "Endere\u00e7o validado pelo servidor.",
         deliveryState.distanceLabel || "",
-        deliveryState.distanceKm ? `Dist\u00e2ncia estimada: ${formatDistanceKm(deliveryState.distanceKm)}.` : "",
+        deliveryState.routeDistanceKm ? `Dist\u00e2ncia real por rota: ${formatDistanceKm(deliveryState.routeDistanceKm)}.` : deliveryState.distanceKm ? `Dist\u00e2ncia calculada: ${formatDistanceKm(deliveryState.distanceKm)}.` : "",
         locationMethodCopy,
         deliveryState.quoteCode ? `C\u00f3digo da cota\u00e7\u00e3o: ${deliveryState.quoteCode}.` : ""
       ].filter(Boolean);
@@ -1105,11 +1329,11 @@ function updateDeliveryUI() {
         source: deliveryState.geocoderSource
       });
       fields.quoteSummary.textContent = [
-        "Esse endere\u00e7o ficou fora da rota autom\u00e1tica de at\u00e9 5 km. Para seguir, escolha retirada.",
+        deliveryState.message || "No momento n\u00e3o entregamos para essa regi\u00e3o.",
         locationMethodCopy
       ].filter(Boolean).join(" ");
     } else if (deliveryState.status === "loading") {
-      fields.quoteSummary.textContent = "A loja est\u00e1 validando o CEP e calculando a rota deste endere\u00e7o...";
+      fields.quoteSummary.textContent = "Calculando taxa de entrega...";
     } else {
       fields.quoteSummary.textContent = "Informe o CEP, complete o endere\u00e7o e valide a entrega para calcular a taxa.";
     }
@@ -1140,9 +1364,9 @@ function updateDeliveryUI() {
       });
       fields.totalNote.textContent = `Taxa validada para este endere\u00e7o: ${deliveryState.distanceLabel}. ${precisionNote} Se o local mudar, a Galaxy Burger exige nova valida\u00e7\u00e3o.`;
     } else if (deliveryState.status === "out_of_range") {
-      fields.totalNote.textContent = "Endere\u00e7o fora da \u00e1rea de entrega. Selecione retirada para continuar.";
+      fields.totalNote.textContent = deliveryState.message || "No momento n\u00e3o entregamos para essa regi\u00e3o.";
     } else if (deliveryState.status === "loading") {
-      fields.totalNote.textContent = "Validando a entrega...";
+      fields.totalNote.textContent = "Calculando taxa de entrega...";
     } else {
       fields.totalNote.textContent = "Valide a entrega para atualizar o total";
     }
@@ -1197,29 +1421,17 @@ function loadDeliveryData() {
     syncDeliveryAddressField();
 
     if (saved.deliveryState) {
-      deliveryState = {
-        ...deliveryState,
-        ...saved.deliveryState
-      };
+      deliveryState = createDeliveryState(saved.deliveryState);
     }
 
-    if (!isDeliveryQuoteFresh(deliveryState)) {
-      deliveryState = {
-        ...deliveryState,
-        status: "idle",
-        fee: 0,
-        distanceLabel: "",
-        distanceRange: "",
-        message: DELIVERY_IDLE_MESSAGE,
-        quoteCode: "",
-        quoteToken: "",
-        addressKey: "",
-        expiresAt: "",
-        distanceKm: 0,
-        locationPrecision: "",
-        geocoderSource: "",
-        validatedAddress: null
-      };
+    const savedAddressKey = buildDeliveryAddressKey(saved);
+    const hasMatchingSavedQuote = !deliveryState.addressKey || deliveryState.addressKey === savedAddressKey;
+
+    if (!hasMatchingSavedQuote || !isDeliveryQuoteFresh(deliveryState)) {
+      if (fields.estimateAck) fields.estimateAck.checked = false;
+      deliveryState = createDeliveryState({
+        address: syncDeliveryAddressField()
+      });
     }
 
     updateDeliveryUI();
@@ -1238,22 +1450,11 @@ function clearDeliveryData() {
   if (fields.estimateAck) fields.estimateAck.checked = false;
   clearEstimateTermsInvalid(fields.estimateTerms, fields.estimateAck);
 
-  deliveryState = {
-    status: "idle",
-    fee: 0,
-    distanceLabel: "",
-    distanceRange: "",
-    address: "",
-    message: DELIVERY_IDLE_MESSAGE,
-    quoteCode: "",
-    quoteToken: "",
-    addressKey: "",
-    expiresAt: "",
-    distanceKm: 0,
-    locationPrecision: "",
-    geocoderSource: "",
-    validatedAddress: null
-  };
+  clearScheduledAutoDeliveryQuote();
+  cancelActiveDeliveryQuoteRequest("clear_storage");
+  cancelActiveViaCepLookup("clear_storage");
+
+  deliveryState = createDeliveryState();
 }
 
 function getCartTotal() {
@@ -1391,12 +1592,15 @@ function updateCartTotals() {
 
   if (finalizeButton) {
     const busy = isFinalizeButtonBusy(finalizeButton);
+    const isCalculatingDelivery = !isPickup && deliveryState.status === "loading";
 
-    finalizeButton.disabled = busy;
+    finalizeButton.disabled = busy || isCalculatingDelivery;
 
     if (!busy) {
       finalizeButton.textContent = !storeOpen
         ? "Loja fechada no momento"
+        : isCalculatingDelivery
+          ? "Calculando taxa de entrega..."
         : hasItems && !meetsMinimumOrder
           ? `Faltam ${formatCurrency(getMinimumOrderShortfall(subtotal))} para o m\u00ednimo`
           : !hasItems
@@ -1771,24 +1975,17 @@ function selectFulfillment(button) {
   clearEstimateTermsInvalid(deliveryFields.estimateTerms, deliveryFields.estimateAck);
 
   if (mode === "pickup") {
-    setDeliveryState({
+    clearScheduledAutoDeliveryQuote();
+    cancelActiveDeliveryQuoteRequest("pickup_selected");
+    cancelActiveViaCepLookup("pickup_selected");
+    setDeliveryState(createDeliveryState({
       status: "pickup",
-      fee: 0,
-      distanceLabel: "",
-      distanceRange: "",
       address: STORE_ADDRESS,
       message: "Retirada no balc\u00e3o, sem taxa de entrega.",
-      quoteCode: "",
-      quoteToken: "",
-      addressKey: "",
-      expiresAt: "",
-      distanceKm: 0,
-      locationPrecision: "",
-      geocoderSource: "",
-      validatedAddress: null
-    });
+    }));
   } else {
     clearDeliveryQuote(DELIVERY_IDLE_MESSAGE);
+    scheduleAutoDeliveryQuote("fulfillment_change");
   }
 
   updateCartTotals();
@@ -2360,6 +2557,7 @@ function buildSharedOrderTicketUrl(orderDetails) {
           orderDetails.deliveryQuote.code || "",
           orderDetails.deliveryQuote.expiresAt || "",
           Number(orderDetails.deliveryQuote.distanceKm || 0),
+          Number(orderDetails.deliveryQuote.routeDistanceKm || 0),
           orderDetails.deliveryQuote.zone || "",
           orderDetails.deliveryQuote.zoneLabel || "",
           orderDetails.deliveryQuote.addressKey || "",
@@ -2433,17 +2631,19 @@ function decodeSharedOrderTicketPayload(encodedTicket) {
     const totalValue = Number(rawPayload.t || 0);
     const deliveryFeeValue = Number(rawPayload.f || 0);
     const rawQuote = Array.isArray(rawPayload.q) ? rawPayload.q : [];
+    const usesExtendedQuoteShape = rawQuote.length >= 10;
     const deliveryQuote = !isPickup && rawQuote.length
       ? {
           token: String(rawQuote[0] || "").trim(),
           code: normalizeText(rawQuote[1]),
           expiresAt: String(rawQuote[2] || "").trim(),
           distanceKm: Number(rawQuote[3] || 0),
-          zone: normalizeText(rawQuote[4]),
-          zoneLabel: normalizeText(rawQuote[5]),
-          addressKey: normalizeText(rawQuote[6]),
-          locationPrecision: normalizeText(rawQuote[7]),
-          geocoderSource: normalizeText(rawQuote[8]),
+          routeDistanceKm: usesExtendedQuoteShape ? Number(rawQuote[4] || rawQuote[3] || 0) : Number(rawQuote[3] || 0),
+          zone: normalizeText(rawQuote[usesExtendedQuoteShape ? 5 : 4]),
+          zoneLabel: normalizeText(rawQuote[usesExtendedQuoteShape ? 6 : 5]),
+          addressKey: normalizeText(rawQuote[usesExtendedQuoteShape ? 7 : 6]),
+          locationPrecision: normalizeText(rawQuote[usesExtendedQuoteShape ? 8 : 7]),
+          geocoderSource: normalizeText(rawQuote[usesExtendedQuoteShape ? 9 : 8]),
           validationStatus: "loading"
         }
       : null;
@@ -2517,7 +2717,7 @@ function buildOrderTicketPreviewMarkup(orderDetails) {
           <p>${escapeHtml(getDeliveryQuoteStatusCopy(orderDetails.deliveryQuote))}</p>
           <p>${escapeHtml(`C\u00f3digo: ${orderDetails.deliveryQuote.code}`)}</p>
           ${orderDetails.deliveryQuote.zoneLabel ? `<p>${escapeHtml(orderDetails.deliveryQuote.zoneLabel)}</p>` : ""}
-          ${orderDetails.deliveryQuote.distanceKm ? `<p>${escapeHtml(`Dist\u00e2ncia estimada: ${formatDistanceKm(orderDetails.deliveryQuote.distanceKm)}`)}</p>` : ""}
+          ${orderDetails.deliveryQuote.routeDistanceKm ? `<p>${escapeHtml(`Dist\u00e2ncia real por rota: ${formatDistanceKm(orderDetails.deliveryQuote.routeDistanceKm)}`)}</p>` : orderDetails.deliveryQuote.distanceKm ? `<p>${escapeHtml(`Dist\u00e2ncia calculada: ${formatDistanceKm(orderDetails.deliveryQuote.distanceKm)}`)}</p>` : ""}
           ${getDeliveryQuotePrecisionCopy(orderDetails.deliveryQuote) ? `<p>${escapeHtml(getDeliveryQuotePrecisionCopy(orderDetails.deliveryQuote))}</p>` : ""}
         </div>
       </section>
@@ -3211,9 +3411,12 @@ async function verifyPendingOrderPreviewDeliveryQuote() {
         ...pendingOrderPreview.deliveryQuote,
         code: verifiedQuote.code || pendingOrderPreview.deliveryQuote.code,
         distanceKm: Number(verifiedQuote.distanceKm || pendingOrderPreview.deliveryQuote.distanceKm || 0),
+        routeDistanceKm: Number(verifiedQuote.routeDistanceKm || verifiedQuote.distanceKm || pendingOrderPreview.deliveryQuote.routeDistanceKm || pendingOrderPreview.deliveryQuote.distanceKm || 0),
         zone: verifiedQuote.zone || pendingOrderPreview.deliveryQuote.zone,
         zoneLabel: verifiedQuote.zoneLabel || pendingOrderPreview.deliveryQuote.zoneLabel,
         addressKey: verifiedQuote.addressKey || pendingOrderPreview.deliveryQuote.addressKey,
+        locationPrecision: verifiedQuote.locationPrecision || pendingOrderPreview.deliveryQuote.locationPrecision,
+        geocoderSource: verifiedQuote.geocoderSource || pendingOrderPreview.deliveryQuote.geocoderSource,
         validationStatus: isFeeMatch ? "verified" : "invalid"
       }
     };
@@ -3381,6 +3584,7 @@ async function buildPendingOrderPreview() {
     token: deliveryState.quoteToken,
     expiresAt: deliveryState.expiresAt,
     distanceKm: deliveryState.distanceKm,
+    routeDistanceKm: deliveryState.routeDistanceKm,
     zone: deliveryState.distanceRange,
     zoneLabel: deliveryState.distanceLabel,
     addressKey: deliveryState.addressKey,
@@ -3507,6 +3711,7 @@ function bindDeliveryEvents() {
       fields.cep.value = formatCep(fields.cep.value);
       clearFieldInvalid(fields.cep);
       clearDeliveryQuote("CEP alterado. Valide a entrega novamente.");
+      cancelActiveViaCepLookup("cep_changed");
 
       if (normalizeCep(fields.cep.value).length === 8) {
         lookupCep(false);
@@ -3529,6 +3734,7 @@ function bindDeliveryEvents() {
       clearFieldInvalid(field);
       syncDeliveryAddressField();
       clearDeliveryQuote("Endere\u00e7o alterado. Valide a entrega novamente.");
+      scheduleAutoDeliveryQuote("address_change");
     });
   });
 
