@@ -54,7 +54,8 @@
       ]
     }
   </script>
-  <script src="carrinho.js?v=20260518-1" defer></script>
+  <script src="delivery-config.js?v=20260520-1" defer></script>
+  <script src="carrinho.js?v=20260520-1" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
@@ -832,7 +833,7 @@
           <button class="fulfillment-btn selected" type="button" data-fulfillment="delivery" onclick="selectFulfillment(this)">Entrega</button>
           <button class="fulfillment-btn" type="button" data-fulfillment="pickup" onclick="selectFulfillment(this)">Retirada</button>
         </div>
-        <p class="field-helper" id="fulfillment-helper">Entrega com taxa validada automaticamente pelo endere&ccedil;o, ou retirada direta no balc&atilde;o da Galaxy.</p>
+        <p class="field-helper" id="fulfillment-helper">Entrega com taxa validada automaticamente pela rua, bairro e regi&atilde;o cadastrada, ou retirada direta no balc&atilde;o da Galaxy.</p>
 
         <label class="field-label" for="customer-name">Seu nome</label>
         <input id="customer-name" type="text" placeholder="Ex: Beatriz" autocomplete="name">
@@ -842,7 +843,7 @@
 
         <div id="delivery-address-group">
           <div class="address-field address-field-full">
-            <p class="field-helper delivery-manual-helper" id="delivery-manual-helper">Informe um CEP real e complete o endere&ccedil;o. A taxa de entrega &eacute; calculada automaticamente pela loja a partir desse endere&ccedil;o validado.</p>
+            <p class="field-helper delivery-manual-helper" id="delivery-manual-helper">O CEP &eacute; opcional para preencher o endere&ccedil;o. Para validar a entrega, informe rua, n&uacute;mero, bairro, cidade e estado; a Galaxy Burger confere a regi&atilde;o pela tabela local.</p>
           </div>
 
           <div class="address-grid address-grid-main">
@@ -902,19 +903,19 @@
             <span class="field-label delivery-fee-title">Taxa validada de entrega</span>
             <p class="field-helper delivery-range-store">Origem: Rua Embaixador Muniz Gordilho, 199 - Campo Grande/RJ</p>
             <input id="delivery-distance-range" type="hidden" value="">
-            <div id="delivery-quote-summary" class="delivery-quote-summary">Informe o CEP, complete o endere&ccedil;o e valide a entrega para calcular a taxa.</div>
+            <div id="delivery-quote-summary" class="delivery-quote-summary">Informe rua, n&uacute;mero, bairro, cidade e estado para validar a entrega.</div>
             <ul class="delivery-policy-list" aria-label="Pol&iacute;tica autom&aacute;tica de entrega">
-              <li>At&eacute; 3 km da base: R$ 5,00</li>
-              <li>De 3 km at&eacute; 5 km da base: R$ 10,00</li>
-              <li>Acima de 5 km: entrega indispon&iacute;vel e retirada recomendada</li>
+              <li>Regi&atilde;o pr&oacute;xima cadastrada: R$ 5,00</li>
+              <li>Regi&atilde;o intermedi&aacute;ria cadastrada: R$ 10,00</li>
+              <li>Fora da cobertura cadastrada: somente retirada no local</li>
             </ul>
-            <p class="field-helper delivery-range-hint">A taxa n&atilde;o &eacute; escolhida pelo cliente. A Galaxy Burger valida o CEP, confere o endere&ccedil;o e calcula a entrega automaticamente antes do envio do pedido.</p>
+            <p class="field-helper delivery-range-hint">A taxa n&atilde;o &eacute; escolhida pelo cliente. A Galaxy Burger cruza rua e bairro com a tabela local de entrega antes de liberar o pedido.</p>
             <label class="delivery-estimate-terms" id="delivery-estimate-terms">
               <input id="delivery-estimate-ack" type="checkbox">
               <span>Entendo que o pedido s&oacute; pode seguir com a taxa validada para este endere&ccedil;o e que qualquer mudan&ccedil;a no local exige nova valida&ccedil;&atilde;o.</span>
             </label>
             <p class="field-helper" id="delivery-fee-feedback">Preencha o endere&ccedil;o e valide a entrega para atualizar o total.</p>
-            <button id="calculate-delivery-btn" class="btn-primary calculate-delivery-btn" type="button">Validar endere&ccedil;o e calcular taxa</button>
+            <button id="calculate-delivery-btn" class="btn-primary calculate-delivery-btn" type="button">Validar regi&atilde;o e calcular taxa</button>
           </div>
         </div>
 

@@ -60,10 +60,10 @@ const DELIVERY_QUOTE_EXPIRY_BUFFER_MS = 30 * 1000;
 const DELIVERY_REQUEST_TIMEOUT_MS = 12000;
 const VIA_CEP_REQUEST_TIMEOUT_MS = 8000;
 const DELIVERY_AUTO_CALCULATE_DEBOUNCE_MS = 700;
-const DELIVERY_IDLE_MESSAGE = "Informe o CEP, complete o endere\u00e7o e valide a entrega para calcular a taxa.";
+const DELIVERY_IDLE_MESSAGE = "Informe rua, n\u00famero, bairro, cidade e estado para validar a entrega.";
 const CHECKOUT_LOG_PREFIX = "[Galaxy Burger checkout]";
 
-const DELIVERY_STORAGE_KEY = "galaxy_burguer_delivery_v12";
+const DELIVERY_STORAGE_KEY = "galaxy_burguer_delivery_v13";
 const LEGACY_DELIVERY_STORAGE_KEYS = [
   "galaxy_burguer_delivery",
   "galaxy_burguer_delivery_v3",
@@ -75,6 +75,7 @@ const LEGACY_DELIVERY_STORAGE_KEYS = [
   "galaxy_burguer_delivery_v9",
   "galaxy_burguer_delivery_v10",
   "galaxy_burguer_delivery_v11",
+  "galaxy_burguer_delivery_v12",
   "galaxy_burguer_store_coords_v1"
 ];
 
@@ -189,8 +190,9 @@ function formatDistanceKm(value) {
 }
 
 function formatGeocoderSourceLabel(value) {
-  const normalized = normalizeCompareText(value);
+  const normalized = normalizeDeliveryMetadataValue(value);
 
+  if (normalized === "manual_zone_registry" || normalized === "manual_zone") return "cadastro local";
   if (normalized === "google_maps" || normalized === "googlemaps" || normalized === "google") return "Google Maps";
   if (normalized === "photon") return "Photon";
   if (normalized === "nominatim") return "Nominatim";
@@ -198,10 +200,14 @@ function formatGeocoderSourceLabel(value) {
 }
 
 function getDeliveryLocationMethodCopy({ precision = "", source = "", includeProvider = true } = {}) {
-  const normalizedPrecision = normalizeCompareText(precision);
+  const normalizedPrecision = normalizeDeliveryMetadataValue(precision);
   const sourceLabel = includeProvider && source
     ? ` (${formatGeocoderSourceLabel(source)})`
     : "";
+
+  if (normalizedPrecision === "manual_zone") {
+    return `Regi\u00e3o validada pela tabela local da Galaxy Burger${sourceLabel}.`;
+  }
 
   if (normalizedPrecision === "exact") {
     return `Localiza\u00e7\u00e3o precisa: n\u00famero do endere\u00e7o confirmado${sourceLabel}.`;
@@ -222,9 +228,31 @@ function getDeliveryLocationMethodCopy({ precision = "", source = "", includePro
   return "";
 }
 
+function normalizeDeliveryMetadataValue(value) {
+  return normalizeCompareText(value).replace(/[\s-]+/g, "_");
+}
+
+function isManualZoneMetadata({ precision = "", source = "" } = {}) {
+  const normalizedPrecision = normalizeDeliveryMetadataValue(precision);
+  const normalizedSource = normalizeDeliveryMetadataValue(source);
+
+  return normalizedPrecision === "manual_zone" || normalizedSource === "manual_zone_registry";
+}
+
+function getDeliveryQuoteDistanceCopy(quote = {}) {
+  if (Number(quote?.routeDistanceKm) > 0) {
+    return `Dist\u00e2ncia real por rota: ${formatDistanceKm(quote.routeDistanceKm)}.`;
+  }
+
+  if (Number(quote?.distanceKm) > 0) {
+    return `Dist\u00e2ncia calculada: ${formatDistanceKm(quote.distanceKm)}.`;
+  }
+
+  return "";
+}
+
 function buildDeliveryAddressKey(values = {}) {
   return [
-    normalizeCep(values.cep),
     normalizeCompareText(values.street),
     normalizeCompareText(values.number),
     normalizeCompareText(values.neighborhood),
@@ -248,8 +276,7 @@ function isDeliveryQuoteFresh(state = deliveryState) {
 
 function hasCompleteDeliveryAddress(values = getDeliveryValues()) {
   return (
-    normalizeCep(values.cep).length === 8
-    && Boolean(normalizeText(values.street))
+    Boolean(normalizeText(values.street))
     && Boolean(normalizeText(values.number))
     && Boolean(normalizeText(values.neighborhood))
     && Boolean(normalizeText(values.city))
@@ -732,7 +759,6 @@ function validateAddressFields(showMessage = true) {
   const values = getDeliveryValues();
 
   const required = [
-    { field: fields.cep, value: values.cep, message: "Informe um CEP v\u00e1lido." },
     { field: fields.street, value: values.street, message: "Informe a rua." },
     { field: fields.number, value: values.number, message: "Informe o n\u00famero." },
     { field: fields.neighborhood, value: values.neighborhood, message: "Informe o bairro." },
@@ -811,10 +837,18 @@ function normalizeDeliveryQuotePayload(payload, values) {
   const status = payload?.status === "out_of_range" ? "out_of_range" : "ready";
   const isOutOfRange = status === "out_of_range";
   const fee = Number(payload?.fee);
-  const distanceKm = Number(payload?.distanceKm);
-  const routeDistanceKm = Number(payload?.routeDistanceKm || payload?.distanceKm);
+  const isManualZone = isManualZoneMetadata({
+    precision: payload?.locationPrecision,
+    source: payload?.geocoderSource
+  });
+  const parsedDistanceKm = Number(payload?.distanceKm);
+  const parsedRouteDistanceKm = Number(payload?.routeDistanceKm ?? payload?.distanceKm);
+  const distanceKm = Number.isFinite(parsedDistanceKm) && parsedDistanceKm > 0 ? parsedDistanceKm : 0;
+  const routeDistanceKm = Number.isFinite(parsedRouteDistanceKm) && parsedRouteDistanceKm > 0
+    ? parsedRouteDistanceKm
+    : distanceKm;
 
-  if (!Number.isFinite(distanceKm) || distanceKm <= 0) {
+  if (!isManualZone && (!Number.isFinite(distanceKm) || distanceKm <= 0)) {
     throw createDeliveryRequestError(
       "A resposta da entrega voltou sem uma dist\u00e2ncia v\u00e1lida.",
       "delivery_quote_invalid_distance",
@@ -823,7 +857,7 @@ function normalizeDeliveryQuotePayload(payload, values) {
     );
   }
 
-  if (!Number.isFinite(routeDistanceKm) || routeDistanceKm <= 0) {
+  if (!isManualZone && (!Number.isFinite(routeDistanceKm) || routeDistanceKm <= 0)) {
     throw createDeliveryRequestError(
       "A resposta da entrega voltou sem uma rota v\u00e1lida.",
       "delivery_quote_invalid_route",
@@ -1302,7 +1336,7 @@ function updateDeliveryUI() {
           ? "Taxa validada"
           : deliveryState.status === "out_of_range"
             ? "Entrega indispon\u00edvel"
-          : "Validar endere\u00e7o e calcular taxa";
+          : "Validar regi\u00e3o e calcular taxa";
 
     fields.calculateDeliveryButton.classList.toggle("is-success", deliveryState.status === "ready");
   }
@@ -1311,14 +1345,20 @@ function updateDeliveryUI() {
     if (isPickup) {
       fields.quoteSummary.textContent = "Retirada no balc\u00e3o, sem taxa de entrega.";
     } else if (deliveryState.status === "ready") {
+      const usesManualZones = isManualZoneMetadata({
+        precision: deliveryState.locationPrecision,
+        source: deliveryState.geocoderSource
+      });
       const locationMethodCopy = getDeliveryLocationMethodCopy({
         precision: deliveryState.locationPrecision,
         source: deliveryState.geocoderSource
       });
       const summaryParts = [
-        "Endere\u00e7o validado pelo servidor.",
+        usesManualZones
+          ? "Endere\u00e7o validado na tabela local de entrega."
+          : "Endere\u00e7o validado pelo servidor.",
         deliveryState.distanceLabel || "",
-        deliveryState.routeDistanceKm ? `Dist\u00e2ncia real por rota: ${formatDistanceKm(deliveryState.routeDistanceKm)}.` : deliveryState.distanceKm ? `Dist\u00e2ncia calculada: ${formatDistanceKm(deliveryState.distanceKm)}.` : "",
+        getDeliveryQuoteDistanceCopy(deliveryState),
         locationMethodCopy,
         deliveryState.quoteCode ? `C\u00f3digo da cota\u00e7\u00e3o: ${deliveryState.quoteCode}.` : ""
       ].filter(Boolean);
@@ -1335,7 +1375,7 @@ function updateDeliveryUI() {
     } else if (deliveryState.status === "loading") {
       fields.quoteSummary.textContent = "Calculando taxa de entrega...";
     } else {
-      fields.quoteSummary.textContent = "Informe o CEP, complete o endere\u00e7o e valide a entrega para calcular a taxa.";
+      fields.quoteSummary.textContent = DELIVERY_IDLE_MESSAGE;
     }
   }
 
@@ -1357,12 +1397,23 @@ function updateDeliveryUI() {
     if (isPickup) {
       fields.totalNote.textContent = "Total final para retirada no local";
     } else if (deliveryState.status === "ready") {
+      const usesManualZones = isManualZoneMetadata({
+        precision: deliveryState.locationPrecision,
+        source: deliveryState.geocoderSource
+      });
       const precisionNote = getDeliveryLocationMethodCopy({
         precision: deliveryState.locationPrecision,
         source: deliveryState.geocoderSource,
         includeProvider: false
       });
-      fields.totalNote.textContent = `Taxa validada para este endere\u00e7o: ${deliveryState.distanceLabel}. ${precisionNote} Se o local mudar, a Galaxy Burger exige nova valida\u00e7\u00e3o.`;
+      fields.totalNote.textContent = [
+        usesManualZones
+          ? `Taxa validada para esta regi\u00e3o: ${deliveryState.distanceLabel}.`
+          : `Taxa validada para este endere\u00e7o: ${deliveryState.distanceLabel}.`,
+        getDeliveryQuoteDistanceCopy(deliveryState),
+        precisionNote,
+        "Se o local mudar, a Galaxy Burger exige nova valida\u00e7\u00e3o."
+      ].filter(Boolean).join(" ");
     } else if (deliveryState.status === "out_of_range") {
       fields.totalNote.textContent = deliveryState.message || "No momento n\u00e3o entregamos para essa regi\u00e3o.";
     } else if (deliveryState.status === "loading") {
@@ -2426,6 +2477,12 @@ function getDeliveryQuoteStatusCopy(quote) {
   if (status === "loading") return "Verificando cota\u00e7\u00e3o no servidor";
   if (status === "invalid") return "Cota\u00e7\u00e3o inv\u00e1lida ou comanda alterada";
   if (status === "expired") return "Cota\u00e7\u00e3o expirada";
+  if (isManualZoneMetadata({
+    precision: quote?.locationPrecision,
+    source: quote?.geocoderSource
+  })) {
+    return "Taxa validada pela tabela local da Galaxy Burger";
+  }
 
   return "Taxa validada pelo servidor";
 }
