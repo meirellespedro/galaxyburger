@@ -19,10 +19,24 @@
       cep: "23070010",
       country: "Brasil"
     }),
+    serviceArea: Object.freeze({
+      neighborhood: "Campo Grande",
+      city: "Rio de Janeiro",
+      state: "RJ"
+    }),
+    normalization: Object.freeze({
+      abbreviations: Object.freeze({
+        cg: "campo grande",
+        jd: "jardim",
+        sta: "santa",
+        sto: "santo",
+        vl: "vila"
+      })
+    }),
     messages: Object.freeze({
       local: "Entrega dispon\u00edvel para sua regi\u00e3o. Taxa: R$ 5,00.",
       extended: "Entrega dispon\u00edvel para sua regi\u00e3o. Taxa: R$ 10,00.",
-      outOfRange: "No momento n\u00e3o entregamos nesse endere\u00e7o. Voc\u00ea pode escolher retirada no local."
+      outOfRange: "No momento n\u00e3o entregamos nessa regi\u00e3o. Voc\u00ea pode escolher retirada no local."
     }),
     metadata: Object.freeze({
       locationPrecision: "manual_zone",
@@ -65,11 +79,16 @@
           "centro de campo grande",
           "campo grande centro",
           "mendanha",
+          "sao basilio",
+          "sao claudio",
+          "vila nova",
           "vila nova campo grande"
         ]),
         streetHints: Object.freeze([
           "rua embaixador muniz gordilho",
           "rua jocelin fraga",
+          "rua soldado lindo sardagna",
+          "rua soldado lino sardagna",
           "rua toroqua",
           "rua varzea alegre",
           "rua ana barcelos",

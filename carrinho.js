@@ -1,4 +1,4 @@
-﻿let cart = JSON.parse(localStorage.getItem("cart")) || [];
+let cart = loadSavedCart();
 
 const PIX_KEY = "66.219.861/0001-73";
 const PIX_BENEFICIARY_NAME = "Sulen Ferreira de Carvalho de Souza";
@@ -8,6 +8,7 @@ const IFOOD_STORE_URL = "https://www.ifood.com.br/delivery/rio-de-janeiro-rj/gal
 // Quando o site estiver publicado, coloque aqui a URL final da loja.
 // Exemplo: "https://galaxy-burger.vercel.app"
 const PUBLIC_ORDER_TICKET_BASE_URL = "https://galaxyburger.vercel.app/";
+const SHARED_DELIVERY_CONFIG = window.GALAXY_DELIVERY_CONFIG || {};
 
 const STORE_ADDRESS = "Rua Embaixador Muniz Gordilho, 199 - Campo Grande, Rio de Janeiro/RJ - CEP 23070-010";
 const STORE_ADDRESS_LINES = Object.freeze([
@@ -60,10 +61,17 @@ const DELIVERY_QUOTE_EXPIRY_BUFFER_MS = 30 * 1000;
 const DELIVERY_REQUEST_TIMEOUT_MS = 12000;
 const VIA_CEP_REQUEST_TIMEOUT_MS = 8000;
 const DELIVERY_AUTO_CALCULATE_DEBOUNCE_MS = 700;
-const DELIVERY_IDLE_MESSAGE = "Informe rua, n\u00famero, bairro, cidade e estado para validar a entrega.";
+const DELIVERY_IDLE_MESSAGE = "Preencha o endere\u00e7o completo para calcular a entrega.";
 const CHECKOUT_LOG_PREFIX = "[Galaxy Burger checkout]";
+const DELIVERY_STATUS_VALUES = new Set(["idle", "loading", "ready", "out_of_range", "error", "pickup"]);
+const INVALID_HOUSE_NUMBER_VALUES = new Set(["s/n", "s n", "sn", "sem numero", "sem numero.", "sem numero,"]);
+const BR_PHONE_MIN_LENGTH = 10;
+const BR_PHONE_MAX_LENGTH = 11;
+const DELIVERY_NORMALIZATION_ABBREVIATIONS = Object.freeze(
+  Object.entries(SHARED_DELIVERY_CONFIG.normalization?.abbreviations || {})
+);
 
-const DELIVERY_STORAGE_KEY = "galaxy_burguer_delivery_v13";
+const DELIVERY_STORAGE_KEY = "galaxy_burguer_delivery_v14";
 const LEGACY_DELIVERY_STORAGE_KEYS = [
   "galaxy_burguer_delivery",
   "galaxy_burguer_delivery_v3",
@@ -76,17 +84,26 @@ const LEGACY_DELIVERY_STORAGE_KEYS = [
   "galaxy_burguer_delivery_v10",
   "galaxy_burguer_delivery_v11",
   "galaxy_burguer_delivery_v12",
+  "galaxy_burguer_delivery_v13",
   "galaxy_burguer_store_coords_v1"
 ];
 
 let deliveryState = createDeliveryState();
 
 const viaCepCache = new Map();
-const DELIVERY_ZONE_LABELS = Object.freeze({
-  local: `At\u00e9 3 km da base - ${formatCurrency(DELIVERY_FEE_LOCAL)}`,
-  extended: `De 3 km at\u00e9 5 km da base - ${formatCurrency(DELIVERY_FEE_EXTENDED)}`,
-  out_of_range: "Acima de 5 km - apenas retirada"
-});
+const DELIVERY_ZONE_LABELS = Object.freeze(
+  (Array.isArray(SHARED_DELIVERY_CONFIG.zones) ? SHARED_DELIVERY_CONFIG.zones : []).reduce((labels, zone) => {
+    if (zone?.value && zone?.label) {
+      labels[zone.value] = normalizeText(zone.label);
+    }
+
+    return labels;
+  }, {
+    local: `At\u00e9 3 km da base - ${formatCurrency(DELIVERY_FEE_LOCAL)}`,
+    extended: `De 3 km at\u00e9 5 km da base - ${formatCurrency(DELIVERY_FEE_EXTENDED)}`,
+    out_of_range: "Acima de 5 km - apenas retirada"
+  })
+);
 const DEFAULT_COMBO_DRINK_OPTIONS = Object.freeze([
   "Coca-Cola Comum 350ML",
   "Coca-Cola Zero 350 ml",
@@ -107,10 +124,15 @@ let activeViaCepLookup = null;
 let deliveryAutoQuoteTimer = 0;
 
 function formatCurrency(value) {
-  return Number(value || 0).toLocaleString("pt-BR", {
+  return normalizeMoneyValue(value).toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL"
   });
+}
+
+function normalizeMoneyValue(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function normalizeCep(value) {
@@ -134,8 +156,95 @@ function normalizeCompareText(value) {
     .toLowerCase();
 }
 
-function createDeliveryState(overrides = {}) {
+function applyAddressAbbreviations(value) {
+  return DELIVERY_NORMALIZATION_ABBREVIATIONS.reduce((normalizedValue, [alias, replacement]) =>
+    normalizedValue.replace(new RegExp(`\\b${alias}\\b`, "g"), replacement),
+  value);
+}
+
+function normalizeAddressToken(value) {
+  return applyAddressAbbreviations(normalizeCompareText(value))
+    .replace(/[.,/\\-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizePhoneDigits(value) {
+  return String(value || "").replace(/\D/g, "").slice(0, BR_PHONE_MAX_LENGTH);
+}
+
+function formatPhoneInput(value) {
+  const digits = normalizePhoneDigits(value);
+
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+function isValidPhoneNumber(value) {
+  const digits = normalizePhoneDigits(value);
+  return digits.length >= BR_PHONE_MIN_LENGTH && digits.length <= BR_PHONE_MAX_LENGTH;
+}
+
+function normalizeDeliveryStateStatus(value) {
+  const status = normalizeCompareText(value).replace(/\s+/g, "_");
+  return DELIVERY_STATUS_VALUES.has(status) ? status : "idle";
+}
+
+function sanitizeValidatedAddress(address) {
+  if (!address || typeof address !== "object") {
+    return null;
+  }
+
   return {
+    cep: normalizeCep(address.cep),
+    street: normalizeText(address.street),
+    number: normalizeText(address.number),
+    neighborhood: normalizeText(address.neighborhood),
+    complement: normalizeText(address.complement),
+    reference: normalizeText(address.reference),
+    city: normalizeText(address.city),
+    state: normalizeText(address.state).toUpperCase()
+  };
+}
+
+function sanitizeCartItem(item) {
+  const name = normalizeText(item?.name);
+  const quantity = Math.max(1, Math.round(normalizeMoneyValue(item?.quantity, 0)));
+  const price = normalizeMoneyValue(item?.price, NaN);
+  const variantLabel = normalizeText(item?.variantLabel);
+
+  if (!name || !Number.isFinite(price) || price < 0 || quantity <= 0) {
+    return null;
+  }
+
+  return {
+    name,
+    price,
+    quantity,
+    ...(variantLabel ? { variantLabel } : {})
+  };
+}
+
+function loadSavedCart() {
+  try {
+    const rawCart = JSON.parse(localStorage.getItem("cart") || "[]");
+    if (!Array.isArray(rawCart)) {
+      return [];
+    }
+
+    return rawCart
+      .map(sanitizeCartItem)
+      .filter(Boolean);
+  } catch {
+    localStorage.removeItem("cart");
+    return [];
+  }
+}
+
+function createDeliveryState(overrides = {}) {
+  const nextState = {
     status: "idle",
     fee: 0,
     distanceLabel: "",
@@ -152,6 +261,24 @@ function createDeliveryState(overrides = {}) {
     geocoderSource: "",
     validatedAddress: null,
     ...overrides
+  };
+
+  return {
+    status: normalizeDeliveryStateStatus(nextState.status),
+    fee: Math.max(0, normalizeMoneyValue(nextState.fee)),
+    distanceLabel: normalizeText(nextState.distanceLabel),
+    distanceRange: normalizeText(nextState.distanceRange),
+    address: normalizeText(nextState.address),
+    message: normalizeText(nextState.message) || DELIVERY_IDLE_MESSAGE,
+    quoteCode: normalizeText(nextState.quoteCode),
+    quoteToken: String(nextState.quoteToken || "").trim(),
+    addressKey: normalizeText(nextState.addressKey),
+    expiresAt: String(nextState.expiresAt || "").trim(),
+    distanceKm: Math.max(0, normalizeMoneyValue(nextState.distanceKm)),
+    routeDistanceKm: Math.max(0, normalizeMoneyValue(nextState.routeDistanceKm)),
+    locationPrecision: normalizeText(nextState.locationPrecision),
+    geocoderSource: normalizeText(nextState.geocoderSource),
+    validatedAddress: sanitizeValidatedAddress(nextState.validatedAddress)
   };
 }
 
@@ -184,7 +311,7 @@ function isCampoGrandeNeighborhood(value) {
 }
 
 function formatDistanceKm(value) {
-  const distance = Number(value || 0);
+  const distance = normalizeMoneyValue(value, 0);
   if (!Number.isFinite(distance) || distance <= 0) return "";
   return `${distance.toFixed(1).replace(".", ",")} km`;
 }
@@ -253,10 +380,10 @@ function getDeliveryQuoteDistanceCopy(quote = {}) {
 
 function buildDeliveryAddressKey(values = {}) {
   return [
-    normalizeCompareText(values.street),
-    normalizeCompareText(values.number),
-    normalizeCompareText(values.neighborhood),
-    normalizeCompareText(values.city),
+    normalizeAddressToken(values.street),
+    normalizeAddressToken(values.number),
+    normalizeAddressToken(values.neighborhood),
+    normalizeAddressToken(values.city),
     normalizeText(values.state).toUpperCase()
   ].join("|");
 }
@@ -493,6 +620,14 @@ function getDeliveryFields() {
     estimateTerms: document.getElementById("delivery-estimate-terms"),
     searchCepButton: document.getElementById("search-cep-btn"),
     calculateDeliveryButton: document.getElementById("calculate-delivery-btn")
+  };
+}
+
+function getCheckoutContactFields() {
+  return {
+    name: document.getElementById("customer-name"),
+    phone: document.getElementById("customer-phone"),
+    notes: document.getElementById("order-notes")
   };
 }
 
@@ -754,6 +889,10 @@ function getDeliveryValues() {
   };
 }
 
+function isInvalidHouseNumberValue(value) {
+  return INVALID_HOUSE_NUMBER_VALUES.has(normalizeAddressToken(value));
+}
+
 function validateAddressFields(showMessage = true) {
   const fields = getDeliveryFields();
   const values = getDeliveryValues();
@@ -776,12 +915,30 @@ function validateAddressFields(showMessage = true) {
 
     if (showMessage) {
       logCheckoutWarn("Checkout bloqueado: endere\u00e7o incompleto.", { missingField: missing.field?.id || "unknown" });
-      showToast(missing.message);
+      showToast(DELIVERY_IDLE_MESSAGE);
       setDeliveryState(createDeliveryState({
         status: "idle",
         distanceRange: values.distanceRange || "",
         address: syncDeliveryAddressField(),
-        message: missing.message,
+        message: DELIVERY_IDLE_MESSAGE,
+      }));
+    }
+
+    return false;
+  }
+
+  if (isInvalidHouseNumberValue(values.number)) {
+    setFieldInvalid(fields.number);
+    fields.number?.focus();
+
+    if (showMessage) {
+      logCheckoutWarn("Checkout bloqueado: numero invalido para entrega.");
+      showToast("Informe o n\u00famero da resid\u00eancia para calcular a entrega.");
+      setDeliveryState(createDeliveryState({
+        status: "idle",
+        distanceRange: values.distanceRange || "",
+        address: syncDeliveryAddressField(),
+        message: "Informe o n\u00famero da resid\u00eancia para calcular a entrega."
       }));
     }
 
@@ -867,7 +1024,7 @@ function normalizeDeliveryQuotePayload(payload, values) {
   }
 
   if (!isOutOfRange) {
-    if (!Number.isFinite(fee) || fee <= 0) {
+    if (!Number.isFinite(fee) || fee <= 0 || ![DELIVERY_FEE_LOCAL, DELIVERY_FEE_EXTENDED].includes(fee)) {
       throw createDeliveryRequestError(
         "A resposta da entrega voltou sem uma taxa v\u00e1lida.",
         "delivery_quote_invalid_fee",
@@ -1509,7 +1666,11 @@ function clearDeliveryData() {
 }
 
 function getCartTotal() {
-  return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  return cart.reduce((sum, item) => {
+    const price = normalizeMoneyValue(item?.price, 0);
+    const quantity = Math.max(0, Math.round(normalizeMoneyValue(item?.quantity, 0)));
+    return sum + (price * quantity);
+  }, 0);
 }
 
 function hasReachedMinimumOrder(subtotal = getCartTotal()) {
@@ -1631,7 +1792,7 @@ function updateCartTotals() {
   const hasAcceptedEstimate = Boolean(getDeliveryFields().estimateAck?.checked);
   const hasValidatedDelivery = !isPickup && deliveryState.status === "ready" && Boolean(deliveryState.quoteToken);
   const fee = hasItems && hasValidatedDelivery
-    ? deliveryState.fee
+    ? Math.max(0, normalizeMoneyValue(deliveryState.fee))
     : 0;
 
   const total = hasItems ? subtotal + fee : 0;
@@ -1672,6 +1833,9 @@ function updateCartTotals() {
 }
 
 function saveCart() {
+  cart = cart
+    .map(sanitizeCartItem)
+    .filter(Boolean);
   localStorage.setItem("cart", JSON.stringify(cart));
 }
 
@@ -2591,6 +2755,7 @@ function buildSharedOrderTicketUrl(orderDetails) {
   const sharedPayload = {
     d: orderDetails.createdAt,
     n: orderDetails.name,
+    c: orderDetails.customerPhone || "",
     o: orderDetails.notes,
     p: orderDetails.isPickup ? 1 : 0,
     m: orderDetails.mapsLink || "",
@@ -2708,6 +2873,7 @@ function decodeSharedOrderTicketPayload(encodedTicket) {
     return {
       createdAt: normalizeText(rawPayload.d) || getOrderCreatedAtLabel(),
       name: normalizeText(rawPayload.n),
+      customerPhone: formatPhoneInput(rawPayload.c),
       notes: normalizeText(rawPayload.o),
       isPickup,
       fulfillmentLabel: isPickup ? "Retirada" : "Entrega",
@@ -2800,6 +2966,10 @@ function buildOrderTicketPreviewMarkup(orderDetails) {
         <div class="order-ticket-meta-card">
           <span>Cliente</span>
           <strong>${escapeHtml(orderDetails.name)}</strong>
+        </div>
+        <div class="order-ticket-meta-card">
+          <span>Telefone</span>
+          <strong>${escapeHtml(orderDetails.customerPhone || "N\u00e3o informado")}</strong>
         </div>
         <div class="order-ticket-meta-card">
           <span>Pagamento</span>
@@ -3017,6 +3187,7 @@ function getCartItemsCount() {
 
 function buildWhatsAppOrderMessage({
   name,
+  customerPhone,
   isPickup,
   address,
   deliveryValues,
@@ -3063,6 +3234,7 @@ function buildWhatsAppOrderMessage({
   lines.push(
     "",
     `Nome: ${name}`,
+    `Telefone: ${customerPhone || "Nao informado"}`,
     `Pedido: ${itemsCount}`,
     "",
     "Itens:",
@@ -3414,6 +3586,13 @@ function printOrderTicket() {
 }
 
 function confirmOrderTicket() {
+  const confirmButton = document.getElementById("order-ticket-confirm-button");
+
+  if (confirmButton?.dataset.busy === "true") {
+    logCheckoutWarn("Clique ignorado: confirmacao da comanda ja esta em andamento.");
+    return;
+  }
+
   if (!pendingOrderPreview) {
     logCheckoutWarn("Tentativa de confirmar comanda sem preview.");
     showToast("Monte a comanda novamente antes de enviar.");
@@ -3506,7 +3685,9 @@ function handleSharedOrderTicketFromUrl() {
 }
 
 function validateCheckout() {
-  const nameField = document.getElementById("customer-name");
+  const contactFields = getCheckoutContactFields();
+  const nameField = contactFields.name;
+  const phoneField = contactFields.phone;
   const payment = getPaymentFields();
   const paymentField = payment.field;
   const isPickup = getCurrentFulfillmentMode() === "pickup";
@@ -3532,6 +3713,16 @@ function validateCheckout() {
 
   clearFieldInvalid(nameField);
 
+  if (!isValidPhoneNumber(phoneField?.value)) {
+    setFieldInvalid(phoneField);
+    logCheckoutWarn("Checkout bloqueado: telefone invalido ou ausente.");
+    showToast("Informe seu telefone com DDD para continuar.");
+    phoneField?.focus();
+    return false;
+  }
+
+  clearFieldInvalid(phoneField);
+
   if (!hasReachedMinimumOrder(subtotal)) {
     logCheckoutWarn("Checkout bloqueado: pedido m\u00ednimo n\u00e3o atingido.", { subtotal });
     showToast(`O pedido m\u00ednimo da Galaxy Burger \u00e9 ${formatCurrency(MIN_ORDER_AMOUNT)} em produtos. Faltam ${formatCurrency(getMinimumOrderShortfall(subtotal))} para continuar.`);
@@ -3549,7 +3740,7 @@ function validateCheckout() {
 
     if (deliveryState.status === "out_of_range") {
       logCheckoutWarn("Checkout bloqueado: endere\u00e7o fora da \u00e1rea.");
-      showToast("Esse endere\u00e7o est\u00e1 fora da \u00e1rea de entrega. Selecione retirada para continuar.");
+      showToast(deliveryState.message || "No momento n\u00e3o entregamos nessa regi\u00e3o. Voc\u00ea pode escolher retirada no local.");
       return false;
     }
 
@@ -3590,8 +3781,10 @@ function validateCheckout() {
 }
 
 async function buildPendingOrderPreview() {
-  const name = normalizeText(document.getElementById("customer-name")?.value);
-  const notes = normalizeText(document.getElementById("order-notes")?.value);
+  const contactFields = getCheckoutContactFields();
+  const name = normalizeText(contactFields.name?.value);
+  const customerPhone = formatPhoneInput(contactFields.phone?.value);
+  const notes = normalizeText(contactFields.notes?.value);
   const paymentMethod = document.getElementById("payment-method")?.value || "";
   const isPickup = getCurrentFulfillmentMode() === "pickup";
   let deliveryValues = isPickup ? {} : getDeliveryValues();
@@ -3652,6 +3845,7 @@ async function buildPendingOrderPreview() {
   const orderPreview = {
     createdAt,
     name,
+    customerPhone,
     notes,
     isPickup,
     fulfillmentLabel: isPickup ? "Retirada" : "Entrega",
@@ -3683,6 +3877,7 @@ async function buildPendingOrderPreview() {
 
   const whatsAppPayload = {
     name,
+    customerPhone,
     isPickup,
     address,
     deliveryValues,
@@ -3761,7 +3956,21 @@ async function finalizeOrder() {
 
 function bindDeliveryEvents() {
   const fields = getDeliveryFields();
+  const contactFields = getCheckoutContactFields();
   const cashFields = getCashChangeFields();
+
+  if (contactFields.name) {
+    contactFields.name.addEventListener("input", () => {
+      clearFieldInvalid(contactFields.name);
+    });
+  }
+
+  if (contactFields.phone) {
+    contactFields.phone.addEventListener("input", () => {
+      contactFields.phone.value = formatPhoneInput(contactFields.phone.value);
+      clearFieldInvalid(contactFields.phone);
+    });
+  }
 
   if (fields.cep) {
     fields.cep.addEventListener("input", () => {

@@ -838,6 +838,9 @@
         <label class="field-label" for="customer-name">Seu nome</label>
         <input id="customer-name" type="text" placeholder="Ex: Beatriz" autocomplete="name">
 
+        <label class="field-label" for="customer-phone">Seu telefone</label>
+        <input id="customer-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Ex: (21) 99999-9999">
+
         <label class="field-label" for="order-notes">Observa&ccedil;&otilde;es do pedido</label>
         <textarea id="order-notes" placeholder="Ex: sem cebola, trocar bebida, caprichar no molho"></textarea>
 
@@ -903,7 +906,7 @@
             <span class="field-label delivery-fee-title">Taxa validada de entrega</span>
             <p class="field-helper delivery-range-store">Origem: Rua Embaixador Muniz Gordilho, 199 - Campo Grande/RJ</p>
             <input id="delivery-distance-range" type="hidden" value="">
-            <div id="delivery-quote-summary" class="delivery-quote-summary">Informe rua, n&uacute;mero, bairro, cidade e estado para validar a entrega.</div>
+            <div id="delivery-quote-summary" class="delivery-quote-summary">Preencha o endere&ccedil;o completo para calcular a entrega.</div>
             <ul class="delivery-policy-list" aria-label="Pol&iacute;tica autom&aacute;tica de entrega">
               <li>Regi&atilde;o pr&oacute;xima cadastrada: R$ 5,00</li>
               <li>Regi&atilde;o intermedi&aacute;ria cadastrada: R$ 10,00</li>
@@ -914,7 +917,7 @@
               <input id="delivery-estimate-ack" type="checkbox">
               <span>Entendo que o pedido s&oacute; pode seguir com a taxa validada para este endere&ccedil;o e que qualquer mudan&ccedil;a no local exige nova valida&ccedil;&atilde;o.</span>
             </label>
-            <p class="field-helper" id="delivery-fee-feedback">Preencha o endere&ccedil;o e valide a entrega para atualizar o total.</p>
+            <p class="field-helper" id="delivery-fee-feedback">Preencha o endere&ccedil;o completo para calcular a entrega.</p>
             <button id="calculate-delivery-btn" class="btn-primary calculate-delivery-btn" type="button">Validar regi&atilde;o e calcular taxa</button>
           </div>
         </div>

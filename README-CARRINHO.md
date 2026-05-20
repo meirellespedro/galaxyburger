@@ -6,6 +6,7 @@ Site estatico com checkout via WhatsApp e taxa de entrega validada por uma funca
 
 - `Entrega`: endereco preenchido no checkout e validado automaticamente pela API `/api/delivery-quote`.
 - `CEP`: opcional e usado apenas para autocomplete via ViaCEP.
+- `Telefone do cliente`: obrigatorio para liberar o envio do pedido.
 - `Taxa por zona local`:
   - `Regiao proxima cadastrada`: `R$ 5,00`
   - `Regiao intermediaria cadastrada`: `R$ 10,00`

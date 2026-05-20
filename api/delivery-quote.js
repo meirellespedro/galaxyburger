@@ -18,6 +18,7 @@ const ADDRESS_STOP_WORDS = new Set([
 ]);
 const INVALID_HOUSE_NUMBER_VALUES = new Set([
   "s/n",
+  "s n",
   "sn",
   "sem numero",
   "sem numero.",
@@ -25,10 +26,14 @@ const INVALID_HOUSE_NUMBER_VALUES = new Set([
 ]);
 
 const STORE_ADDRESS = Object.freeze(deliveryConfig.store);
+const SERVICE_AREA = Object.freeze(deliveryConfig.serviceArea || {});
 const DELIVERY_ZONES = Object.freeze(deliveryConfig.zones);
 const BLOCKED_RULES = Object.freeze(deliveryConfig.blockedRules);
 const DELIVERY_MESSAGES = Object.freeze(deliveryConfig.messages);
 const DELIVERY_METADATA = Object.freeze(deliveryConfig.metadata);
+const DELIVERY_NORMALIZATION_ABBREVIATIONS = Object.freeze(
+  Object.entries(deliveryConfig.normalization?.abbreviations || {})
+);
 
 module.exports = async function handler(req, res) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -180,8 +185,14 @@ function normalizeCompareText(value) {
     .toLowerCase();
 }
 
+function applyAddressAbbreviations(value) {
+  return DELIVERY_NORMALIZATION_ABBREVIATIONS.reduce((normalizedValue, [alias, replacement]) =>
+    normalizedValue.replace(new RegExp(`\\b${alias}\\b`, "g"), replacement),
+  value);
+}
+
 function normalizeAddressToken(value) {
-  return normalizeCompareText(value)
+  return applyAddressAbbreviations(normalizeCompareText(value))
     .replace(/[.,/\\-]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -203,20 +214,26 @@ function streetTokensLookCompatible(left, right) {
   }
 
   return leftTokens.every(leftToken =>
-    rightTokens.some(rightToken =>
-      leftToken === rightToken
-      || leftToken.includes(rightToken)
-      || rightToken.includes(leftToken)
-    )
+    rightTokens.some(rightToken => {
+      if (leftToken === rightToken) {
+        return true;
+      }
+
+      if (leftToken.length < 4 || rightToken.length < 4) {
+        return false;
+      }
+
+      return leftToken.startsWith(rightToken) || rightToken.startsWith(leftToken);
+    })
   );
 }
 
 function buildDeliveryAddressKey(values = {}) {
   return [
-    normalizeCompareText(values.street),
-    normalizeCompareText(values.number),
-    normalizeCompareText(values.neighborhood),
-    normalizeCompareText(values.city),
+    normalizeAddressToken(values.street),
+    normalizeAddressToken(values.number),
+    normalizeAddressToken(values.neighborhood),
+    normalizeAddressToken(values.city),
     normalizeText(values.state).toUpperCase()
   ].join("|");
 }
@@ -248,9 +265,25 @@ function assertSubmittedAddress(address) {
     throw createError("missing_address_field", missing[1], 422);
   }
 
-  if (INVALID_HOUSE_NUMBER_VALUES.has(normalizeCompareText(address.number))) {
+  if (INVALID_HOUSE_NUMBER_VALUES.has(normalizeAddressToken(address.number))) {
     throw createError("invalid_house_number", "Informe o numero da residencia para calcular a entrega.", 422);
   }
+}
+
+function isSupportedServiceArea(address) {
+  const expectedCity = normalizeAddressToken(SERVICE_AREA.city);
+  const receivedCity = normalizeAddressToken(address.city);
+  const expectedState = normalizeText(SERVICE_AREA.state).toUpperCase();
+  const receivedState = normalizeText(address.state).toUpperCase();
+
+  if (!expectedCity || !expectedState) {
+    return true;
+  }
+
+  const isSupportedCity = expectedCity === receivedCity
+    || (expectedCity === "rio de janeiro" && receivedCity === "rio");
+
+  return isSupportedCity && expectedState === receivedState;
 }
 
 function encodeBase64Url(value) {
@@ -407,6 +440,22 @@ function buildDeliveryQuote(payload) {
   const submittedAddress = sanitizeSubmittedAddress(payload);
   assertSubmittedAddress(submittedAddress);
 
+  if (!isSupportedServiceArea(submittedAddress)) {
+    return {
+      status: "out_of_range",
+      fee: 0,
+      zone: "out_of_range",
+      zoneLabel: "Acima de 5 km - apenas retirada",
+      distanceKm: 0,
+      routeDistanceKm: 0,
+      locationPrecision: DELIVERY_METADATA.locationPrecision,
+      geocoderSource: DELIVERY_METADATA.geocoderSource,
+      distanceLabel: "Acima de 5 km - apenas retirada",
+      message: DELIVERY_MESSAGES.outOfRange,
+      address: submittedAddress
+    };
+  }
+
   const zoneMatch = resolveDeliveryRule(submittedAddress);
 
   if (zoneMatch.status === "out_of_range" || !zoneMatch.zone) {
@@ -462,4 +511,3 @@ function buildDeliveryQuote(payload) {
     }
   };
 }
-
