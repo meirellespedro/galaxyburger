@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#05080a">
+  <title>Painel Administrativo | Galaxy Burger</title>
+  <link rel="icon" href="img/logotipo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=20260521-1">
+  <script src="store-config.js?v=20260520-3" defer></script>
+  <script src="admin.js?v=20260521-1" defer></script>
+</head>
+<body class="admin-body">
+  <div class="space-dust" aria-hidden="true"></div>
+  <div class="aurora aurora-one" aria-hidden="true"></div>
+  <div class="aurora aurora-two" aria-hidden="true"></div>
+
+  <main class="admin-shell">
+    <section class="admin-panel admin-login-panel" id="admin-login-panel">
+      <span class="section-kicker">Painel administrativo</span>
+      <h1 id="admin-brand-title">Controle operacional da Galaxy Burger</h1>
+      <p>Entre com a senha do painel para atualizar bairros de entrega, taxas e estoque sem mexer no c&oacute;digo.</p>
+
+      <form id="admin-login-form" class="admin-form" autocomplete="off">
+        <label class="admin-field">
+          <span>Senha do painel</span>
+          <input id="admin-password" name="password" type="password" inputmode="text" autocomplete="current-password" placeholder="Digite a senha" required>
+        </label>
+
+        <button id="admin-login-button" class="btn-primary admin-submit" type="submit">Entrar no painel</button>
+        <p id="admin-login-message" class="admin-inline-message" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section class="admin-panel admin-dashboard" id="admin-dashboard" hidden>
+      <div class="admin-dashboard-head">
+        <div>
+          <span class="section-kicker">Gest&atilde;o segura</span>
+          <h2>Painel do dono</h2>
+          <p id="admin-last-updated">Carregando informa&ccedil;&otilde;es do painel...</p>
+        </div>
+
+        <div class="admin-dashboard-actions">
+          <button id="admin-refresh-button" type="button" class="btn-secondary admin-toolbar-btn">Atualizar tudo</button>
+          <button id="admin-logout-button" type="button" class="outline-link admin-toolbar-btn">Sair</button>
+        </div>
+      </div>
+
+      <p id="admin-dashboard-message" class="admin-inline-message" aria-live="polite"></p>
+
+      <section class="admin-section">
+        <div class="admin-section-head">
+          <div>
+            <span class="section-kicker">Entrega</span>
+            <h3>Gerencie os bairros atendidos</h3>
+            <p>Cadastre bairros, ajuste taxas e escolha se o local fica com entrega ativa, bloqueado ou somente retirada.</p>
+          </div>
+          <p id="admin-delivery-storage-note" class="admin-section-note">Carregando armazenamento dos bairros...</p>
+        </div>
+
+        <div class="admin-stats-grid admin-stats-grid-4">
+          <article class="admin-stat-card">
+            <span>Total de bairros</span>
+            <strong id="admin-delivery-stat-total">0</strong>
+          </article>
+          <article class="admin-stat-card">
+            <span>Entrega ativa</span>
+            <strong id="admin-delivery-stat-active">0</strong>
+          </article>
+          <article class="admin-stat-card">
+            <span>Somente retirada</span>
+            <strong id="admin-delivery-stat-pickup">0</strong>
+          </article>
+          <article class="admin-stat-card">
+            <span>Bloqueados</span>
+            <strong id="admin-delivery-stat-blocked">0</strong>
+          </article>
+        </div>
+
+        <div class="admin-split-grid">
+          <article class="admin-section-card">
+            <div class="admin-card-head">
+              <div>
+                <span class="section-kicker">Cadastro</span>
+                <h4 id="admin-delivery-form-title">Novo bairro</h4>
+              </div>
+            </div>
+
+            <form id="admin-delivery-form" class="admin-form admin-delivery-form" autocomplete="off">
+              <input id="admin-delivery-id" type="hidden" value="">
+
+              <label class="admin-field">
+                <span>Nome do bairro</span>
+                <input id="admin-delivery-name" name="name" type="text" placeholder="Ex.: Campo Grande" required>
+              </label>
+
+              <div class="admin-field-grid admin-field-grid-compact">
+                <label class="admin-field">
+                  <span>Taxa de entrega</span>
+                  <input id="admin-delivery-fee" name="fee" type="text" inputmode="decimal" placeholder="Ex.: 5,00" required>
+                </label>
+
+                <label class="admin-field">
+                  <span>Status</span>
+                  <select id="admin-delivery-status" name="status">
+                    <option value="active">Ativo para entrega</option>
+                    <option value="pickup_only">Somente retirada</option>
+                    <option value="blocked">Bloqueado</option>
+                  </select>
+                </label>
+              </div>
+
+              <label class="admin-field">
+                <span>Observa&ccedil;&atilde;o</span>
+                <textarea id="admin-delivery-note" name="note" rows="4" placeholder="Opcional. Ex.: atendimento mais r&aacute;pido nesta regi&atilde;o."></textarea>
+              </label>
+
+              <div class="admin-inline-actions">
+                <button id="admin-delivery-save-button" class="btn-primary admin-toolbar-btn" type="submit">Salvar bairro</button>
+                <button id="admin-delivery-cancel-button" class="btn-secondary admin-toolbar-btn" type="button">Limpar</button>
+              </div>
+            </form>
+          </article>
+
+          <article class="admin-section-card">
+            <div class="admin-card-head">
+              <div>
+                <span class="section-kicker">Lista</span>
+                <h4>Bairros cadastrados</h4>
+              </div>
+            </div>
+
+            <div class="admin-filter-row admin-filter-row-dual">
+              <label class="admin-field admin-search-field">
+                <span>Buscar bairro</span>
+                <input id="admin-delivery-search-input" type="search" placeholder="Ex.: cosmos, campo grande...">
+              </label>
+
+              <label class="admin-field admin-filter-field">
+                <span>Filtro</span>
+                <select id="admin-delivery-filter">
+                  <option value="all">Todos os status</option>
+                  <option value="active">Entrega ativa</option>
+                  <option value="pickup_only">Somente retirada</option>
+                  <option value="blocked">Bloqueados</option>
+                </select>
+              </label>
+            </div>
+
+            <p id="admin-delivery-message" class="admin-inline-message" aria-live="polite"></p>
+            <div id="admin-delivery-areas-list" class="admin-delivery-areas-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="admin-section">
+        <div class="admin-section-head">
+          <div>
+            <span class="section-kicker">Estoque</span>
+            <h3>Atualize a disponibilidade do card&aacute;pio</h3>
+            <p>Marque produtos como dispon&iacute;veis ou esgotados sem sair do painel.</p>
+          </div>
+          <p id="admin-inventory-storage-note" class="admin-section-note">Carregando armazenamento do estoque...</p>
+        </div>
+
+        <div class="admin-stats-grid" id="admin-stats-grid">
+          <article class="admin-stat-card">
+            <span>Total de produtos</span>
+            <strong id="admin-stat-total">0</strong>
+          </article>
+          <article class="admin-stat-card">
+            <span>Dispon&iacute;veis</span>
+            <strong id="admin-stat-available">0</strong>
+          </article>
+          <article class="admin-stat-card">
+            <span>Esgotados</span>
+            <strong id="admin-stat-unavailable">0</strong>
+          </article>
+        </div>
+
+        <div class="admin-filter-row">
+          <label class="admin-field admin-search-field">
+            <span>Buscar produto</span>
+            <input id="admin-search-input" type="search" placeholder="Ex.: Saturno, bebida, combo...">
+          </label>
+        </div>
+
+        <p id="admin-inventory-message" class="admin-inline-message" aria-live="polite"></p>
+        <div id="admin-inventory-groups" class="admin-inventory-groups"></div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

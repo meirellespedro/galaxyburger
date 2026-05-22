@@ -1,21 +1,13 @@
 const { createHmac, timingSafeEqual } = require("crypto");
 const deliveryConfig = require("../delivery-config");
+const {
+  getDeliveryAreaById,
+  getDeliveryAreaByName,
+  normalizeDeliveryAreaName
+} = require("./_delivery-areas-store");
 
 const QUOTE_TTL_MS = 15 * 60 * 1000;
 const DEFAULT_DEV_SECRET = "galaxy-burger-local-delivery-dev-secret";
-const ADDRESS_STOP_WORDS = new Set([
-  "rua",
-  "r",
-  "avenida",
-  "av",
-  "travessa",
-  "tv",
-  "estrada",
-  "estr",
-  "rodovia",
-  "alameda",
-  "ladeira"
-]);
 const INVALID_HOUSE_NUMBER_VALUES = new Set([
   "s/n",
   "s n",
@@ -25,17 +17,19 @@ const INVALID_HOUSE_NUMBER_VALUES = new Set([
   "sem numero,"
 ]);
 
-const STORE_ADDRESS = Object.freeze(deliveryConfig.store);
 const SERVICE_AREA = Object.freeze(deliveryConfig.serviceArea || {});
-const DELIVERY_ZONES = Object.freeze(deliveryConfig.zones);
-const BLOCKED_RULES = Object.freeze(deliveryConfig.blockedRules);
-const DELIVERY_MESSAGES = Object.freeze(deliveryConfig.messages);
-const DELIVERY_METADATA = Object.freeze(deliveryConfig.metadata);
+const DELIVERY_METADATA = Object.freeze(deliveryConfig.metadata || {});
 const DELIVERY_NORMALIZATION_ABBREVIATIONS = Object.freeze(
   Object.entries(deliveryConfig.normalization?.abbreviations || {})
 );
+const DELIVERY_MESSAGES = Object.freeze({
+  active: "Entrega disponivel para sua regiao. Taxa: {fee}.",
+  blocked: "No momento nao entregamos nessa regiao. Voce pode escolher retirada no local.",
+  pickupOnly: "Para essa regiao, no momento trabalhamos apenas com retirada no local.",
+  outOfRange: "No momento nao entregamos nessa regiao. Voce pode escolher retirada no local."
+});
 
-module.exports = async function handler(req, res) {
+const deliveryQuoteHandler = async function handler(req, res) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -51,7 +45,7 @@ module.exports = async function handler(req, res) {
   try {
     if (req.method === "POST") {
       const payload = await parseJsonBody(req);
-      const quote = buildDeliveryQuote(payload);
+      const quote = await buildDeliveryQuote(payload);
       res.status(200).json({
         ok: true,
         ...quote
@@ -73,7 +67,7 @@ module.exports = async function handler(req, res) {
             calculateQuote: {
               method: "POST",
               path: "/api/delivery-quote",
-              requiredFields: ["street", "number", "neighborhood", "city", "state"]
+              requiredFields: ["street", "number", "neighborhood", "city", "state", "deliveryAreaId"]
             },
             verifyQuote: {
               method: "GET",
@@ -98,6 +92,10 @@ module.exports = async function handler(req, res) {
         throw createError("address_mismatch", "O endereco desta comanda nao bate com a cotacao validada.", 409);
       }
 
+      const area = await assertCurrentDeliveryQuote(quote, {
+        neighborhood: quote.deliveryAreaName
+      });
+
       res.status(200).json({
         ok: true,
         status: "verified",
@@ -112,6 +110,9 @@ module.exports = async function handler(req, res) {
           locationPrecision: quote.locationPrecision,
           geocoderSource: quote.geocoderSource,
           addressKey: quote.addressKey,
+          deliveryAreaId: quote.deliveryAreaId,
+          deliveryAreaName: area.name,
+          deliveryAreaStatus: area.status,
           expiresAt: new Date(Number(quote.expiresAt || 0)).toISOString()
         }
       });
@@ -134,6 +135,8 @@ module.exports = async function handler(req, res) {
     });
   }
 };
+
+module.exports = deliveryQuoteHandler;
 
 function createError(code, message, statusCode = 400, extra = {}) {
   const error = new Error(message);
@@ -198,36 +201,6 @@ function normalizeAddressToken(value) {
     .trim();
 }
 
-function tokenizeAddressText(value) {
-  return normalizeAddressToken(value)
-    .split(" ")
-    .map(token => token.trim())
-    .filter(token => token && !ADDRESS_STOP_WORDS.has(token));
-}
-
-function streetTokensLookCompatible(left, right) {
-  const leftTokens = tokenizeAddressText(left);
-  const rightTokens = tokenizeAddressText(right);
-
-  if (!leftTokens.length || !rightTokens.length) {
-    return false;
-  }
-
-  return leftTokens.every(leftToken =>
-    rightTokens.some(rightToken => {
-      if (leftToken === rightToken) {
-        return true;
-      }
-
-      if (leftToken.length < 4 || rightToken.length < 4) {
-        return false;
-      }
-
-      return leftToken.startsWith(rightToken) || rightToken.startsWith(leftToken);
-    })
-  );
-}
-
 function buildDeliveryAddressKey(values = {}) {
   return [
     normalizeAddressToken(values.street),
@@ -240,6 +213,7 @@ function buildDeliveryAddressKey(values = {}) {
 
 function sanitizeSubmittedAddress(payload = {}) {
   return {
+    deliveryAreaId: normalizeText(payload.deliveryAreaId || payload.neighborhoodId || payload.areaId),
     street: normalizeText(payload.street),
     number: normalizeText(payload.number),
     neighborhood: normalizeText(payload.neighborhood),
@@ -255,9 +229,10 @@ function assertSubmittedAddress(address) {
   const requiredFields = [
     ["street", "Informe a rua."],
     ["number", "Informe o numero da residencia."],
-    ["neighborhood", "Informe o bairro."],
+    ["neighborhood", "Selecione o bairro."],
     ["city", "Informe a cidade."],
-    ["state", "Informe o estado."]
+    ["state", "Informe o estado."],
+    ["deliveryAreaId", "Selecione o bairro para calcular a entrega."]
   ];
   const missing = requiredFields.find(([field]) => !address[field]);
 
@@ -364,61 +339,104 @@ function verifyQuoteToken(token) {
   }
 }
 
-function ruleMatchesNeighborhood(rule, normalizedNeighborhood) {
-  return Array.isArray(rule.neighborhoods)
-    && rule.neighborhoods.some(candidate => normalizeAddressToken(candidate) === normalizedNeighborhood);
+function formatCurrency(value) {
+  return Number(value || 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  });
 }
 
-function ruleMatchesStreet(rule, normalizedStreet) {
-  return Array.isArray(rule.streetHints)
-    && rule.streetHints.some(candidate => streetTokensLookCompatible(candidate, normalizedStreet));
+function buildActiveMessage(fee) {
+  return DELIVERY_MESSAGES.active.replace("{fee}", formatCurrency(fee));
 }
 
-function resolveDeliveryRule(address) {
-  const normalizedStreet = normalizeAddressToken(address.street);
-  const normalizedNeighborhood = normalizeAddressToken(address.neighborhood);
-
-  const blockedRule = BLOCKED_RULES.find(rule =>
-    ruleMatchesStreet(rule, normalizedStreet) || ruleMatchesNeighborhood(rule, normalizedNeighborhood)
-  );
-
-  if (blockedRule) {
-    return {
-      status: "out_of_range",
-      matchedBy: ruleMatchesStreet(blockedRule, normalizedStreet) ? "street" : "neighborhood",
-      ruleName: blockedRule.name,
-      zone: null
-    };
+function getDeliveryMessageForStatus(status, fee = 0) {
+  if (status === "active") {
+    return buildActiveMessage(fee);
   }
 
-  for (const zone of DELIVERY_ZONES) {
-    if (ruleMatchesStreet(zone, normalizedStreet)) {
-      return {
-        status: "ready",
-        matchedBy: "street",
-        ruleName: zone.name,
-        zone
-      };
-    }
+  if (status === "pickup_only") {
+    return DELIVERY_MESSAGES.pickupOnly;
   }
 
-  for (const zone of DELIVERY_ZONES) {
-    if (ruleMatchesNeighborhood(zone, normalizedNeighborhood)) {
-      return {
-        status: "ready",
-        matchedBy: "neighborhood",
-        ruleName: zone.name,
-        zone
-      };
-    }
+  if (status === "blocked") {
+    return DELIVERY_MESSAGES.blocked;
   }
 
-  return {
-    status: "out_of_range",
-    matchedBy: "none",
-    ruleName: "unsupported_area",
-    zone: null
-  };
+  return DELIVERY_MESSAGES.outOfRange;
+}
+
+function buildZoneLabelForArea(area) {
+  if (!area) {
+    return "Apenas retirada no local";
+  }
+
+  if (area.status === "pickup_only") {
+    return "Somente retirada no local";
+  }
+
+  if (area.status === "blocked") {
+    return "Entrega bloqueada para este bairro";
+  }
+
+  return `Taxa cadastrada para ${area.name}`;
+}
+
+async function findDeliveryAreaForAddress(address) {
+  const byId = address.deliveryAreaId
+    ? await getDeliveryAreaById(address.deliveryAreaId)
+    : null;
+
+  if (byId) {
+    return byId;
+  }
+
+  if (!address.neighborhood) {
+    return null;
+  }
+
+  return getDeliveryAreaByName(address.neighborhood);
+}
+
+async function assertCurrentDeliveryQuote(quote, submittedAddress = {}) {
+  const currentArea = quote?.deliveryAreaId
+    ? await getDeliveryAreaById(quote.deliveryAreaId)
+    : await getDeliveryAreaByName(quote?.deliveryAreaName || submittedAddress.neighborhood);
+
+  if (!currentArea) {
+    throw createError(
+      "delivery_area_missing",
+      "O bairro selecionado nao esta mais cadastrado. Escolha outro bairro ou retirada no local.",
+      409
+    );
+  }
+
+  const submittedAreaName = normalizeDeliveryAreaName(submittedAddress.neighborhood || quote?.deliveryAreaName || "");
+  if (submittedAreaName && currentArea.normalizedName !== submittedAreaName) {
+    throw createError(
+      "delivery_area_mismatch",
+      "O bairro selecionado mudou. Calcule a entrega novamente antes de finalizar.",
+      409
+    );
+  }
+
+  if (currentArea.status === "blocked") {
+    throw createError("delivery_area_blocked", getDeliveryMessageForStatus("blocked"), 409);
+  }
+
+  if (currentArea.status === "pickup_only") {
+    throw createError("delivery_area_pickup_only", getDeliveryMessageForStatus("pickup_only"), 409);
+  }
+
+  if (currentArea.updatedAt !== quote.deliveryAreaUpdatedAt || Number(currentArea.fee || 0) !== Number(quote.fee || 0)) {
+    throw createError(
+      "delivery_area_changed",
+      "A taxa de entrega deste bairro mudou. Calcule a entrega novamente antes de finalizar.",
+      409
+    );
+  }
+
+  return currentArea;
 }
 
 function buildQuoteCode(addressKey, issuedAt) {
@@ -426,17 +444,7 @@ function buildQuoteCode(addressKey, issuedAt) {
   return `GB-${rawCode.slice(0, 8)}`;
 }
 
-function buildZoneMessage(zone) {
-  if (!zone) {
-    return DELIVERY_MESSAGES.outOfRange;
-  }
-
-  return zone.value === "local"
-    ? DELIVERY_MESSAGES.local
-    : DELIVERY_MESSAGES.extended;
-}
-
-function buildDeliveryQuote(payload) {
+async function buildDeliveryQuote(payload) {
   const submittedAddress = sanitizeSubmittedAddress(payload);
   assertSubmittedAddress(submittedAddress);
 
@@ -445,64 +453,101 @@ function buildDeliveryQuote(payload) {
       status: "out_of_range",
       fee: 0,
       zone: "out_of_range",
-      zoneLabel: "Acima de 5 km - apenas retirada",
+      zoneLabel: "Apenas retirada no local",
       distanceKm: 0,
       routeDistanceKm: 0,
-      locationPrecision: DELIVERY_METADATA.locationPrecision,
-      geocoderSource: DELIVERY_METADATA.geocoderSource,
-      distanceLabel: "Acima de 5 km - apenas retirada",
-      message: DELIVERY_MESSAGES.outOfRange,
+      locationPrecision: DELIVERY_METADATA.locationPrecision || "manual_zone",
+      geocoderSource: DELIVERY_METADATA.geocoderSource || "manual_zone_registry",
+      distanceLabel: "Apenas retirada no local",
+      message: getDeliveryMessageForStatus("out_of_range"),
       address: submittedAddress
     };
   }
 
-  const zoneMatch = resolveDeliveryRule(submittedAddress);
+  const area = await findDeliveryAreaForAddress(submittedAddress);
 
-  if (zoneMatch.status === "out_of_range" || !zoneMatch.zone) {
+  if (!area) {
     return {
       status: "out_of_range",
       fee: 0,
       zone: "out_of_range",
-      zoneLabel: "Acima de 5 km - apenas retirada",
+      zoneLabel: "Apenas retirada no local",
       distanceKm: 0,
       routeDistanceKm: 0,
-      locationPrecision: DELIVERY_METADATA.locationPrecision,
-      geocoderSource: DELIVERY_METADATA.geocoderSource,
-      distanceLabel: "Acima de 5 km - apenas retirada",
-      message: DELIVERY_MESSAGES.outOfRange,
+      locationPrecision: DELIVERY_METADATA.locationPrecision || "manual_zone",
+      geocoderSource: DELIVERY_METADATA.geocoderSource || "manual_zone_registry",
+      distanceLabel: "Apenas retirada no local",
+      message: getDeliveryMessageForStatus("out_of_range"),
       address: submittedAddress
+    };
+  }
+
+  const validatedAddress = {
+    ...submittedAddress,
+    neighborhood: area.name
+  };
+
+  if (area.status === "blocked" || area.status === "pickup_only") {
+    return {
+      status: area.status,
+      fee: 0,
+      zone: area.status,
+      zoneLabel: buildZoneLabelForArea(area),
+      distanceKm: 0,
+      routeDistanceKm: 0,
+      locationPrecision: DELIVERY_METADATA.locationPrecision || "manual_zone",
+      geocoderSource: DELIVERY_METADATA.geocoderSource || "manual_zone_registry",
+      distanceLabel: buildZoneLabelForArea(area),
+      message: getDeliveryMessageForStatus(area.status),
+      address: validatedAddress,
+      deliveryArea: {
+        id: area.id,
+        name: area.name,
+        status: area.status,
+        note: area.note || ""
+      }
     };
   }
 
   const issuedAt = Date.now();
   const expiresAt = issuedAt + QUOTE_TTL_MS;
-  const addressKey = buildDeliveryAddressKey(submittedAddress);
+  const addressKey = buildDeliveryAddressKey(validatedAddress);
   const quotePayload = {
     code: buildQuoteCode(addressKey, issuedAt),
-    fee: zoneMatch.zone.fee,
-    zone: zoneMatch.zone.value,
-    zoneLabel: zoneMatch.zone.label,
+    fee: Number(area.fee || 0),
+    zone: "delivery_area",
+    zoneLabel: buildZoneLabelForArea(area),
     distanceKm: 0,
     routeDistanceKm: 0,
-    locationPrecision: DELIVERY_METADATA.locationPrecision,
-    geocoderSource: DELIVERY_METADATA.geocoderSource,
+    locationPrecision: DELIVERY_METADATA.locationPrecision || "manual_zone",
+    geocoderSource: DELIVERY_METADATA.geocoderSource || "manual_zone_registry",
     addressKey,
     issuedAt,
-    expiresAt
+    expiresAt,
+    deliveryAreaId: area.id,
+    deliveryAreaName: area.name,
+    deliveryAreaUpdatedAt: area.updatedAt,
+    deliveryAreaStatus: area.status
   };
 
   return {
     status: "ready",
-    fee: zoneMatch.zone.fee,
-    zone: zoneMatch.zone.value,
-    zoneLabel: zoneMatch.zone.label,
+    fee: Number(area.fee || 0),
+    zone: "delivery_area",
+    zoneLabel: buildZoneLabelForArea(area),
     distanceKm: 0,
     routeDistanceKm: 0,
-    locationPrecision: DELIVERY_METADATA.locationPrecision,
-    geocoderSource: DELIVERY_METADATA.geocoderSource,
-    distanceLabel: zoneMatch.zone.label,
-    message: buildZoneMessage(zoneMatch.zone),
-    address: submittedAddress,
+    locationPrecision: quotePayload.locationPrecision,
+    geocoderSource: quotePayload.geocoderSource,
+    distanceLabel: buildZoneLabelForArea(area),
+    message: getDeliveryMessageForStatus("active", area.fee),
+    address: validatedAddress,
+    deliveryArea: {
+      id: area.id,
+      name: area.name,
+      status: area.status,
+      note: area.note || ""
+    },
     quote: {
       token: createQuoteToken(quotePayload),
       code: quotePayload.code,
@@ -511,3 +556,20 @@ function buildDeliveryQuote(payload) {
     }
   };
 }
+
+module.exports._internals = {
+  QUOTE_TTL_MS,
+  INVALID_HOUSE_NUMBER_VALUES,
+  assertCurrentDeliveryQuote,
+  buildDeliveryAddressKey,
+  buildDeliveryQuote,
+  createError,
+  getQuoteSecret,
+  isSupportedServiceArea,
+  normalizeAddressToken,
+  normalizeCompareText,
+  normalizeText,
+  sanitizeSubmittedAddress,
+  assertSubmittedAddress,
+  verifyQuoteToken
+};

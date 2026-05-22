@@ -1050,6 +1050,27 @@ body.ticket-view-active .order-ticket-modal-content {
   opacity: 1;
 }
 
+.card.is-unavailable {
+  opacity: 0.82;
+}
+
+.card.is-unavailable::before {
+  content: "Indisponível";
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(114, 20, 26, 0.92);
+  border: 1px solid rgba(255, 112, 112, 0.42);
+  color: #fff5f5;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .card img {
   width: 100%;
   aspect-ratio: 1 / 1;
@@ -1558,6 +1579,24 @@ body.ticket-view-active .order-ticket-modal-content {
   padding: 0 16px;
 }
 
+.admin-footer-link {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10px;
+  font-size: 0.84rem;
+  color: rgba(245, 248, 251, 0.58);
+  text-decoration: underline;
+  text-decoration-color: rgba(245, 248, 251, 0.2);
+  text-underline-offset: 3px;
+  transition: color var(--transition), text-decoration-color var(--transition);
+}
+
+.admin-footer-link:hover,
+.admin-footer-link:focus-visible {
+  color: rgba(245, 248, 251, 0.82);
+  text-decoration-color: rgba(245, 248, 251, 0.46);
+}
+
 .footer-marketplace img {
   width: 84px;
 }
@@ -1710,6 +1749,10 @@ body.ticket-view-active .order-ticket-modal-content {
 .item-info span {
   color: var(--muted);
   font-size: 0.94rem;
+}
+
+.item-info small:last-of-type {
+  color: #ffd8d8;
 }
 
 .fulfillment-grid {
@@ -2146,6 +2189,10 @@ body.ticket-view-active .order-ticket-modal-content {
   margin-bottom: 0;
 }
 
+.address-field :is(select) {
+  margin-bottom: 0;
+}
+
 .cep-action-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 126px;
@@ -2301,7 +2348,6 @@ body.ticket-view-active .order-ticket-modal-content {
 #customer-cep::placeholder,
 #customer-street::placeholder,
 #customer-number::placeholder,
-#customer-neighborhood::placeholder,
 #customer-complement::placeholder,
 #customer-reference::placeholder,
 #customer-city::placeholder,
@@ -2309,6 +2355,40 @@ body.ticket-view-active .order-ticket-modal-content {
 #order-notes::placeholder,
 #cash-change-value::placeholder {
   color: rgba(247, 248, 250, 0.46);
+}
+
+#customer-neighborhood {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(247, 248, 250, 0.74) 50%),
+    linear-gradient(135deg, rgba(247, 248, 250, 0.74) 50%, transparent 50%);
+  background-position:
+    calc(100% - 22px) calc(50% - 3px),
+    calc(100% - 16px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 42px;
+}
+
+#customer-neighborhood option {
+  background: #081018;
+  color: #f7f8fa;
+}
+
+#customer-neighborhood-helper {
+  margin: 10px 0 0;
+}
+
+#customer-neighborhood-helper.is-success {
+  color: #d8ffe8;
+}
+
+#customer-neighborhood-helper.is-warning {
+  color: #ffd78d;
+}
+
+#customer-neighborhood-helper.is-error {
+  color: #ffb6bd;
 }
 
 .payment-grid {
@@ -2599,6 +2679,49 @@ body.ticket-view-active .order-ticket-modal-content {
 .minimum-order-note[data-status="ready"] {
   border-color: rgba(88, 255, 176, 0.28);
   color: #c9ffe5;
+}
+
+.pending-order-banner {
+  position: fixed;
+  right: 18px;
+  bottom: 24px;
+  z-index: 1700;
+  width: min(420px, calc(100vw - 28px));
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at top left, rgba(255, 104, 104, 0.16), transparent 34%),
+    linear-gradient(180deg, rgba(9, 13, 16, 0.97), rgba(10, 9, 12, 0.97));
+  border: 1px solid rgba(255, 108, 108, 0.28);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.34);
+}
+
+.pending-order-banner-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.pending-order-banner-copy strong {
+  color: #fff5f5;
+  font-size: 1rem;
+}
+
+.pending-order-banner-copy p {
+  margin: 0;
+  color: #e8eef3;
+  font-size: 0.94rem;
+}
+
+.pending-order-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pending-order-btn {
+  flex: 1 1 180px;
 }
 
 .toast,
@@ -2904,6 +3027,13 @@ body.ticket-view-active .order-ticket-modal-content {
     margin-top: 18px;
   }
 
+  .pending-order-banner {
+    right: 14px;
+    left: 14px;
+    bottom: 84px;
+    width: auto;
+  }
+
   .delivery-fee-panel,
   .cash-panel,
   .pix-panel,
@@ -3139,5 +3269,539 @@ body.ticket-view-active .order-ticket-modal-content {
   .mobile-cart-dock-btn {
     min-height: 56px;
     border-radius: 18px;
+  }
+}
+
+.card.is-unavailable::before {
+  content: "Esgotado";
+}
+
+.admin-body {
+  min-height: 100vh;
+}
+
+.admin-shell {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 40px 0 72px;
+}
+
+.admin-panel {
+  background: rgba(8, 12, 18, 0.9);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.admin-login-panel {
+  max-width: 520px;
+  margin: 56px auto 0;
+  padding: 32px;
+}
+
+.admin-login-panel h1,
+.admin-dashboard h2,
+.admin-section-head h3,
+.admin-category-head h4,
+.admin-card-head h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+.admin-login-panel p,
+.admin-dashboard-head p,
+.admin-section-head p,
+.admin-card-head p,
+.admin-empty-state p {
+  color: var(--muted);
+}
+
+.admin-form,
+.admin-dashboard {
+  display: grid;
+  gap: 20px;
+}
+
+.admin-field {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-field span {
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(245, 248, 251, 0.72);
+}
+
+.admin-field :is(input, select, textarea) {
+  width: 100%;
+  min-height: 52px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(6, 10, 16, 0.9);
+  color: var(--text);
+}
+
+.admin-field textarea {
+  min-height: 132px;
+  resize: vertical;
+}
+
+.admin-field select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(247, 248, 250, 0.74) 50%),
+    linear-gradient(135deg, rgba(247, 248, 250, 0.74) 50%, transparent 50%);
+  background-position:
+    calc(100% - 22px) calc(50% - 3px),
+    calc(100% - 16px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 42px;
+}
+
+.admin-field select option {
+  background: #081018;
+  color: #f7f8fa;
+}
+
+.admin-field :is(input, select, textarea):focus-visible {
+  outline: 2px solid rgba(125, 255, 198, 0.35);
+  outline-offset: 2px;
+}
+
+.admin-submit {
+  justify-content: center;
+  min-height: 52px;
+}
+
+.admin-inline-message {
+  min-height: 1.4em;
+  margin: 0;
+  color: var(--muted);
+}
+
+.admin-inline-message.is-error {
+  color: #ffc2c7;
+}
+
+.admin-inline-message.is-success {
+  color: #cffff0;
+}
+
+.admin-dashboard {
+  padding: 28px;
+}
+
+.admin-section {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.admin-section + .admin-section {
+  margin-top: 8px;
+}
+
+.admin-dashboard-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.admin-dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-toolbar-btn {
+  min-height: 46px;
+}
+
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-stats-grid-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.admin-stat-card {
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.admin-stat-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.admin-stat-card strong {
+  display: block;
+  margin-top: 8px;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  letter-spacing: 0.04em;
+}
+
+.admin-filter-row {
+  display: grid;
+}
+
+.admin-filter-row-dual {
+  grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.8fr);
+  gap: 14px;
+}
+
+.admin-search-field input {
+  padding-right: 18px;
+}
+
+.admin-inventory-groups {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-category-group {
+  padding: 20px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.admin-section-head,
+.admin-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.admin-section-note {
+  margin: 0;
+  color: var(--muted);
+  max-width: 360px;
+}
+
+.admin-section-note.is-warning {
+  color: #ffd78d;
+}
+
+.admin-split-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.95fr) minmax(0, 1.25fr);
+  gap: 16px;
+}
+
+.admin-section-card {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(4, 7, 11, 0.72);
+}
+
+.admin-field-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-field-grid-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-inline-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-delivery-areas-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-delivery-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(6, 10, 16, 0.88);
+  transition: border-color var(--transition), opacity var(--transition);
+}
+
+.admin-delivery-card.is-saving {
+  opacity: 0.72;
+}
+
+.admin-delivery-copy {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-delivery-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.admin-delivery-status-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-delivery-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  color: rgba(245, 248, 251, 0.78);
+  font-size: 0.92rem;
+}
+
+.admin-status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-status-badge.is-active {
+  border-color: rgba(125, 255, 198, 0.32);
+  background: rgba(125, 255, 198, 0.14);
+  color: #d8fff0;
+}
+
+.admin-status-badge.is-pickup {
+  border-color: rgba(255, 215, 141, 0.28);
+  background: rgba(255, 215, 141, 0.12);
+  color: #ffe9be;
+}
+
+.admin-status-badge.is-blocked {
+  border-color: rgba(240, 70, 84, 0.28);
+  background: rgba(240, 70, 84, 0.14);
+  color: #ffe3e6;
+}
+
+.admin-delivery-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-delivery-chip {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform var(--transition), border-color var(--transition), background var(--transition);
+}
+
+.admin-delivery-chip:hover,
+.admin-delivery-chip:focus-visible {
+  transform: translateY(-1px);
+}
+
+.admin-delivery-chip.is-active {
+  border-color: rgba(125, 255, 198, 0.28);
+}
+
+.admin-delivery-chip.is-pickup {
+  border-color: rgba(255, 215, 141, 0.24);
+}
+
+.admin-delivery-chip.is-blocked,
+.admin-delivery-chip.is-danger {
+  border-color: rgba(240, 70, 84, 0.24);
+}
+
+.admin-delivery-chip.is-danger {
+  background: rgba(240, 70, 84, 0.08);
+}
+
+.admin-delivery-chip.is-selected {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.admin-delivery-chip.is-active.is-selected {
+  background: rgba(125, 255, 198, 0.16);
+  color: #d8fff0;
+}
+
+.admin-delivery-chip.is-pickup.is-selected {
+  background: rgba(255, 215, 141, 0.16);
+  color: #ffe9be;
+}
+
+.admin-delivery-chip.is-blocked.is-selected {
+  background: rgba(240, 70, 84, 0.16);
+  color: #ffe3e6;
+}
+
+.admin-category-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.admin-category-head span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.admin-product-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-product-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(4, 7, 11, 0.72);
+  transition: border-color var(--transition), opacity var(--transition);
+}
+
+.admin-product-card.is-saving {
+  opacity: 0.72;
+}
+
+.admin-product-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-product-copy span,
+.admin-product-copy small {
+  color: var(--muted);
+}
+
+.admin-stock-actions {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.admin-stock-chip {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform var(--transition), border-color var(--transition), background var(--transition);
+}
+
+.admin-stock-chip:hover,
+.admin-stock-chip:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(125, 255, 198, 0.28);
+}
+
+.admin-stock-chip.is-active {
+  background: rgba(125, 255, 198, 0.16);
+  border-color: rgba(125, 255, 198, 0.32);
+  color: #d8fff0;
+}
+
+.admin-stock-chip.is-danger {
+  border-color: rgba(240, 70, 84, 0.22);
+}
+
+.admin-stock-chip.is-danger.is-active {
+  background: rgba(240, 70, 84, 0.16);
+  border-color: rgba(240, 70, 84, 0.28);
+  color: #ffe3e6;
+}
+
+.admin-empty-state {
+  padding: 24px;
+  border-radius: 22px;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  text-align: center;
+}
+
+@media (max-width: 780px) {
+  .admin-shell {
+    width: calc(100% - 24px);
+    padding: 24px 0 48px;
+  }
+
+  .admin-login-panel,
+  .admin-dashboard {
+    padding: 22px;
+  }
+
+  .admin-dashboard-head,
+  .admin-section-head,
+  .admin-card-head,
+  .admin-delivery-card,
+  .admin-product-card,
+  .admin-category-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .admin-dashboard-actions,
+  .admin-inline-actions,
+  .admin-delivery-actions,
+  .admin-stock-actions {
+    width: 100%;
+  }
+
+  .admin-toolbar-btn,
+  .admin-delivery-chip,
+  .admin-stock-chip {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .admin-stats-grid,
+  .admin-stats-grid-4,
+  .admin-field-grid-compact,
+  .admin-filter-row-dual,
+  .admin-split-grid {
+    grid-template-columns: 1fr;
   }
 }

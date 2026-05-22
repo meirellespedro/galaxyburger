@@ -1,26 +1,39 @@
 let cart = loadSavedCart();
 
-const PIX_KEY = "66.219.861/0001-73";
-const PIX_BENEFICIARY_NAME = "Sulen Ferreira de Carvalho de Souza";
-const STORE_WHATSAPP = "5521995578652";
-const WHATSAPP_ORDER_BASE_URL = "https://api.whatsapp.com/send";
-const IFOOD_STORE_URL = "https://www.ifood.com.br/delivery/rio-de-janeiro-rj/galaxy-burger-199-campo-grande/fe3716f9-fab7-4b6b-9e7a-09f0ccff22d1";
-// Quando o site estiver publicado, coloque aqui a URL final da loja.
-// Exemplo: "https://galaxy-burger.vercel.app"
-const PUBLIC_ORDER_TICKET_BASE_URL = "https://galaxyburger.vercel.app/";
+const SHARED_STORE_CONFIG = window.GALAXY_STORE_CONFIG || {};
 const SHARED_DELIVERY_CONFIG = window.GALAXY_DELIVERY_CONFIG || {};
+const SHARED_CATALOG_CONFIG = window.GALAXY_CATALOG_CONFIG || {};
 
-const STORE_ADDRESS = "Rua Embaixador Muniz Gordilho, 199 - Campo Grande, Rio de Janeiro/RJ - CEP 23070-010";
+const PIX_KEY = normalizeText(SHARED_STORE_CONFIG.pix?.key);
+const PIX_BENEFICIARY_NAME = normalizeText(SHARED_STORE_CONFIG.pix?.beneficiaryName);
+const STORE_WHATSAPP = normalizeText(SHARED_STORE_CONFIG.store?.whatsapp);
+const WHATSAPP_ORDER_BASE_URL = "https://api.whatsapp.com/send";
+const IFOOD_STORE_URL = normalizeText(SHARED_STORE_CONFIG.store?.iFoodUrl);
+const PUBLIC_ORDER_TICKET_BASE_URL = normalizeText(SHARED_STORE_CONFIG.store?.publicOrderTicketBaseUrl);
+
+const CONFIGURED_STORE_ADDRESS = Object.freeze({
+  street: normalizeText(SHARED_STORE_CONFIG.store?.address?.street),
+  number: normalizeText(SHARED_STORE_CONFIG.store?.address?.number),
+  neighborhood: normalizeText(SHARED_STORE_CONFIG.store?.address?.neighborhood),
+  city: normalizeText(SHARED_STORE_CONFIG.store?.address?.city),
+  state: normalizeText(SHARED_STORE_CONFIG.store?.address?.state).toUpperCase(),
+  cep: normalizeCep(SHARED_STORE_CONFIG.store?.address?.cep)
+});
+
+const STORE_ADDRESS = buildStoreAddressLabel(CONFIGURED_STORE_ADDRESS);
 const STORE_ADDRESS_LINES = Object.freeze([
-  "Rua Embaixador Muniz Gordilho, 199",
-  "Campo Grande - Rio de Janeiro/RJ",
-  "CEP 23070-010"
-]);
+  [CONFIGURED_STORE_ADDRESS.street, CONFIGURED_STORE_ADDRESS.number].filter(Boolean).join(", "),
+  [
+    CONFIGURED_STORE_ADDRESS.neighborhood,
+    [CONFIGURED_STORE_ADDRESS.city, CONFIGURED_STORE_ADDRESS.state].filter(Boolean).join("/")
+  ].filter(Boolean).join(" - "),
+  CONFIGURED_STORE_ADDRESS.cep ? `CEP ${formatCep(CONFIGURED_STORE_ADDRESS.cep)}` : ""
+].filter(Boolean));
 const ORDER_TICKET_WIDTH = 30;
 const ORDER_TICKET_DIVIDER = "-".repeat(ORDER_TICKET_WIDTH);
-const STORE_TIME_ZONE = "America/Sao_Paulo";
+const STORE_TIME_ZONE = normalizeText(SHARED_STORE_CONFIG.checkout?.timeZone) || "America/Sao_Paulo";
 // Use "live" para respeitar o horário real da loja. Troque para "preview" apenas em testes.
-const STORE_SCHEDULE_MODE = "live";
+const STORE_SCHEDULE_MODE = normalizeText(SHARED_STORE_CONFIG.checkout?.scheduleMode) || "live";
 const STORE_WEEKDAY_TOKENS = Object.freeze({
   Sun: 0,
   Mon: 1,
@@ -39,7 +52,7 @@ const STORE_WEEKDAY_LABELS = Object.freeze([
   "sexta",
   "s\u00e1bado"
 ]);
-const STORE_HOURS = Object.freeze({
+const STORE_HOURS = Object.freeze(SHARED_STORE_CONFIG.checkout?.hours || {
   0: Object.freeze({ openMinutes: 19 * 60, closeMinutes: 23 * 60 + 59 }),
   1: Object.freeze({ openMinutes: 19 * 60, closeMinutes: 23 * 60 + 59 }),
   2: Object.freeze({ openMinutes: 19 * 60, closeMinutes: 23 * 60 + 59 }),
@@ -51,19 +64,26 @@ const STORE_HOURS = Object.freeze({
 
 const VIA_CEP_BASE_URL = "https://viacep.com.br/ws";
 const DELIVERY_QUOTE_API_URL = "/api/delivery-quote";
+const DELIVERY_AREAS_API_URL = "/api/delivery-areas";
+const ORDER_TICKET_API_URL = "/api/order-ticket";
+const INVENTORY_STATUS_API_URL = "/api/inventory-status";
 const DELIVERY_FEE_LOCAL = 5;
 const DELIVERY_FEE_EXTENDED = 10;
-const MIN_ORDER_AMOUNT = 20;
+const MIN_ORDER_AMOUNT = normalizeMoneyValue(SHARED_STORE_CONFIG.checkout?.minimumOrderAmount, 20);
 const MAX_WHATSAPP_URL_LENGTH = 1800;
 const WHATSAPP_FALLBACK_DELAY_MS = 700;
 const WHATSAPP_OPEN_CHECK_DELAY_MS = 1800;
 const DELIVERY_QUOTE_EXPIRY_BUFFER_MS = 30 * 1000;
 const DELIVERY_REQUEST_TIMEOUT_MS = 12000;
+const DELIVERY_AREAS_REQUEST_TIMEOUT_MS = 8000;
+const INVENTORY_REQUEST_TIMEOUT_MS = 8000;
+const INVENTORY_REFRESH_INTERVAL_MS = 5000;
+const DELIVERY_AREAS_REFRESH_INTERVAL_MS = 60000;
 const VIA_CEP_REQUEST_TIMEOUT_MS = 8000;
 const DELIVERY_AUTO_CALCULATE_DEBOUNCE_MS = 700;
 const DELIVERY_IDLE_MESSAGE = "Preencha o endere\u00e7o completo para calcular a entrega.";
 const CHECKOUT_LOG_PREFIX = "[Galaxy Burger checkout]";
-const DELIVERY_STATUS_VALUES = new Set(["idle", "loading", "ready", "out_of_range", "error", "pickup"]);
+const DELIVERY_STATUS_VALUES = new Set(["idle", "loading", "ready", "out_of_range", "blocked", "pickup_only", "error", "pickup"]);
 const INVALID_HOUSE_NUMBER_VALUES = new Set(["s/n", "s n", "sn", "sem numero", "sem numero.", "sem numero,"]);
 const BR_PHONE_MIN_LENGTH = 10;
 const BR_PHONE_MAX_LENGTH = 11;
@@ -72,6 +92,10 @@ const DELIVERY_NORMALIZATION_ABBREVIATIONS = Object.freeze(
 );
 
 const DELIVERY_STORAGE_KEY = "galaxy_burguer_delivery_v14";
+const ORDER_PREPARATION_STORAGE_KEY = "galaxy_burguer_pending_order_v1";
+const DELIVERY_AREAS_BROADCAST_STORAGE_KEY = "galaxy_burguer_delivery_areas_broadcast_v1";
+const INVENTORY_BROADCAST_STORAGE_KEY = "galaxy_burguer_inventory_broadcast_v1";
+const INVENTORY_SYNC_CHANNEL_NAME = "galaxy_burguer_inventory_sync_v1";
 const LEGACY_DELIVERY_STORAGE_KEYS = [
   "galaxy_burguer_delivery",
   "galaxy_burguer_delivery_v3",
@@ -87,6 +111,21 @@ const LEGACY_DELIVERY_STORAGE_KEYS = [
   "galaxy_burguer_delivery_v13",
   "galaxy_burguer_store_coords_v1"
 ];
+
+const CATALOG_PRODUCTS = Array.isArray(SHARED_CATALOG_CONFIG.products) ? SHARED_CATALOG_CONFIG.products : [];
+const CATALOG_PRODUCT_MAP = new Map(
+  CATALOG_PRODUCTS
+    .filter(product => product && normalizeText(product.id))
+    .map(product => [normalizeText(product.id), Object.freeze(product)])
+);
+let catalogInventoryStatusMap = new Map(
+  CATALOG_PRODUCTS
+    .filter(product => product && normalizeText(product.id))
+    .map(product => [normalizeText(product.id), {
+      available: Boolean(product.available),
+      stockUpdatedAt: ""
+    }])
+);
 
 let deliveryState = createDeliveryState();
 
@@ -104,24 +143,19 @@ const DELIVERY_ZONE_LABELS = Object.freeze(
     out_of_range: "Acima de 5 km - apenas retirada"
   })
 );
-const DEFAULT_COMBO_DRINK_OPTIONS = Object.freeze([
-  "Coca-Cola Comum 350ML",
-  "Coca-Cola Zero 350 ml",
-  "Pepsi lata 350ml",
-  "Pepsi Black lata 350ml",
-  "Fanta Laranja",
-  "Guaran\u00e1 lata 350ml",
-  "Fanta uva",
-  "Guaracamp copo 285ml"
-]);
 let activeComboSelection = null;
 let pendingOrderPreview = null;
 let orderTicketModalMode = "checkout";
 let cartModalHiddenForOrderTicket = false;
 let activeWhatsAppAttempt = null;
 let activeDeliveryQuoteRequest = null;
+let activeDeliveryAreasRequest = null;
+let activeInventoryStatusRequest = null;
 let activeViaCepLookup = null;
 let deliveryAutoQuoteTimer = 0;
+let pendingCustomerOrder = loadPendingCustomerOrder();
+let inventoryRealtimeChannel = null;
+let deliveryAreasState = createDeliveryAreasState();
 
 function formatCurrency(value) {
   return normalizeMoneyValue(value).toLocaleString("pt-BR", {
@@ -169,6 +203,170 @@ function normalizeAddressToken(value) {
     .trim();
 }
 
+function buildStoreAddressLabel(address = {}) {
+  const streetLine = [normalizeText(address.street), normalizeText(address.number)].filter(Boolean).join(", ");
+  const cityLine = [
+    normalizeText(address.neighborhood),
+    [normalizeText(address.city), normalizeText(address.state).toUpperCase()].filter(Boolean).join("/")
+  ].filter(Boolean).join(" - ");
+  const cep = formatCep(address.cep || "");
+  return [streetLine, cityLine, cep ? `CEP ${cep}` : ""].filter(Boolean).join(" - ");
+}
+
+function normalizeCatalogLookupValue(value) {
+  return normalizeCompareText(value)
+    .replace(/[.,/()_-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getCatalogInventoryEntry(productId) {
+  return catalogInventoryStatusMap.get(normalizeText(productId)) || null;
+}
+
+function getCatalogProduct(productId) {
+  const normalizedProductId = normalizeText(productId);
+  const baseProduct = CATALOG_PRODUCT_MAP.get(normalizedProductId) || null;
+  if (!baseProduct) return null;
+
+  const inventoryEntry = getCatalogInventoryEntry(normalizedProductId);
+  if (!inventoryEntry) {
+    return baseProduct;
+  }
+
+  return {
+    ...baseProduct,
+    available: Boolean(inventoryEntry.available),
+    stockUpdatedAt: normalizeText(inventoryEntry.stockUpdatedAt)
+  };
+}
+
+function findCatalogProductByName(name) {
+  const normalizedName = normalizeCatalogLookupValue(name);
+  if (!normalizedName) return null;
+
+  const matchedProduct = CATALOG_PRODUCTS.find(product => {
+    const catalogNames = [product?.name, ...(Array.isArray(product?.aliases) ? product.aliases : [])];
+    return catalogNames.some(candidate => normalizeCatalogLookupValue(candidate) === normalizedName);
+  }) || null;
+
+  return matchedProduct ? getCatalogProduct(matchedProduct.id) : null;
+}
+
+function isCatalogProductAvailable(product) {
+  return Boolean(product?.available);
+}
+
+function isCatalogProductSellable(product) {
+  if (!isCatalogProductAvailable(product)) {
+    return false;
+  }
+
+  if (product?.category === "combo" && product?.combo?.drinksCount) {
+    return getCatalogComboOptionProducts(product).length >= Number(product.combo.drinksCount || 0);
+  }
+
+  return true;
+}
+
+function getCatalogComboOptionProducts(product) {
+  if (!product?.combo) {
+    return [];
+  }
+
+  const explicitOptionIds = Array.isArray(product.combo.optionIds)
+    ? product.combo.optionIds
+        .map(optionId => getCatalogProduct(optionId))
+        .filter(option => option && isCatalogProductAvailable(option))
+    : [];
+
+  if (explicitOptionIds.length) {
+    return explicitOptionIds;
+  }
+
+  return CATALOG_PRODUCTS.filter(option =>
+    option?.category === "drink"
+    && option?.comboEligible
+    && isCatalogProductAvailable(getCatalogProduct(option.id))
+  );
+}
+
+function isCartItemSellable(item) {
+  const product = getCatalogProduct(item?.productId);
+  if (!isCatalogProductSellable(product)) {
+    return false;
+  }
+
+  if (product?.category === "combo" && product?.combo?.drinksCount) {
+    const selectedOptionIds = Array.isArray(item?.selectedOptionIds)
+      ? item.selectedOptionIds.map(optionId => normalizeText(optionId)).filter(Boolean)
+      : [];
+
+    if (selectedOptionIds.length !== Number(product.combo.drinksCount || 0)) {
+      return false;
+    }
+
+    return selectedOptionIds.every(optionId => isCatalogProductAvailable(getCatalogProduct(optionId)));
+  }
+
+  return true;
+}
+
+function buildRemovedUnavailableItemsMessage(items) {
+  const uniqueNames = [...new Set(
+    items
+      .map(item => normalizeText(item?.name))
+      .filter(Boolean)
+  )];
+
+  if (!uniqueNames.length) {
+    return "Alguns itens saíram do pedido porque ficaram esgotados.";
+  }
+
+  if (uniqueNames.length === 1) {
+    return `${uniqueNames[0]} saiu do pedido porque ficou esgotado.`;
+  }
+
+  if (uniqueNames.length === 2) {
+    return `${uniqueNames[0]} e ${uniqueNames[1]} saíram do pedido porque ficaram esgotados.`;
+  }
+
+  return `${uniqueNames.length} itens saíram do pedido porque ficaram esgotados.`;
+}
+
+function purgeUnavailableCartItems({ notify = true, reason = "inventory_changed" } = {}) {
+  const sellableItems = [];
+  const removedItems = [];
+
+  cart.forEach(item => {
+    if (isCartItemSellable(item)) {
+      sellableItems.push(item);
+      return;
+    }
+
+    removedItems.push(item);
+  });
+
+  if (!removedItems.length) {
+    return [];
+  }
+
+  cart = sellableItems;
+  invalidatePendingCustomerOrder(`inventory_refresh:${reason}`);
+  pendingOrderPreview = null;
+  const orderTicketModal = document.getElementById("order-ticket-modal");
+  if (orderTicketModal && !orderTicketModal.hidden && orderTicketModalMode === "checkout") {
+    closeOrderTicketModal({ restoreCart: true });
+  }
+  saveCart();
+
+  if (notify) {
+    showToast(buildRemovedUnavailableItemsMessage(removedItems));
+  }
+
+  return removedItems;
+}
+
 function normalizePhoneDigits(value) {
   return String(value || "").replace(/\D/g, "").slice(0, BR_PHONE_MAX_LENGTH);
 }
@@ -198,6 +396,7 @@ function sanitizeValidatedAddress(address) {
   }
 
   return {
+    deliveryAreaId: normalizeText(address.deliveryAreaId),
     cep: normalizeCep(address.cep),
     street: normalizeText(address.street),
     number: normalizeText(address.number),
@@ -210,19 +409,26 @@ function sanitizeValidatedAddress(address) {
 }
 
 function sanitizeCartItem(item) {
-  const name = normalizeText(item?.name);
+  const catalogProduct = getCatalogProduct(item?.productId) || findCatalogProductByName(item?.name);
+  const name = normalizeText(catalogProduct?.name || item?.name);
   const quantity = Math.max(1, Math.round(normalizeMoneyValue(item?.quantity, 0)));
-  const price = normalizeMoneyValue(item?.price, NaN);
+  const price = normalizeMoneyValue(catalogProduct?.price ?? item?.price, NaN);
   const variantLabel = normalizeText(item?.variantLabel);
+  const productId = normalizeText(catalogProduct?.id || item?.productId);
+  const selectedOptionIds = Array.isArray(item?.selectedOptionIds)
+    ? item.selectedOptionIds.map(optionId => normalizeText(optionId)).filter(Boolean)
+    : [];
 
-  if (!name || !Number.isFinite(price) || price < 0 || quantity <= 0) {
+  if (!name || !productId || !Number.isFinite(price) || price < 0 || quantity <= 0) {
     return null;
   }
 
   return {
+    productId,
     name,
     price,
     quantity,
+    ...(selectedOptionIds.length ? { selectedOptionIds } : {}),
     ...(variantLabel ? { variantLabel } : {})
   };
 }
@@ -259,6 +465,10 @@ function createDeliveryState(overrides = {}) {
     routeDistanceKm: 0,
     locationPrecision: "",
     geocoderSource: "",
+    deliveryAreaId: "",
+    deliveryAreaName: "",
+    deliveryAreaStatus: "",
+    deliveryAreaNote: "",
     validatedAddress: null,
     ...overrides
   };
@@ -278,8 +488,83 @@ function createDeliveryState(overrides = {}) {
     routeDistanceKm: Math.max(0, normalizeMoneyValue(nextState.routeDistanceKm)),
     locationPrecision: normalizeText(nextState.locationPrecision),
     geocoderSource: normalizeText(nextState.geocoderSource),
+    deliveryAreaId: normalizeText(nextState.deliveryAreaId),
+    deliveryAreaName: normalizeText(nextState.deliveryAreaName),
+    deliveryAreaStatus: normalizeText(nextState.deliveryAreaStatus),
+    deliveryAreaNote: normalizeText(nextState.deliveryAreaNote),
     validatedAddress: sanitizeValidatedAddress(nextState.validatedAddress)
   };
+}
+
+function createDeliveryAreasState(overrides = {}) {
+  return {
+    loaded: Boolean(overrides.loaded),
+    loading: Boolean(overrides.loading),
+    updatedAt: normalizeText(overrides.updatedAt),
+    error: normalizeText(overrides.error),
+    areas: Array.isArray(overrides.areas) ? overrides.areas.slice() : []
+  };
+}
+
+function sanitizeDeliveryAreaOption(area) {
+  const id = normalizeText(area?.id);
+  const name = normalizeText(area?.name);
+  const status = normalizeCompareText(area?.status).replace(/[\s-]+/g, "_");
+  const fee = Math.max(0, normalizeMoneyValue(area?.fee, 0));
+
+  if (!id || !name || !["active", "blocked", "pickup_only"].includes(status)) {
+    return null;
+  }
+
+  return {
+    id,
+    name,
+    normalizedName: normalizeAddressToken(name),
+    status,
+    fee,
+    note: normalizeText(area?.note),
+    supportsDelivery: status === "active",
+    blocked: status === "blocked",
+    pickupOnly: status === "pickup_only",
+    updatedAt: normalizeText(area?.updatedAt)
+  };
+}
+
+function getDeliveryAreasMap() {
+  return new Map(
+    (Array.isArray(deliveryAreasState.areas) ? deliveryAreasState.areas : [])
+      .filter(Boolean)
+      .map(area => [area.id, area])
+  );
+}
+
+function getDeliveryAreaByIdLocal(areaId) {
+  return getDeliveryAreasMap().get(normalizeText(areaId)) || null;
+}
+
+function findDeliveryAreaByNameLocal(name) {
+  const normalizedName = normalizeAddressToken(name);
+  if (!normalizedName) {
+    return null;
+  }
+
+  return (deliveryAreasState.areas || []).find(area => area.normalizedName === normalizedName) || null;
+}
+
+function buildDeliveryAreaOptionLabel(area) {
+  if (!area) {
+    return "";
+  }
+
+  if (area.status === "active") {
+    return `${area.name} - entrega ${formatCurrency(area.fee)}`;
+  }
+
+  if (area.status === "pickup_only") {
+    return `${area.name} - somente retirada`;
+  }
+
+  return `${area.name} - indisponivel para entrega`;
 }
 
 function createTimedRequest(timeoutMs) {
@@ -333,7 +618,7 @@ function getDeliveryLocationMethodCopy({ precision = "", source = "", includePro
     : "";
 
   if (normalizedPrecision === "manual_zone") {
-    return `Regi\u00e3o validada pela tabela local da Galaxy Burger${sourceLabel}.`;
+    return "Taxa confirmada para este endere\u00e7o.";
   }
 
   if (normalizedPrecision === "exact") {
@@ -405,6 +690,7 @@ function hasCompleteDeliveryAddress(values = getDeliveryValues()) {
   return (
     Boolean(normalizeText(values.street))
     && Boolean(normalizeText(values.number))
+    && Boolean(normalizeText(values.deliveryAreaId))
     && Boolean(normalizeText(values.neighborhood))
     && Boolean(normalizeText(values.city))
     && Boolean(normalizeText(values.state))
@@ -487,6 +773,54 @@ function resolveDeliveryQuoteApiUrl() {
   }
 
   return DELIVERY_QUOTE_API_URL;
+}
+
+function resolveDeliveryAreasApiUrl() {
+  const currentHref = String(window?.location?.href || "").trim();
+  const currentOrigin = String(window?.location?.origin || "").trim();
+  const isHttpPage = /^https?:\/\//i.test(currentHref);
+  const isLocalPage = !isHttpPage || /^(https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?$/i.test(currentOrigin);
+
+  if (isLocalPage) {
+    const baseUrl = resolveOrderTicketBaseUrl();
+    if (baseUrl) {
+      return new URL(DELIVERY_AREAS_API_URL, baseUrl).toString();
+    }
+  }
+
+  return DELIVERY_AREAS_API_URL;
+}
+
+function resolveOrderTicketApiUrl() {
+  const currentHref = String(window?.location?.href || "").trim();
+  const currentOrigin = String(window?.location?.origin || "").trim();
+  const isHttpPage = /^https?:\/\//i.test(currentHref);
+  const isLocalPage = !isHttpPage || /^(https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?$/i.test(currentOrigin);
+
+  if (isLocalPage) {
+    const baseUrl = resolveOrderTicketBaseUrl();
+    if (baseUrl) {
+      return new URL(ORDER_TICKET_API_URL, baseUrl).toString();
+    }
+  }
+
+  return ORDER_TICKET_API_URL;
+}
+
+function resolveInventoryStatusApiUrl() {
+  const currentHref = String(window?.location?.href || "").trim();
+  const currentOrigin = String(window?.location?.origin || "").trim();
+  const isHttpPage = /^https?:\/\//i.test(currentHref);
+  const isLocalPage = !isHttpPage || /^(https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?$/i.test(currentOrigin);
+
+  if (isLocalPage) {
+    const baseUrl = resolveOrderTicketBaseUrl();
+    if (baseUrl) {
+      return new URL(INVENTORY_STATUS_API_URL, baseUrl).toString();
+    }
+  }
+
+  return INVENTORY_STATUS_API_URL;
 }
 
 function formatStoreTimeLabel(totalMinutes) {
@@ -605,6 +939,7 @@ function getDeliveryFields() {
     street: document.getElementById("customer-street"),
     number: document.getElementById("customer-number"),
     neighborhood: document.getElementById("customer-neighborhood"),
+    neighborhoodHelper: document.getElementById("customer-neighborhood-helper"),
     complement: document.getElementById("customer-complement"),
     reference: document.getElementById("customer-reference"),
     city: document.getElementById("customer-city"),
@@ -629,6 +964,100 @@ function getCheckoutContactFields() {
     phone: document.getElementById("customer-phone"),
     notes: document.getElementById("order-notes")
   };
+}
+
+function getSelectedDeliveryArea() {
+  const field = getDeliveryFields().neighborhood;
+  return field ? getDeliveryAreaByIdLocal(field.value) : null;
+}
+
+function setNeighborhoodHelperCopy(message, tone = "") {
+  const helper = getDeliveryFields().neighborhoodHelper;
+  if (!helper) {
+    return;
+  }
+
+  helper.textContent = normalizeText(message);
+  helper.classList.remove("is-success", "is-warning", "is-error");
+
+  if (tone === "success") helper.classList.add("is-success");
+  if (tone === "warning") helper.classList.add("is-warning");
+  if (tone === "error") helper.classList.add("is-error");
+}
+
+function syncNeighborhoodHelperFromSelection() {
+  const selectedArea = getSelectedDeliveryArea();
+
+  if (!selectedArea) {
+    setNeighborhoodHelperCopy("Selecione seu bairro para calcular a entrega.");
+    return;
+  }
+
+  if (selectedArea.status === "active") {
+    setNeighborhoodHelperCopy(`Entrega ativa neste bairro. Taxa cadastrada: ${formatCurrency(selectedArea.fee)}.`, "success");
+    return;
+  }
+
+  if (selectedArea.status === "pickup_only") {
+    setNeighborhoodHelperCopy("Este bairro esta liberado apenas para retirada no local.", "warning");
+    return;
+  }
+
+  setNeighborhoodHelperCopy("Este bairro esta bloqueado para entrega no momento.", "error");
+}
+
+function syncDeliveryAreaSelection(areaId = "", areaName = "") {
+  const field = getDeliveryFields().neighborhood;
+  if (!field) {
+    return null;
+  }
+
+  const normalizedAreaId = normalizeText(areaId);
+  const nextArea = getDeliveryAreaByIdLocal(normalizedAreaId) || findDeliveryAreaByNameLocal(areaName);
+
+  field.value = nextArea?.id || "";
+  syncNeighborhoodHelperFromSelection();
+  return nextArea || null;
+}
+
+function renderDeliveryAreaOptions() {
+  const field = getDeliveryFields().neighborhood;
+  if (!field) {
+    return;
+  }
+
+  const currentValue = normalizeText(field.value || field.dataset.savedAreaId || "");
+  const currentName = normalizeText(field.dataset.savedAreaName || "");
+  const nextAreas = Array.isArray(deliveryAreasState.areas) ? deliveryAreasState.areas.slice() : [];
+
+  field.innerHTML = [
+    '<option value="">Selecione seu bairro</option>',
+    ...nextAreas.map(area =>
+      `<option value="${escapeHtml(area.id)}">${escapeHtml(buildDeliveryAreaOptionLabel(area))}</option>`
+    )
+  ].join("");
+
+  if (!nextAreas.length && !deliveryAreasState.loaded) {
+    field.value = "";
+    setNeighborhoodHelperCopy("Carregando bairros de entrega...");
+    return;
+  }
+
+  const restoredArea = syncDeliveryAreaSelection(currentValue, currentName);
+  if (restoredArea) {
+    field.dataset.savedAreaId = restoredArea.id;
+    field.dataset.savedAreaName = restoredArea.name;
+  } else {
+    field.dataset.savedAreaId = "";
+    field.dataset.savedAreaName = "";
+  }
+
+  if (!nextAreas.length && deliveryAreasState.loaded) {
+    setNeighborhoodHelperCopy("Nenhum bairro disponivel foi encontrado. Escolha retirada no local.", "warning");
+    return;
+  }
+
+  syncNeighborhoodHelperFromSelection();
 }
 
 function getCurrentFulfillmentMode() {
@@ -839,11 +1268,12 @@ function getCashChangeSummary(orderTotal, showMessage = true) {
 
 function buildFullAddress() {
   const fields = getDeliveryFields();
+  const selectedArea = getSelectedDeliveryArea();
 
   const cep = formatCep(fields.cep?.value || "");
   const street = normalizeText(fields.street?.value);
   const number = normalizeText(fields.number?.value);
-  const neighborhood = normalizeText(fields.neighborhood?.value);
+  const neighborhood = normalizeText(selectedArea?.name || fields.neighborhood?.dataset.savedAreaName || "");
   const complement = normalizeText(fields.complement?.value);
   const reference = normalizeText(fields.reference?.value);
   const city = normalizeText(fields.city?.value);
@@ -874,12 +1304,14 @@ function syncDeliveryAddressField() {
 
 function getDeliveryValues() {
   const fields = getDeliveryFields();
+  const selectedArea = getSelectedDeliveryArea();
 
   return {
+    deliveryAreaId: normalizeText(selectedArea?.id || fields.neighborhood?.dataset.savedAreaId || ""),
     cep: normalizeCep(fields.cep?.value),
     street: normalizeText(fields.street?.value),
     number: normalizeText(fields.number?.value),
-    neighborhood: normalizeText(fields.neighborhood?.value),
+    neighborhood: normalizeText(selectedArea?.name || fields.neighborhood?.dataset.savedAreaName || ""),
     complement: normalizeText(fields.complement?.value),
     reference: normalizeText(fields.reference?.value),
     city: normalizeText(fields.city?.value),
@@ -900,7 +1332,7 @@ function validateAddressFields(showMessage = true) {
   const required = [
     { field: fields.street, value: values.street, message: "Informe a rua." },
     { field: fields.number, value: values.number, message: "Informe o n\u00famero." },
-    { field: fields.neighborhood, value: values.neighborhood, message: "Informe o bairro." },
+    { field: fields.neighborhood, value: values.deliveryAreaId && values.neighborhood, message: "Selecione o bairro." },
     { field: fields.city, value: values.city, message: "Informe a cidade." },
     { field: fields.state, value: values.state, message: "Informe o estado." }
   ];
@@ -915,12 +1347,12 @@ function validateAddressFields(showMessage = true) {
 
     if (showMessage) {
       logCheckoutWarn("Checkout bloqueado: endere\u00e7o incompleto.", { missingField: missing.field?.id || "unknown" });
-      showToast(DELIVERY_IDLE_MESSAGE);
+      showToast(missing.message || DELIVERY_IDLE_MESSAGE);
       setDeliveryState(createDeliveryState({
         status: "idle",
         distanceRange: values.distanceRange || "",
         address: syncDeliveryAddressField(),
-        message: DELIVERY_IDLE_MESSAGE,
+        message: missing.message || DELIVERY_IDLE_MESSAGE,
       }));
     }
 
@@ -977,7 +1409,9 @@ function applyValidatedAddressToFields(address = {}) {
 
   if (fields.cep && address.cep) fields.cep.value = formatCep(address.cep);
   if (fields.street && address.street) fields.street.value = address.street;
-  if (fields.neighborhood && address.neighborhood) fields.neighborhood.value = address.neighborhood;
+  if (fields.neighborhood && (address.deliveryAreaId || address.neighborhood)) {
+    syncDeliveryAreaSelection(address.deliveryAreaId, address.neighborhood);
+  }
   if (fields.city && address.city) fields.city.value = address.city;
   if (fields.state && address.state) fields.state.value = address.state;
 }
@@ -991,8 +1425,10 @@ function createDeliveryRequestError(message, code, status = 500, payload = null)
 }
 
 function normalizeDeliveryQuotePayload(payload, values) {
-  const status = payload?.status === "out_of_range" ? "out_of_range" : "ready";
-  const isOutOfRange = status === "out_of_range";
+  const status = ["ready", "out_of_range", "blocked", "pickup_only"].includes(payload?.status)
+    ? payload.status
+    : "ready";
+  const isDeliveryUnavailable = ["out_of_range", "blocked", "pickup_only"].includes(status);
   const fee = Number(payload?.fee);
   const isManualZone = isManualZoneMetadata({
     precision: payload?.locationPrecision,
@@ -1023,10 +1459,10 @@ function normalizeDeliveryQuotePayload(payload, values) {
     );
   }
 
-  if (!isOutOfRange) {
-    if (!Number.isFinite(fee) || fee <= 0 || ![DELIVERY_FEE_LOCAL, DELIVERY_FEE_EXTENDED].includes(fee)) {
+  if (!isDeliveryUnavailable) {
+    if (!Number.isFinite(fee) || fee <= 0) {
       throw createDeliveryRequestError(
-        "A resposta da entrega voltou sem uma taxa v\u00e1lida.",
+        "A resposta da entrega voltou sem uma taxa valida.",
         "delivery_quote_invalid_fee",
         502,
         payload
@@ -1035,7 +1471,7 @@ function normalizeDeliveryQuotePayload(payload, values) {
 
     if (!payload?.quote?.token || !payload?.quote?.code || !payload?.quote?.expiresAt) {
       throw createDeliveryRequestError(
-        "A resposta da entrega voltou sem a valida\u00e7\u00e3o completa da taxa.",
+        "A resposta da entrega voltou sem a validacao completa da taxa.",
         "delivery_quote_invalid_token",
         502,
         payload
@@ -1053,11 +1489,17 @@ function normalizeDeliveryQuotePayload(payload, values) {
 
   return {
     status,
-    isOutOfRange,
-    fee: isOutOfRange ? 0 : fee,
+    isDeliveryUnavailable,
+    fee: isDeliveryUnavailable ? 0 : fee,
     distanceKm,
     routeDistanceKm,
-    validatedAddress
+    validatedAddress,
+    deliveryArea: {
+      id: normalizeText(payload?.deliveryArea?.id || values.deliveryAreaId),
+      name: normalizeText(payload?.deliveryArea?.name || validatedAddress.neighborhood),
+      status: normalizeText(payload?.deliveryArea?.status || status),
+      note: normalizeText(payload?.deliveryArea?.note)
+    }
   };
 }
 
@@ -1069,6 +1511,7 @@ async function fetchDeliveryQuote(values, { signal } = {}) {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
+      deliveryAreaId: normalizeText(values.deliveryAreaId),
       cep: normalizeCep(values.cep),
       street: normalizeText(values.street),
       number: normalizeText(values.number),
@@ -1164,11 +1607,445 @@ async function verifyDeliveryQuoteToken(token, addressKey = "", { signal } = {})
   return payload;
 }
 
+function buildCartPayloadForServer() {
+  return cart.map(item => ({
+    productId: normalizeText(item.productId),
+    quantity: Math.max(1, Math.round(normalizeMoneyValue(item.quantity, 0))),
+    selectedOptionIds: Array.isArray(item.selectedOptionIds)
+      ? item.selectedOptionIds.map(optionId => normalizeText(optionId)).filter(Boolean)
+      : []
+  }));
+}
+
+async function prepareValidatedOrderTicket(payload, { signal } = {}) {
+  const timedRequest = signal ? null : createTimedRequest(DELIVERY_REQUEST_TIMEOUT_MS);
+
+  let response;
+
+  try {
+    response = await fetch(resolveOrderTicketApiUrl(), {
+      method: "POST",
+      signal: signal || timedRequest?.controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch (error) {
+    if (timedRequest?.didTimeout && isAbortError(error)) {
+      throw createDeliveryRequestError(
+        "A preparação do pedido demorou mais do que o esperado.",
+        "order_ticket_timeout",
+        504
+      );
+    }
+
+    throw error;
+  } finally {
+    timedRequest?.cleanup();
+  }
+
+  let data = null;
+
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok || !data?.ok || !data?.order) {
+    const error = new Error(data?.message || "Não foi possível preparar a comanda agora.");
+    error.code = data?.code || "order_ticket_prepare_failed";
+    error.status = response.status;
+    error.payload = data;
+    throw error;
+  }
+
+  return data;
+}
+
+function normalizeInventoryProductsPayload(payload) {
+  if (Array.isArray(payload?.products)) {
+    return payload.products;
+  }
+
+  if (Array.isArray(payload?.inventory?.products)) {
+    return payload.inventory.products;
+  }
+
+  return [];
+}
+
+function normalizeInventoryRealtimePayload(payload) {
+  const productId = normalizeText(payload?.productId);
+  if (!productId || !CATALOG_PRODUCT_MAP.has(productId)) {
+    return null;
+  }
+
+  return {
+    productId,
+    available: Boolean(payload?.available),
+    updatedAt: normalizeText(payload?.updatedAt) || new Date().toISOString()
+  };
+}
+
+function applyCatalogInventorySnapshot(payload, { notify = true, reason = "inventory_sync" } = {}) {
+  const inventoryProducts = normalizeInventoryProductsPayload(payload);
+  if (!inventoryProducts.length) {
+    return [];
+  }
+
+  const nextInventoryStatusMap = new Map(catalogInventoryStatusMap);
+
+  inventoryProducts.forEach(product => {
+    const productId = normalizeText(product?.id);
+    if (!productId || !CATALOG_PRODUCT_MAP.has(productId)) {
+      return;
+    }
+
+    nextInventoryStatusMap.set(productId, {
+      available: Boolean(product.available),
+      stockUpdatedAt: normalizeText(product.stockUpdatedAt || product.updatedAt)
+    });
+  });
+
+  catalogInventoryStatusMap = nextInventoryStatusMap;
+  const removedItems = purgeUnavailableCartItems({ notify, reason });
+  updateUI();
+  requestExpandableCardDescriptionsSync();
+  return removedItems;
+}
+
+function applyCatalogInventoryPatch(payload, { notify = true, reason = "inventory_patch" } = {}) {
+  const normalizedPayload = normalizeInventoryRealtimePayload(payload);
+  if (!normalizedPayload) {
+    return [];
+  }
+
+  const currentEntry = getCatalogInventoryEntry(normalizedPayload.productId);
+  if (
+    currentEntry
+    && Boolean(currentEntry.available) === normalizedPayload.available
+    && normalizeText(currentEntry.stockUpdatedAt) === normalizedPayload.updatedAt
+  ) {
+    return [];
+  }
+
+  const nextInventoryStatusMap = new Map(catalogInventoryStatusMap);
+  nextInventoryStatusMap.set(normalizedPayload.productId, {
+    available: normalizedPayload.available,
+    stockUpdatedAt: normalizedPayload.updatedAt
+  });
+
+  catalogInventoryStatusMap = nextInventoryStatusMap;
+  const removedItems = purgeUnavailableCartItems({ notify, reason });
+  updateUI();
+  requestExpandableCardDescriptionsSync();
+  return removedItems;
+}
+
+function createInventoryRealtimeChannel() {
+  try {
+    return typeof window.BroadcastChannel === "function"
+      ? new window.BroadcastChannel(INVENTORY_SYNC_CHANNEL_NAME)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseInventoryRealtimePayload(rawValue) {
+  try {
+    return normalizeInventoryRealtimePayload(JSON.parse(rawValue));
+  } catch {
+    return null;
+  }
+}
+
+function handleRealtimeInventoryUpdate(payload, { notify = true, reason = "inventory_realtime" } = {}) {
+  const normalizedPayload = normalizeInventoryRealtimePayload(payload);
+  if (!normalizedPayload) {
+    return;
+  }
+
+  applyCatalogInventoryPatch(normalizedPayload, { notify, reason });
+  window.setTimeout(() => {
+    refreshCatalogAvailability({
+      notify,
+      quiet: true,
+      reason: `${reason}_confirm`
+    });
+  }, 0);
+}
+
+async function fetchInventoryStatus({ signal } = {}) {
+  if (activeInventoryStatusRequest?.promise) {
+    return activeInventoryStatusRequest.promise;
+  }
+
+  const request = {};
+  activeInventoryStatusRequest = request;
+  request.promise = (async () => {
+    const timedRequest = signal ? null : createTimedRequest(INVENTORY_REQUEST_TIMEOUT_MS);
+    let response;
+
+    try {
+      response = await fetch(resolveInventoryStatusApiUrl(), {
+        signal: signal || timedRequest?.controller.signal,
+        headers: {
+          Accept: "application/json"
+        }
+      });
+    } catch (error) {
+      if (timedRequest?.didTimeout && isAbortError(error)) {
+        throw createDeliveryRequestError(
+          "A atualização do estoque demorou mais do que o esperado.",
+          "inventory_status_timeout",
+          504
+        );
+      }
+
+      throw error;
+    } finally {
+      timedRequest?.cleanup();
+    }
+
+    let payload = null;
+
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
+    }
+
+    if (!response.ok || !payload?.ok) {
+      const error = new Error(payload?.message || "Não foi possível atualizar o estoque agora.");
+      error.code = payload?.code || "inventory_status_failed";
+      error.status = response.status;
+      error.payload = payload;
+      throw error;
+    }
+
+    return payload;
+  })();
+
+  try {
+    return await request.promise;
+  } finally {
+    if (activeInventoryStatusRequest === request) {
+      activeInventoryStatusRequest = null;
+    }
+  }
+}
+
+async function refreshCatalogAvailability({ notify = true, quiet = true, reason = "inventory_sync" } = {}) {
+  try {
+    const payload = await fetchInventoryStatus({});
+    applyCatalogInventorySnapshot(payload, { notify, reason });
+    return payload;
+  } catch (error) {
+    logCheckoutWarn("Falha ao sincronizar estoque do cardápio.", error);
+    if (!quiet) {
+      showToast("Não foi possível atualizar o estoque agora.");
+    }
+    return null;
+  }
+}
+
+async function syncInventoryAfterOrderError(error) {
+  const errorCode = normalizeText(error?.code);
+  if (!["product_unavailable", "invalid_combo_option", "unknown_product"].includes(errorCode)) {
+    return;
+  }
+
+  await refreshCatalogAvailability({
+    notify: true,
+    quiet: true,
+    reason: "order_validation_failed"
+  });
+}
+
+async function fetchPreparedOrderTicket(token, { signal } = {}) {
+  const url = new URL(resolveOrderTicketApiUrl(), window.location.origin);
+  url.searchParams.set("token", token);
+  const timedRequest = signal ? null : createTimedRequest(DELIVERY_REQUEST_TIMEOUT_MS);
+
+  let response;
+
+  try {
+    response = await fetch(url.toString(), {
+      signal: signal || timedRequest?.controller.signal,
+      headers: {
+        Accept: "application/json"
+      }
+    });
+  } catch (error) {
+    if (timedRequest?.didTimeout && isAbortError(error)) {
+      throw createDeliveryRequestError(
+        "A comanda segura demorou mais do que o esperado para carregar.",
+        "order_ticket_fetch_timeout",
+        504
+      );
+    }
+
+    throw error;
+  } finally {
+    timedRequest?.cleanup();
+  }
+
+  let data = null;
+
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok || !data?.ok || !data?.order) {
+    const error = new Error(data?.message || "Não foi possível abrir a comanda agora.");
+    error.code = data?.code || "order_ticket_fetch_failed";
+    error.status = response.status;
+    error.payload = data;
+    throw error;
+  }
+
+  return data.order;
+}
+
+async function fetchDeliveryAreas({ signal } = {}) {
+  const timedRequest = signal ? null : createTimedRequest(DELIVERY_AREAS_REQUEST_TIMEOUT_MS);
+  let response;
+
+  try {
+    response = await fetch(resolveDeliveryAreasApiUrl(), {
+      signal: signal || timedRequest?.controller.signal,
+      headers: {
+        Accept: "application/json"
+      }
+    });
+  } catch (error) {
+    if (timedRequest?.didTimeout && isAbortError(error)) {
+      throw createDeliveryRequestError(
+        "A lista de bairros demorou mais do que o esperado para carregar.",
+        "delivery_areas_timeout",
+        504
+      );
+    }
+
+    throw error;
+  } finally {
+    timedRequest?.cleanup();
+  }
+
+  let payload = null;
+
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok || !payload?.ok || !Array.isArray(payload?.areas)) {
+    const error = new Error(payload?.message || "Nao foi possivel carregar os bairros de entrega agora.");
+    error.code = payload?.code || "delivery_areas_failed";
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
+  }
+
+  return payload;
+}
+
+async function refreshDeliveryAreas({ quiet = true, reason = "manual" } = {}) {
+  if (activeDeliveryAreasRequest?.promise) {
+    return activeDeliveryAreasRequest.promise;
+  }
+
+  const request = {};
+  activeDeliveryAreasRequest = request;
+  request.promise = (async () => {
+    try {
+      const payload = await fetchDeliveryAreas({});
+      const areas = payload.areas
+        .map(sanitizeDeliveryAreaOption)
+        .filter(Boolean)
+        .sort((left, right) => left.name.localeCompare(right.name, "pt-BR"));
+
+      deliveryAreasState = createDeliveryAreasState({
+        loaded: true,
+        loading: false,
+        updatedAt: payload.updatedAt,
+        error: "",
+        areas
+      });
+
+      renderDeliveryAreaOptions();
+
+      const selectedArea = getSelectedDeliveryArea();
+      if (
+        deliveryState.status === "ready"
+        && selectedArea
+        && (
+          selectedArea.status !== "active"
+          || selectedArea.id !== deliveryState.deliveryAreaId
+          || Math.abs(Number(selectedArea.fee || 0) - Number(deliveryState.fee || 0)) > 0.0001
+        )
+      ) {
+        clearDeliveryQuote("As regras de entrega deste bairro mudaram. Valide a taxa novamente.");
+      }
+
+      return deliveryAreasState;
+    } catch (error) {
+      deliveryAreasState = createDeliveryAreasState({
+        loaded: true,
+        loading: false,
+        updatedAt: deliveryAreasState.updatedAt,
+        error: error.message,
+        areas: deliveryAreasState.areas
+      });
+
+      if (!quiet) {
+        showToast(error.message || "Nao foi possivel carregar os bairros de entrega agora.");
+      }
+
+      if (!deliveryAreasState.areas.length) {
+        renderDeliveryAreaOptions();
+      }
+
+      logCheckoutWarn("Falha ao carregar a lista de bairros de entrega.", {
+        reason,
+        error
+      });
+      return null;
+    } finally {
+      if (activeDeliveryAreasRequest === request) {
+        activeDeliveryAreasRequest = null;
+      }
+    }
+  })();
+
+  return request.promise;
+}
+
+function handleDeliveryAreasRealtimeRefresh(reason = "delivery_areas_sync") {
+  refreshDeliveryAreas({
+    quiet: true,
+    reason
+  }).catch(error => {
+    logCheckoutWarn("Falha ao sincronizar bairros de entrega em segundo plano.", error);
+  });
+}
+
 async function requestDeliveryQuote({ showMessage = true, quietSuccess = false, reason = "manual" } = {}) {
   clearScheduledAutoDeliveryQuote();
 
   if (getCurrentFulfillmentMode() === "pickup") {
     return deliveryState;
+  }
+
+  if (!deliveryAreasState.loaded) {
+    await refreshDeliveryAreas({ quiet: !showMessage, reason: `${reason}_bootstrap` });
   }
 
   if (!validateAddressFields(showMessage)) {
@@ -1228,7 +2105,7 @@ async function requestDeliveryQuote({ showMessage = true, quietSuccess = false, 
       }
 
       if (fields.estimateAck) {
-        fields.estimateAck.checked = !normalizedPayload.isOutOfRange;
+        fields.estimateAck.checked = !normalizedPayload.isDeliveryUnavailable;
         clearEstimateTermsInvalid(fields.estimateTerms, fields.estimateAck);
       }
 
@@ -1239,14 +2116,18 @@ async function requestDeliveryQuote({ showMessage = true, quietSuccess = false, 
         distanceRange: payload.zone || "",
         address: syncDeliveryAddressField(),
         message: payload.message || DELIVERY_IDLE_MESSAGE,
-        quoteCode: normalizedPayload.isOutOfRange ? "" : payload.quote?.code || "",
-        quoteToken: normalizedPayload.isOutOfRange ? "" : payload.quote?.token || "",
+        quoteCode: normalizedPayload.isDeliveryUnavailable ? "" : payload.quote?.code || "",
+        quoteToken: normalizedPayload.isDeliveryUnavailable ? "" : payload.quote?.token || "",
         addressKey: buildDeliveryAddressKey(normalizedPayload.validatedAddress),
-        expiresAt: normalizedPayload.isOutOfRange ? "" : payload.quote?.expiresAt || "",
+        expiresAt: normalizedPayload.isDeliveryUnavailable ? "" : payload.quote?.expiresAt || "",
         distanceKm: normalizedPayload.distanceKm,
         routeDistanceKm: normalizedPayload.routeDistanceKm,
         locationPrecision: normalizeText(payload.locationPrecision),
         geocoderSource: normalizeText(payload.geocoderSource),
+        deliveryAreaId: normalizedPayload.deliveryArea.id,
+        deliveryAreaName: normalizedPayload.deliveryArea.name,
+        deliveryAreaStatus: normalizedPayload.deliveryArea.status,
+        deliveryAreaNote: normalizedPayload.deliveryArea.note,
         validatedAddress: normalizedPayload.validatedAddress
       });
 
@@ -1399,7 +2280,14 @@ async function lookupCep(isManual = false) {
     }
 
     if (fields.street) fields.street.value = data.logradouro || "";
-    if (fields.neighborhood) fields.neighborhood.value = data.bairro || "";
+    if (fields.neighborhood) {
+      const matchedArea = syncDeliveryAreaSelection("", data.bairro || "");
+      if (!matchedArea) {
+        fields.neighborhood.dataset.savedAreaId = "";
+        fields.neighborhood.dataset.savedAreaName = normalizeText(data.bairro || "");
+        syncNeighborhoodHelperFromSelection();
+      }
+    }
     if (fields.city) fields.city.value = data.localidade || "";
     if (fields.state) fields.state.value = data.uf || "";
 
@@ -1490,10 +2378,14 @@ function updateDeliveryUI() {
       deliveryState.status === "loading"
         ? "Calculando taxa de entrega..."
         : deliveryState.status === "ready"
-          ? "Taxa validada"
+          ? "Taxa calculada"
+          : deliveryState.status === "pickup_only"
+            ? "Somente retirada"
+          : deliveryState.status === "blocked"
+            ? "Entrega bloqueada"
           : deliveryState.status === "out_of_range"
             ? "Entrega indispon\u00edvel"
-          : "Validar regi\u00e3o e calcular taxa";
+          : "Calcular taxa de entrega";
 
     fields.calculateDeliveryButton.classList.toggle("is-success", deliveryState.status === "ready");
   }
@@ -1502,33 +2394,13 @@ function updateDeliveryUI() {
     if (isPickup) {
       fields.quoteSummary.textContent = "Retirada no balc\u00e3o, sem taxa de entrega.";
     } else if (deliveryState.status === "ready") {
-      const usesManualZones = isManualZoneMetadata({
-        precision: deliveryState.locationPrecision,
-        source: deliveryState.geocoderSource
-      });
-      const locationMethodCopy = getDeliveryLocationMethodCopy({
-        precision: deliveryState.locationPrecision,
-        source: deliveryState.geocoderSource
-      });
-      const summaryParts = [
-        usesManualZones
-          ? "Endere\u00e7o validado na tabela local de entrega."
-          : "Endere\u00e7o validado pelo servidor.",
-        deliveryState.distanceLabel || "",
-        getDeliveryQuoteDistanceCopy(deliveryState),
-        locationMethodCopy,
-        deliveryState.quoteCode ? `C\u00f3digo da cota\u00e7\u00e3o: ${deliveryState.quoteCode}.` : ""
-      ].filter(Boolean);
-      fields.quoteSummary.textContent = summaryParts.join(" ");
+      fields.quoteSummary.textContent = deliveryState.message || "Entrega dispon\u00edvel para sua regi\u00e3o.";
+    } else if (deliveryState.status === "pickup_only") {
+      fields.quoteSummary.textContent = deliveryState.message || "Para essa regi\u00e3o, no momento trabalhamos apenas com retirada no local.";
+    } else if (deliveryState.status === "blocked") {
+      fields.quoteSummary.textContent = deliveryState.message || "No momento n\u00e3o entregamos nessa regi\u00e3o. Voc\u00ea pode escolher retirada no local.";
     } else if (deliveryState.status === "out_of_range") {
-      const locationMethodCopy = getDeliveryLocationMethodCopy({
-        precision: deliveryState.locationPrecision,
-        source: deliveryState.geocoderSource
-      });
-      fields.quoteSummary.textContent = [
-        deliveryState.message || "No momento n\u00e3o entregamos para essa regi\u00e3o.",
-        locationMethodCopy
-      ].filter(Boolean).join(" ");
+      fields.quoteSummary.textContent = deliveryState.message || "No momento n\u00e3o entregamos nessa regi\u00e3o. Voc\u00ea pode escolher retirada no local.";
     } else if (deliveryState.status === "loading") {
       fields.quoteSummary.textContent = "Calculando taxa de entrega...";
     } else {
@@ -1538,15 +2410,17 @@ function updateDeliveryUI() {
 
   if (fields.feeLine) {
     if (isPickup) {
-      fields.feeLine.textContent = "Entrega: R$ 0,00";
+      fields.feeLine.textContent = "Taxa de entrega: R$ 0,00";
     } else if (deliveryState.status === "ready") {
-      fields.feeLine.textContent = `Entrega validada: ${formatCurrency(deliveryState.fee)}`;
+      fields.feeLine.textContent = `Taxa de entrega: ${formatCurrency(deliveryState.fee)}`;
+    } else if (deliveryState.status === "pickup_only" || deliveryState.status === "blocked") {
+      fields.feeLine.textContent = "Taxa de entrega: retirada obrigatoria";
     } else if (deliveryState.status === "out_of_range") {
-      fields.feeLine.textContent = "Entrega: indispon\u00edvel";
+      fields.feeLine.textContent = "Taxa de entrega: indispon\u00edvel";
     } else if (deliveryState.status === "loading") {
-      fields.feeLine.textContent = "Entrega validada: calculando...";
+      fields.feeLine.textContent = "Taxa de entrega: calculando...";
     } else {
-      fields.feeLine.textContent = "Entrega validada: aguardando valida\u00e7\u00e3o";
+      fields.feeLine.textContent = "Taxa de entrega: aguardando c\u00e1lculo";
     }
   }
 
@@ -1554,23 +2428,9 @@ function updateDeliveryUI() {
     if (isPickup) {
       fields.totalNote.textContent = "Total final para retirada no local";
     } else if (deliveryState.status === "ready") {
-      const usesManualZones = isManualZoneMetadata({
-        precision: deliveryState.locationPrecision,
-        source: deliveryState.geocoderSource
-      });
-      const precisionNote = getDeliveryLocationMethodCopy({
-        precision: deliveryState.locationPrecision,
-        source: deliveryState.geocoderSource,
-        includeProvider: false
-      });
-      fields.totalNote.textContent = [
-        usesManualZones
-          ? `Taxa validada para esta regi\u00e3o: ${deliveryState.distanceLabel}.`
-          : `Taxa validada para este endere\u00e7o: ${deliveryState.distanceLabel}.`,
-        getDeliveryQuoteDistanceCopy(deliveryState),
-        precisionNote,
-        "Se o local mudar, a Galaxy Burger exige nova valida\u00e7\u00e3o."
-      ].filter(Boolean).join(" ");
+      fields.totalNote.textContent = "Taxa confirmada para este endere\u00e7o. Se o local mudar, a entrega ser\u00e1 recalculada.";
+    } else if (deliveryState.status === "pickup_only" || deliveryState.status === "blocked") {
+      fields.totalNote.textContent = deliveryState.message || "Para esse bairro, o atendimento segue apenas com retirada.";
     } else if (deliveryState.status === "out_of_range") {
       fields.totalNote.textContent = deliveryState.message || "No momento n\u00e3o entregamos para essa regi\u00e3o.";
     } else if (deliveryState.status === "loading") {
@@ -1583,16 +2443,16 @@ function updateDeliveryUI() {
   if (fields.totalLabel) {
     if (isPickup) {
       fields.totalLabel.textContent = "Total do pedido";
-    } else if (deliveryState.status === "out_of_range") {
+    } else if (["out_of_range", "blocked", "pickup_only"].includes(deliveryState.status)) {
       fields.totalLabel.textContent = "Subtotal do pedido";
     } else {
-      fields.totalLabel.textContent = "Total validado do pedido";
+      fields.totalLabel.textContent = "Total do pedido com entrega";
     }
   }
 
   if (fields.feeFeedback) {
     if (feedbackTone === "ready") fields.feeFeedback.classList.add("fee-ok");
-    if (feedbackTone === "out_of_range" || feedbackTone === "warning") fields.feeFeedback.classList.add("fee-warning");
+    if (["out_of_range", "blocked", "pickup_only", "warning"].includes(feedbackTone)) fields.feeFeedback.classList.add("fee-warning");
     if (feedbackTone === "error") fields.feeFeedback.classList.add("fee-error");
   }
 }
@@ -1618,7 +2478,10 @@ function loadDeliveryData() {
     if (fields.cep) fields.cep.value = formatCep(saved.cep || "");
     if (fields.street) fields.street.value = saved.street || "";
     if (fields.number) fields.number.value = saved.number || "";
-    if (fields.neighborhood) fields.neighborhood.value = saved.neighborhood || "";
+    if (fields.neighborhood) {
+      fields.neighborhood.dataset.savedAreaId = saved.deliveryAreaId || "";
+      fields.neighborhood.dataset.savedAreaName = saved.neighborhood || "";
+    }
     if (fields.complement) fields.complement.value = saved.complement || "";
     if (fields.reference) fields.reference.value = saved.reference || "";
     if (fields.city) fields.city.value = saved.city || "";
@@ -1627,6 +2490,7 @@ function loadDeliveryData() {
     if (fields.estimateAck) fields.estimateAck.checked = Boolean(saved.estimateAccepted);
 
     syncDeliveryAddressField();
+    renderDeliveryAreaOptions();
 
     if (saved.deliveryState) {
       deliveryState = createDeliveryState(saved.deliveryState);
@@ -1663,6 +2527,118 @@ function clearDeliveryData() {
   cancelActiveViaCepLookup("clear_storage");
 
   deliveryState = createDeliveryState();
+}
+
+function loadPendingCustomerOrder() {
+  try {
+    const raw = localStorage.getItem(ORDER_PREPARATION_STORAGE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    localStorage.removeItem(ORDER_PREPARATION_STORAGE_KEY);
+    return null;
+  }
+}
+
+function savePendingCustomerOrder(orderPreview) {
+  pendingCustomerOrder = orderPreview && typeof orderPreview === "object"
+    ? {
+        ...orderPreview,
+        pendingAt: new Date().toISOString()
+      }
+    : null;
+
+  if (!pendingCustomerOrder) {
+    localStorage.removeItem(ORDER_PREPARATION_STORAGE_KEY);
+    updatePendingOrderBanner();
+    return;
+  }
+
+  localStorage.setItem(ORDER_PREPARATION_STORAGE_KEY, JSON.stringify(pendingCustomerOrder));
+  updatePendingOrderBanner();
+}
+
+function clearPendingCustomerOrder() {
+  pendingCustomerOrder = null;
+  localStorage.removeItem(ORDER_PREPARATION_STORAGE_KEY);
+  updatePendingOrderBanner();
+}
+
+function invalidatePendingCustomerOrder(reason = "") {
+  if (!pendingCustomerOrder) {
+    return;
+  }
+
+  logCheckoutInfo("Pedido pendente descartado porque o checkout mudou.", {
+    reason,
+    orderCode: pendingCustomerOrder.orderCode || ""
+  });
+  clearPendingCustomerOrder();
+}
+
+function updatePendingOrderBanner() {
+  const banner = document.getElementById("pending-order-banner");
+  const title = document.getElementById("pending-order-title");
+  const copy = document.getElementById("pending-order-copy");
+
+  if (!banner) return;
+
+  const expiresAt = Number(new Date(pendingCustomerOrder?.expiresAt || "").getTime());
+  if (pendingCustomerOrder && Number.isFinite(expiresAt) && expiresAt > 0 && Date.now() > expiresAt) {
+    pendingCustomerOrder = null;
+    localStorage.removeItem(ORDER_PREPARATION_STORAGE_KEY);
+  }
+
+  if (!pendingCustomerOrder?.whatsAppMessage) {
+    banner.hidden = true;
+    return;
+  }
+
+  banner.hidden = false;
+
+  if (title) {
+    title.textContent = pendingCustomerOrder.orderCode
+      ? `Pedido pendente ${pendingCustomerOrder.orderCode}`
+      : "Pedido aguardando envio";
+  }
+
+  if (copy) {
+    copy.textContent = pendingCustomerOrder.totalLabel
+      ? `Seu pedido ficou salvo neste navegador. Se ainda não terminou no WhatsApp, você pode abrir novamente ou marcar como enviado quando concluir. Total: ${pendingCustomerOrder.totalLabel}.`
+      : "Seu pedido ficou salvo neste navegador até a confirmação do envio.";
+  }
+}
+
+function markPendingOrderSent() {
+  if (!pendingCustomerOrder) {
+    return;
+  }
+
+  cart = [];
+  saveCart();
+  clearDeliveryData();
+  clearPendingCustomerOrder();
+  pendingOrderPreview = null;
+  closeOrderTicketModal({ restoreCart: false });
+  closeCartModal();
+  updateUI();
+  showToast("Pedido marcado como enviado. Carrinho liberado para o próximo atendimento.");
+}
+
+function reopenPendingOrderWhatsApp() {
+  if (!pendingCustomerOrder?.whatsAppMessage) {
+    showToast("Não existe pedido pendente para reenviar.");
+    return;
+  }
+
+  try {
+    openWhatsAppOrder(pendingCustomerOrder.whatsAppMessage, { source: "pending_order" });
+  } catch (error) {
+    logCheckoutError("Falha ao reabrir o WhatsApp do pedido pendente.", error);
+    showToast("Não foi possível abrir o WhatsApp agora. Tente novamente.");
+  }
 }
 
 function getCartTotal() {
@@ -1736,8 +2712,8 @@ function updatePixPanelSummary({ subtotal = getCartTotal(), total = subtotal } =
 
 function getFinalizeButtonLabel() {
   return getCurrentFulfillmentMode() === "pickup"
-    ? "Enviar retirada no WhatsApp"
-    : "Enviar pedido no WhatsApp";
+    ? "Revisar retirada no WhatsApp"
+    : "Revisar pedido no WhatsApp";
 }
 
 function getFinalizeButton() {
@@ -1765,7 +2741,7 @@ function setOrderTicketConfirmButtonBusy(isBusy, label = "Abrindo WhatsApp...") 
   if (!confirmButton) return;
 
   if (!confirmButton.dataset.defaultLabel) {
-    confirmButton.dataset.defaultLabel = confirmButton.textContent.trim() || "Enviar no WhatsApp";
+    confirmButton.dataset.defaultLabel = confirmButton.textContent.trim() || "Abrir WhatsApp";
   }
 
   confirmButton.dataset.busy = isBusy ? "true" : "false";
@@ -1777,6 +2753,47 @@ function resetOrderSubmissionButtons() {
   setFinalizeButtonBusy(false);
   setOrderTicketConfirmButtonBusy(false);
   updateCartTotals();
+}
+
+function syncCatalogCards() {
+  document.querySelectorAll(".card[data-product-id]").forEach(card => {
+    const product = getCatalogProduct(card.dataset.productId);
+    const price = card.querySelector(".price");
+    const button = card.querySelector(".add-btn");
+    const sellable = isCatalogProductSellable(product);
+
+    if (price && product) {
+      price.textContent = formatCurrency(product.price);
+    }
+
+    if (product?.category === "combo" && product?.combo?.drinksCount) {
+      card.dataset.comboDrinks = String(product.combo.drinksCount);
+    }
+
+    card.classList.toggle("is-unavailable", !sellable);
+
+    if (!button) {
+      return;
+    }
+
+    if (!button.dataset.label) {
+      const currentLabel = button.textContent.trim();
+      button.dataset.label = currentLabel && currentLabel !== "Esgotado"
+        ? currentLabel
+        : product?.category === "combo"
+          ? "Quero esse combo"
+          : product?.category === "drink"
+            ? "Adicionar bebida"
+            : product?.category === "extra"
+              ? "Adicionar ao pedido"
+              : product?.category === "side"
+                ? "Quero essa porção"
+                : "Quero esse burger";
+    }
+
+    button.disabled = !sellable;
+    button.textContent = sellable ? button.dataset.label : "Esgotado";
+  });
 }
 
 function updateCartTotals() {
@@ -1791,6 +2808,7 @@ function updateCartTotals() {
   const meetsMinimumOrder = hasReachedMinimumOrder(subtotal);
   const hasAcceptedEstimate = Boolean(getDeliveryFields().estimateAck?.checked);
   const hasValidatedDelivery = !isPickup && deliveryState.status === "ready" && Boolean(deliveryState.quoteToken);
+  const deliveryUnavailable = !isPickup && ["out_of_range", "blocked", "pickup_only"].includes(deliveryState.status);
   const fee = hasItems && hasValidatedDelivery
     ? Math.max(0, normalizeMoneyValue(deliveryState.fee))
     : 0;
@@ -1817,6 +2835,8 @@ function updateCartTotals() {
           ? `Faltam ${formatCurrency(getMinimumOrderShortfall(subtotal))} para o m\u00ednimo`
           : !hasItems
             ? getFinalizeButtonLabel()
+            : deliveryUnavailable
+              ? "Escolha retirada para continuar"
             : !isPickup && !hasValidatedDelivery
               ? "Valide o endere\u00e7o para enviar"
               : !isPickup && !hasAcceptedEstimate
@@ -1840,6 +2860,7 @@ function saveCart() {
 }
 
 function updateUI() {
+  syncCatalogCards();
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   ["header-cart-count", "mobile-cart-count", "mobile-dock-cart-count"].forEach(id => {
@@ -1866,11 +2887,13 @@ function updateModalCart() {
   cart.forEach((item, index) => {
     const div = document.createElement("div");
     div.className = "cart-item";
+    const isSellable = isCartItemSellable(item);
 
     div.innerHTML = `
       <div class="item-info">
         <strong>${item.name}</strong>
         ${item.variantLabel ? `<small>${item.variantLabel}</small>` : ""}
+        ${!isSellable ? `<small>Item indisponível no momento. Remova para continuar.</small>` : ""}
         <span>${formatCurrency(item.price)} por unidade</span>
       </div>
 
@@ -1889,11 +2912,31 @@ function updateModalCart() {
   updateCartTotals();
 }
 
-function addItemToCart({ name, price, quantity = 1, variantLabel = "" }) {
+function getUnavailableCartItems() {
+  return cart.filter(item => !isCartItemSellable(item));
+}
+
+function buildCartItemKey({ productId = "", selectedOptionIds = [], variantLabel = "" } = {}) {
+  return [
+    normalizeText(productId),
+    [...selectedOptionIds].map(optionId => normalizeText(optionId)).filter(Boolean).sort().join(","),
+    normalizeText(variantLabel)
+  ].join("|");
+}
+
+function addItemToCart({ productId, name, price, quantity = 1, variantLabel = "", selectedOptionIds = [] }) {
+  invalidatePendingCustomerOrder("cart_item_added");
   const normalizedVariantLabel = normalizeText(variantLabel);
-  const existing = cart.find(item =>
-    item.name === name && normalizeText(item.variantLabel) === normalizedVariantLabel
-  );
+  const normalizedProductId = normalizeText(productId);
+  const normalizedSelectedOptionIds = selectedOptionIds
+    .map(optionId => normalizeText(optionId))
+    .filter(Boolean);
+  const nextItemKey = buildCartItemKey({
+    productId: normalizedProductId,
+    selectedOptionIds: normalizedSelectedOptionIds,
+    variantLabel: normalizedVariantLabel
+  });
+  const existing = cart.find(item => buildCartItemKey(item) === nextItemKey);
 
   if (existing) {
     existing.quantity += quantity;
@@ -1901,9 +2944,11 @@ function addItemToCart({ name, price, quantity = 1, variantLabel = "" }) {
   }
 
   cart.push({
+    productId: normalizedProductId,
     name,
     price,
     quantity,
+    ...(normalizedSelectedOptionIds.length ? { selectedOptionIds: normalizedSelectedOptionIds } : {}),
     ...(normalizedVariantLabel ? { variantLabel: normalizedVariantLabel } : {})
   });
 }
@@ -1916,26 +2961,23 @@ function showAddedButtonState(button, temporaryLabel = "Adicionado") {
   button.disabled = true;
 
   setTimeout(() => {
-    button.textContent = button.dataset.label || original;
-    button.disabled = false;
+    const card = button.closest(".card");
+    const product = getCatalogProduct(card?.dataset?.productId);
+    const sellable = isCatalogProductSellable(product);
+    button.textContent = sellable ? (button.dataset.label || original) : "Esgotado";
+    button.disabled = !sellable;
   }, 900);
 }
 
-function getComboDrinkOptions(card) {
-  const customOptions = String(card?.dataset.comboDrinkOptions || "")
-    .split("|")
-    .map(option => normalizeText(option))
-    .filter(Boolean);
-
-  if (customOptions.length) {
-    return customOptions;
-  }
-
-  return [...DEFAULT_COMBO_DRINK_OPTIONS];
+function getComboDrinkOptions(product) {
+  return getCatalogComboOptionProducts(product).map(option => ({
+    id: option.id,
+    name: option.name
+  }));
 }
 
 function buildComboVariantLabel(selectedDrinks) {
-  const drinks = selectedDrinks.map(drink => normalizeText(drink)).filter(Boolean);
+  const drinks = selectedDrinks.map(drink => normalizeText(drink?.name || drink)).filter(Boolean);
   if (!drinks.length) return "";
 
   return `${drinks.length === 1 ? "Bebida" : "Bebidas"}: ${drinks.join(", ")}`;
@@ -2010,8 +3052,8 @@ function openComboDrinkModal(config) {
 
     config.options.forEach(option => {
       const optionElement = document.createElement("option");
-      optionElement.value = option;
-      optionElement.textContent = option;
+      optionElement.value = option.id;
+      optionElement.textContent = option.name;
       select.appendChild(optionElement);
     });
 
@@ -2030,10 +3072,13 @@ function openComboDrinkModal(config) {
 }
 
 function addConfiguredComboToCart(config, selectedDrinks) {
+  const selectedOptionIds = selectedDrinks.map(drink => normalizeText(drink.id)).filter(Boolean);
   addItemToCart({
+    productId: config.productId,
     name: config.name,
     price: config.price,
     quantity: 1,
+    selectedOptionIds,
     variantLabel: buildComboVariantLabel(selectedDrinks)
   });
 
@@ -2042,7 +3087,7 @@ function addConfiguredComboToCart(config, selectedDrinks) {
   showAddedButtonState(config.button, "Combo adicionado");
 
   const drinksLabel = selectedDrinks.length
-    ? ` com ${selectedDrinks.join(", ")}`
+    ? ` com ${selectedDrinks.map(drink => drink.name).join(", ")}`
     : "";
   showToast(`${config.name} adicionado${drinksLabel}.`);
 }
@@ -2065,7 +3110,10 @@ function confirmComboDrinkSelection() {
       return;
     }
 
-    selectedDrinks.push(select.value);
+    const option = activeComboSelection.options.find(item => item.id === select.value);
+    if (option) {
+      selectedDrinks.push(option);
+    }
   });
 
   if (firstInvalidField) {
@@ -2086,19 +3134,30 @@ function addToCart(button) {
   const card = button.closest(".card");
   if (!card) return;
 
-  const name = card.querySelector("h3")?.textContent?.trim();
-  const priceText = card.querySelector(".price")?.textContent || "0";
-  const price = Number(priceText.replace("R$", "").replace(/\./g, "").replace(",", "."));
+  const product = getCatalogProduct(card.dataset.productId);
+  if (!product) {
+    showToast("Este item não está configurado corretamente no cardápio.");
+    return;
+  }
+
+  if (!isCatalogProductSellable(product)) {
+    showToast("Este item está esgotado no momento.");
+    return;
+  }
+
+  const name = normalizeText(product.name);
+  const price = normalizeMoneyValue(product.price, NaN);
 
   if (!name || Number.isNaN(price)) return;
 
-  if (card.classList.contains("combo-card")) {
-    const drinksCount = Number(card.dataset.comboDrinks || 0);
-    const drinkOptions = getComboDrinkOptions(card);
+  if (product.category === "combo" && card.classList.contains("combo-card")) {
+    const drinksCount = Number(product.combo?.drinksCount || 0);
+    const drinkOptions = getComboDrinkOptions(product);
 
     if (drinksCount > 0) {
       if (drinksCount === 1 && drinkOptions.length === 1) {
         addConfiguredComboToCart({
+          productId: product.id,
           name,
           price,
           drinksCount,
@@ -2109,6 +3168,7 @@ function addToCart(button) {
       }
 
       openComboDrinkModal({
+        productId: product.id,
         name,
         price,
         drinksCount,
@@ -2120,6 +3180,7 @@ function addToCart(button) {
   }
 
   addItemToCart({
+    productId: product.id,
     name,
     price,
     quantity: 1
@@ -2132,6 +3193,7 @@ function addToCart(button) {
 }
 
 function removeItem(index) {
+  invalidatePendingCustomerOrder("cart_item_removed");
   cart.splice(index, 1);
   saveCart();
   updateUI();
@@ -2139,6 +3201,7 @@ function removeItem(index) {
 
 function changeItemQuantity(index, delta) {
   if (!cart[index]) return;
+  invalidatePendingCustomerOrder("cart_item_quantity_changed");
 
   cart[index].quantity += delta;
 
@@ -2152,6 +3215,7 @@ function changeItemQuantity(index, delta) {
 }
 
 function selectPayment(button) {
+  invalidatePendingCustomerOrder("payment_changed");
   clearPaymentInvalid();
   document.querySelectorAll(".payment-btn").forEach(btn => btn.classList.remove("selected"));
   button.classList.add("selected");
@@ -2174,6 +3238,7 @@ function selectPayment(button) {
 }
 
 function selectFulfillment(button) {
+  invalidatePendingCustomerOrder("fulfillment_changed");
   document.querySelectorAll(".fulfillment-btn").forEach(btn => btn.classList.remove("selected"));
   button.classList.add("selected");
 
@@ -2225,6 +3290,47 @@ function openIfoodStore(event) {
   return false;
 }
 
+function syncStoreConfigUI() {
+  const storeAddressLine1 = document.getElementById("footer-store-address-line-1");
+  const storeAddressLine2 = document.getElementById("footer-store-address-line-2");
+  const footerPhone = document.getElementById("footer-store-phone");
+  const deliveryOriginCopy = document.getElementById("delivery-origin-copy");
+  const pickupStoreAddress = document.getElementById("pickup-store-address");
+  const orderLinks = document.querySelectorAll('a[onclick*="openIfoodStore"]');
+  const localPhoneDigits = String(STORE_WHATSAPP || "").replace(/\D/g, "").replace(/^55/, "");
+  const phoneLabel = formatPhoneInput(localPhoneDigits);
+
+  if (storeAddressLine1) {
+    storeAddressLine1.textContent = [CONFIGURED_STORE_ADDRESS.street, CONFIGURED_STORE_ADDRESS.number].filter(Boolean).join(", ");
+  }
+
+  if (storeAddressLine2) {
+    storeAddressLine2.textContent = [
+      CONFIGURED_STORE_ADDRESS.neighborhood,
+      [CONFIGURED_STORE_ADDRESS.city, CONFIGURED_STORE_ADDRESS.state].filter(Boolean).join("/")
+    ].filter(Boolean).join(" - ");
+  }
+
+  if (footerPhone && STORE_WHATSAPP) {
+    footerPhone.href = `tel:+${STORE_WHATSAPP}`;
+    footerPhone.textContent = phoneLabel || footerPhone.textContent;
+  }
+
+  if (deliveryOriginCopy) {
+    deliveryOriginCopy.textContent = `Origem: ${[CONFIGURED_STORE_ADDRESS.street, CONFIGURED_STORE_ADDRESS.number].filter(Boolean).join(", ")} - ${CONFIGURED_STORE_ADDRESS.neighborhood}/${CONFIGURED_STORE_ADDRESS.state}`;
+  }
+
+  if (pickupStoreAddress) {
+    pickupStoreAddress.textContent = STORE_ADDRESS;
+  }
+
+  orderLinks.forEach(link => {
+    if (IFOOD_STORE_URL) {
+      link.href = IFOOD_STORE_URL;
+    }
+  });
+}
+
 function updateOrderAvailabilityUI(availability = getStoreAvailability()) {
   const footerStatus = document.getElementById("footer-store-status");
   const cartStatusStrip = document.getElementById("cart-order-status-strip");
@@ -2238,6 +3344,10 @@ function updateOrderAvailabilityUI(availability = getStoreAvailability()) {
   orderLinks.forEach(link => {
     if (!link.dataset.defaultLabel) {
       link.dataset.defaultLabel = link.textContent.trim();
+    }
+
+    if (IFOOD_STORE_URL) {
+      link.href = IFOOD_STORE_URL;
     }
 
     link.classList.toggle("is-disabled", !availability.isOpen);
@@ -2261,7 +3371,7 @@ function updateOrderAvailabilityUI(availability = getStoreAvailability()) {
     cartStatusMessage.textContent = !availability.scheduleEnforced
       ? "Modo de valida\u00e7\u00e3o ativo. O bloqueio por hor\u00e1rio foi desativado temporariamente para voc\u00ea testar o checkout, inclusive o envio do pedido para a hamburgueria."
       : availability.isOpen
-      ? "Valide o endere\u00e7o, escolha o pagamento e toque no bot\u00e3o vermelho para abrir o WhatsApp oficial."
+      ? "Valide o endere\u00e7o, revise o pedido e abra o WhatsApp oficial da Galaxy Burger para concluir."
       : `${getStoreClosedOrderMessage(availability)} Voc\u00ea pode montar o carrinho normalmente, mas o envio do pedido fica liberado apenas no hor\u00e1rio de funcionamento.`;
   }
 
@@ -2269,7 +3379,7 @@ function updateOrderAvailabilityUI(availability = getStoreAvailability()) {
     checkoutHelper.textContent = !availability.scheduleEnforced
       ? `Modo de testes ativo: o envio para a hamburgueria est\u00e1 liberado temporariamente para validar o fluxo completo do pedido. ${minimumOrderCopy}`
       : availability.isOpen
-      ? `Para entrega, o bot\u00e3o vermelho abre o WhatsApp oficial da Galaxy Burger com o pedido preenchido. ${minimumOrderCopy}`
+      ? `Revise o pedido, abra o WhatsApp oficial da Galaxy Burger e confirme o envio no site para limpar o carrinho. ${minimumOrderCopy}`
       : `${getStoreClosedOrderMessage(availability)} Monte seu carrinho normalmente; o envio pelo WhatsApp fica bloqueado at\u00e9 a reabertura. ${minimumOrderCopy}`;
   }
 
@@ -2299,6 +3409,11 @@ function openCartModal() {
   modal.hidden = false;
   document.body.classList.add("modal-open");
   updateModalCart();
+  refreshCatalogAvailability({
+    notify: true,
+    quiet: true,
+    reason: "cart_open"
+  });
 
   requestAnimationFrame(() => {
     modal.classList.add("is-visible");
@@ -2645,7 +3760,7 @@ function getDeliveryQuoteStatusCopy(quote) {
     precision: quote?.locationPrecision,
     source: quote?.geocoderSource
   })) {
-    return "Taxa validada pela tabela local da Galaxy Burger";
+    return "Taxa confirmada para este endere\u00e7o";
   }
 
   return "Taxa validada pelo servidor";
@@ -2954,6 +4069,7 @@ function buildOrderTicketPreviewMarkup(orderDetails) {
           <span class="order-ticket-brand">Galaxy Burger</span>
           <strong>Comanda detalhada</strong>
           <span>Gerada em ${escapeHtml(orderDetails.createdAt)}</span>
+          ${orderDetails.orderCode ? `<span>${escapeHtml(`Código ${orderDetails.orderCode}`)}</span>` : ""}
         </div>
         <div>
           <span>${escapeHtml(orderDetails.fulfillmentLabel)}</span>
@@ -2977,7 +4093,7 @@ function buildOrderTicketPreviewMarkup(orderDetails) {
         </div>
         <div class="order-ticket-meta-card">
           <span>Status</span>
-          <strong>${escapeHtml(orderDetails.statusLabel || "Pronto para enviar")}</strong>
+          <strong>${escapeHtml(orderDetails.statusLabel || "Pronto para abrir no WhatsApp")}</strong>
         </div>
       </div>
 
@@ -3327,14 +4443,6 @@ function clearActiveWhatsAppAttempt(attempt = activeWhatsAppAttempt) {
     window.clearTimeout(attempt.failureTimer);
   }
 
-  if (attempt.visibilityHandler) {
-    document.removeEventListener("visibilitychange", attempt.visibilityHandler);
-  }
-
-  if (attempt.pageHideHandler) {
-    window.removeEventListener("pagehide", attempt.pageHideHandler);
-  }
-
   if (activeWhatsAppAttempt === attempt) {
     activeWhatsAppAttempt = null;
   }
@@ -3351,19 +4459,6 @@ function finalizeSuccessfulOrderSubmission(attempt, trigger) {
     source: attempt.source,
     urlLength: attempt.browserUrl.length
   });
-
-  cart = [];
-  saveCart();
-  clearDeliveryData();
-  pendingOrderPreview = null;
-  updateUI();
-
-  if (attempt.closeReviewModal) {
-    closeOrderTicketModal({ restoreCart: false });
-  }
-
-  closeCartModal();
-  resetOrderSubmissionButtons();
 }
 
 function handleWhatsAppOpenFailure(attempt) {
@@ -3385,6 +4480,10 @@ function openWhatsAppOrder(message, options = {}) {
     throw new Error("Mensagem do pedido vazia.");
   }
 
+  if (!STORE_WHATSAPP) {
+    throw new Error("WhatsApp da loja não configurado.");
+  }
+
   const browserUrl = buildWhatsAppUrl(normalizedMessage);
   const deepLinkUrl = buildWhatsAppDeepLink(normalizedMessage);
   const source = options.source || "checkout";
@@ -3394,28 +4493,12 @@ function openWhatsAppOrder(message, options = {}) {
 
   const attempt = {
     source,
-    closeReviewModal: Boolean(options.closeReviewModal),
     browserUrl,
     deepLinkUrl,
     completed: false,
     fallbackTimer: 0,
-    failureTimer: 0,
-    visibilityHandler: null,
-    pageHideHandler: null
+    failureTimer: 0
   };
-
-  attempt.visibilityHandler = () => {
-    if (document.visibilityState === "hidden") {
-      finalizeSuccessfulOrderSubmission(attempt, "visibilitychange");
-    }
-  };
-
-  attempt.pageHideHandler = () => {
-    finalizeSuccessfulOrderSubmission(attempt, "pagehide");
-  };
-
-  document.addEventListener("visibilitychange", attempt.visibilityHandler);
-  window.addEventListener("pagehide", attempt.pageHideHandler);
 
   activeWhatsAppAttempt = attempt;
 
@@ -3437,7 +4520,14 @@ function openWhatsAppOrder(message, options = {}) {
 
     window.location.href = deepLinkUrl;
   } else {
-    window.location.href = browserUrl;
+    const popup = window.open(browserUrl, "_blank", "noopener");
+    if (!popup) {
+      handleWhatsAppOpenFailure(attempt);
+      return browserUrl;
+    }
+
+    finalizeSuccessfulOrderSubmission(attempt, "popup");
+    return browserUrl;
   }
 
   attempt.failureTimer = window.setTimeout(() => {
@@ -3462,10 +4552,22 @@ function submitPendingOrder(preview, options = {}) {
     return false;
   }
 
-  openWhatsAppOrder(orderPreview.whatsAppMessage, {
-    source,
-    closeReviewModal: shouldCloseReviewModal
-  });
+  if (!normalizeText(orderPreview.whatsAppMessage)) {
+    logCheckoutWarn("Tentativa de envio sem mensagem de WhatsApp preparada.", orderPreview);
+    showToast("Não foi possível montar a mensagem do pedido. Tente novamente.");
+    return false;
+  }
+
+  savePendingCustomerOrder(orderPreview);
+  openWhatsAppOrder(orderPreview.whatsAppMessage, { source });
+  resetOrderSubmissionButtons();
+
+  if (shouldCloseReviewModal) {
+    closeOrderTicketModal({ restoreCart: false });
+  }
+
+  closeCartModal();
+  showToast("Pedido salvo como pendente. Depois de enviar no WhatsApp, volte e confirme no aviso do pedido.");
 
   return true;
 }
@@ -3501,10 +4603,11 @@ function updateOrderTicketModalMode() {
   if (actions) actions.dataset.mode = "checkout";
   if (title) title.textContent = "Revise seu pedido";
   if (label) label.textContent = "Revis\u00e3o final do pedido";
-  if (message) message.textContent = "Confira os detalhes e envie o pedido. A impress\u00e3o da comanda ser\u00e1 feita pela loja quando abrirem o link recebido no WhatsApp.";
+  if (message) message.textContent = "Confira os detalhes, abra o WhatsApp e depois confirme no site quando a mensagem for enviada. A loja usar\u00e1 o link seguro da comanda para imprimir o pedido.";
   if (backButton) backButton.textContent = "Voltar ao checkout";
   if (printButton) printButton.hidden = true;
   if (confirmButton) confirmButton.hidden = false;
+  if (confirmButton) confirmButton.textContent = "Abrir WhatsApp";
 }
 
 function openOrderTicketModal(mode = "checkout") {
@@ -3521,7 +4624,7 @@ function openOrderTicketModal(mode = "checkout") {
   if (pendingOrderPreview) {
     pendingOrderPreview = {
       ...pendingOrderPreview,
-      statusLabel: mode === "shared" ? "Pronto para imprimir" : "Pronto para enviar"
+      statusLabel: mode === "shared" ? "Pronto para imprimir" : "Pronto para abrir no WhatsApp"
     };
   }
 
@@ -3549,8 +4652,10 @@ function closeOrderTicketModal(options = {}) {
     modal.hidden = true;
     if (wasSharedMode) {
       const url = new URL(window.location.href);
+      url.searchParams.delete("order");
       url.searchParams.delete("t");
       url.searchParams.delete("ticket");
+      url.searchParams.delete("ref");
       history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
       document.body.classList.remove("ticket-view-active");
       pendingOrderPreview = null;
@@ -3600,7 +4705,7 @@ function confirmOrderTicket() {
   }
 
   if (!pendingOrderPreview.sharedTicketUrl) {
-    showToast("Link da comanda indispon\u00edvel neste teste local. Configure a URL p\u00fablica da loja para liberar a impress\u00e3o pelo WhatsApp.");
+    logCheckoutWarn("Comanda segura sem link p\u00fablico configurado.", pendingOrderPreview);
   }
   setOrderTicketConfirmButtonBusy(true);
 
@@ -3671,12 +4776,31 @@ async function verifyPendingOrderPreviewDeliveryQuote() {
   renderOrderTicketPreview();
 }
 
-function handleSharedOrderTicketFromUrl() {
+async function handleSharedOrderTicketFromUrl() {
   const searchParams = new URLSearchParams(window.location.search);
-  const encodedTicket = searchParams.get("t") || searchParams.get("ticket");
+  const encodedTicket = searchParams.get("ticket")
+    || searchParams.get("order")
+    || searchParams.get("t")
+    || searchParams.get("ref");
   if (!encodedTicket) return;
 
-  const decodedTicket = decodeSharedOrderTicketPayload(encodedTicket);
+  let decodedTicket = null;
+  let fetchError = null;
+
+  try {
+    decodedTicket = await fetchPreparedOrderTicket(encodedTicket);
+  } catch (error) {
+    fetchError = error;
+  }
+
+  if (!decodedTicket) {
+    decodedTicket = decodeSharedOrderTicketPayload(encodedTicket);
+  }
+
+  if (!decodedTicket && fetchError) {
+    logCheckoutError("Falha ao abrir a comanda segura pelo servidor.", fetchError);
+  }
+
   if (!decodedTicket) return;
 
   pendingOrderPreview = decodedTicket;
@@ -3696,6 +4820,13 @@ function validateCheckout() {
   if (!cart.length) {
     logCheckoutWarn("Checkout bloqueado: carrinho vazio.");
     showToast("Seu pedido est\u00e1 vazio.");
+    return false;
+  }
+
+  const unavailableCartItems = getUnavailableCartItems();
+  if (unavailableCartItems.length) {
+    logCheckoutWarn("Checkout bloqueado: item indisponível no carrinho.", unavailableCartItems);
+    showToast("Remova os itens indisponíveis do carrinho para continuar.");
     return false;
   }
 
@@ -3735,6 +4866,12 @@ function validateCheckout() {
     if (deliveryState.status === "loading") {
       logCheckoutWarn("Checkout bloqueado: valida\u00e7\u00e3o da entrega em andamento.");
       showToast("Aguarde a valida\u00e7\u00e3o da entrega.");
+      return false;
+    }
+
+    if (deliveryState.status === "blocked" || deliveryState.status === "pickup_only") {
+      logCheckoutWarn("Checkout bloqueado: bairro sem entrega ativa.", { deliveryState });
+      showToast(deliveryState.message || "Escolha retirada no local para continuar.");
       return false;
     }
 
@@ -3809,115 +4946,43 @@ async function buildPendingOrderPreview() {
   const address = isPickup ? STORE_ADDRESS : syncDeliveryAddressField();
   const totals = updateCartTotals();
   const cashChangeSummary = getCashChangeSummary(totals.total, false);
-  const createdAt = getOrderCreatedAtLabel();
 
   if (!cashChangeSummary) {
     return null;
   }
 
-  const paymentLabel = cashChangeSummary.paymentLabel || formatPaymentLabel(paymentMethod);
-  const paymentLines = buildOrderPaymentLines({
-    paymentMethod,
-    paymentLabel,
-    cashChangeText: cashChangeSummary.cashChangeText
-  });
-  const { addressData, addressLines } = buildOrderAddressPreviewLines({
-    isPickup,
-    address,
-    deliveryValues
-  });
-  const deliveryFeeLabel = isPickup ? "Sem taxa de entrega" : formatCurrency(totals.fee);
-  const subtotalLabel = formatCurrency(totals.subtotal);
-  const totalLabel = formatCurrency(totals.total);
-  const deliveryQuote = isPickup ? null : {
-    code: deliveryState.quoteCode,
-    token: deliveryState.quoteToken,
-    expiresAt: deliveryState.expiresAt,
-    distanceKm: deliveryState.distanceKm,
-    routeDistanceKm: deliveryState.routeDistanceKm,
-    zone: deliveryState.distanceRange,
-    zoneLabel: deliveryState.distanceLabel,
-    addressKey: deliveryState.addressKey,
-    locationPrecision: deliveryState.locationPrecision,
-    geocoderSource: deliveryState.geocoderSource,
-    validationStatus: "verified"
-  };
-  const orderPreview = {
-    createdAt,
-    name,
-    customerPhone,
+  const prepared = await prepareValidatedOrderTicket({
+    customer: {
+      name,
+      phone: customerPhone
+    },
     notes,
-    isPickup,
-    fulfillmentLabel: isPickup ? "Retirada" : "Entrega",
-    items: getOrderLineItems(),
-    itemsCount: getCartItemsCount(),
-    addressData,
-    addressLines,
-    mapsLink: isPickup ? "" : generateMapsLink(addressData.mapsQueryAddress),
-    paymentMethod,
-    paymentSummary: paymentLines.join(" | "),
-    paymentLines,
-    deliveryValues,
-    deliveryQuote,
-    deliveryFeeValue: totals.fee,
-    deliveryFeeLabel,
-    feeLabelTitle: isPickup ? "Retirada" : "Entrega validada",
-    subtotalValue: totals.subtotal,
-    subtotalLabel,
-    totalValue: totals.total,
-    totalLabel
-  };
-  let sharedTicketUrl = "";
-
-  try {
-    sharedTicketUrl = buildSharedOrderTicketUrl(orderPreview);
-  } catch (error) {
-    logCheckoutError("Falha ao gerar a comanda compartilhada.", error);
-  }
-
-  const whatsAppPayload = {
-    name,
-    customerPhone,
-    isPickup,
-    address,
-    deliveryValues,
-    deliveryFee: deliveryFeeLabel,
-    subtotal: subtotalLabel,
-    total: totalLabel,
-    paymentMethod,
-    paymentLabel,
-    cashChangeText: cashChangeSummary.cashChangeText,
-    notes,
-    createdAt,
-    deliveryQuote
-  };
-  const compactWhatsAppMessage = buildWhatsAppOrderMessage({
-    ...whatsAppPayload,
-    ticketUrl: ""
+    fulfillment: isPickup ? "pickup" : "delivery",
+    payment: {
+      method: paymentMethod,
+      cashChangeText: cashChangeSummary.cashChangeText
+    },
+    cart: buildCartPayloadForServer(),
+    delivery: isPickup ? null : {
+      quoteToken: deliveryState.quoteToken,
+      values: {
+        ...deliveryValues,
+        address
+      }
+    }
   });
-  const whatsAppMessageWithTicket = sharedTicketUrl
-    ? buildWhatsAppOrderMessage({
-        ...whatsAppPayload,
-        ticketUrl: sharedTicketUrl
-      })
-    : "";
-  const shouldUseSharedTicketUrl = Boolean(whatsAppMessageWithTicket)
-    && buildWhatsAppUrl(whatsAppMessageWithTicket).length <= MAX_WHATSAPP_URL_LENGTH;
 
   logCheckoutInfo("Comanda preparada para envio.", {
-    items: orderPreview.itemsCount,
+    items: prepared.order?.itemsCount || 0,
     isPickup,
     paymentMethod,
-    sharedTicketIncluded: shouldUseSharedTicketUrl
+    sharedTicketIncluded: Boolean(prepared.sharedTicketUrl)
   });
 
   return {
-    ...orderPreview,
-    sharedTicketUrl,
-    sharedTicketIncludedInMessage: shouldUseSharedTicketUrl,
-    whatsAppMessage: shouldUseSharedTicketUrl
-      ? whatsAppMessageWithTicket
-      : compactWhatsAppMessage
+    ...(prepared.order || {}),
+    sharedTicketUrl: prepared.sharedTicketUrl || prepared.order?.sharedTicketUrl || "",
+    whatsAppMessage: String(prepared.whatsAppMessage || "").trim()
   };
 }
 
@@ -3938,17 +5003,13 @@ async function finalizeOrder() {
       return false;
     }
 
-    const wasSubmitted = submitPendingOrder(pendingOrderPreview, { source: "checkout" });
-
-    if (!wasSubmitted) {
-      resetOrderSubmissionButtons();
-      return false;
-    }
-
+    openOrderTicketModal("checkout");
+    resetOrderSubmissionButtons();
     return true;
   } catch (error) {
+    await syncInventoryAfterOrderError(error);
     logCheckoutError("Falha ao preparar o checkout.", error);
-    showToast("N\u00e3o foi poss\u00edvel preparar o pedido agora. Tente novamente.");
+    showToast(error?.message || "N\u00e3o foi poss\u00edvel preparar o pedido agora. Tente novamente.");
     resetOrderSubmissionButtons();
     return false;
   }
@@ -3961,19 +5022,28 @@ function bindDeliveryEvents() {
 
   if (contactFields.name) {
     contactFields.name.addEventListener("input", () => {
+      invalidatePendingCustomerOrder("customer_name_changed");
       clearFieldInvalid(contactFields.name);
     });
   }
 
   if (contactFields.phone) {
     contactFields.phone.addEventListener("input", () => {
+      invalidatePendingCustomerOrder("customer_phone_changed");
       contactFields.phone.value = formatPhoneInput(contactFields.phone.value);
       clearFieldInvalid(contactFields.phone);
     });
   }
 
+  if (contactFields.notes) {
+    contactFields.notes.addEventListener("input", () => {
+      invalidatePendingCustomerOrder("order_notes_changed");
+    });
+  }
+
   if (fields.cep) {
     fields.cep.addEventListener("input", () => {
+      invalidatePendingCustomerOrder("delivery_cep_changed");
       fields.cep.value = formatCep(fields.cep.value);
       clearFieldInvalid(fields.cep);
       clearDeliveryQuote("CEP alterado. Valide a entrega novamente.");
@@ -3993,10 +5063,11 @@ function bindDeliveryEvents() {
     fields.calculateDeliveryButton.addEventListener("click", handleCalculateDelivery);
   }
 
-  [fields.street, fields.number, fields.neighborhood, fields.city, fields.state].forEach(field => {
+  [fields.street, fields.number, fields.city, fields.state].forEach(field => {
     if (!field) return;
 
     field.addEventListener("input", () => {
+      invalidatePendingCustomerOrder(`delivery_field_changed:${field.id}`);
       clearFieldInvalid(field);
       syncDeliveryAddressField();
       clearDeliveryQuote("Endere\u00e7o alterado. Valide a entrega novamente.");
@@ -4008,14 +5079,31 @@ function bindDeliveryEvents() {
     if (!field) return;
 
     field.addEventListener("input", () => {
+      invalidatePendingCustomerOrder(`delivery_detail_changed:${field.id}`);
       clearFieldInvalid(field);
       syncDeliveryAddressField();
       saveDeliveryData();
     });
   });
 
+  if (fields.neighborhood) {
+    fields.neighborhood.addEventListener("change", () => {
+      invalidatePendingCustomerOrder("delivery_area_changed");
+      clearFieldInvalid(fields.neighborhood);
+      const selectedArea = getSelectedDeliveryArea();
+      fields.neighborhood.dataset.savedAreaId = selectedArea?.id || "";
+      fields.neighborhood.dataset.savedAreaName = selectedArea?.name || "";
+      syncNeighborhoodHelperFromSelection();
+      syncDeliveryAddressField();
+      clearDeliveryQuote("Bairro alterado. Valide a entrega novamente.");
+      scheduleAutoDeliveryQuote("delivery_area_change");
+      saveDeliveryData();
+    });
+  }
+
   if (fields.estimateAck) {
     fields.estimateAck.addEventListener("change", () => {
+      invalidatePendingCustomerOrder("delivery_estimate_ack_changed");
       clearEstimateTermsInvalid(fields.estimateTerms, fields.estimateAck);
       updateDeliveryUI();
       updateCartTotals();
@@ -4025,6 +5113,7 @@ function bindDeliveryEvents() {
 
   cashFields.typeInputs.forEach(input => {
     input.addEventListener("change", () => {
+      invalidatePendingCustomerOrder("cash_change_type_changed");
       clearFieldInvalid(cashFields.valueInput);
       updateCashChangeUI();
     });
@@ -4032,6 +5121,7 @@ function bindDeliveryEvents() {
 
   if (cashFields.valueInput) {
     cashFields.valueInput.addEventListener("input", () => {
+      invalidatePendingCustomerOrder("cash_change_value_changed");
       clearFieldInvalid(cashFields.valueInput);
       cashFields.valueInput.value = normalizeCurrencyInput(cashFields.valueInput.value);
     });
@@ -4196,17 +5286,63 @@ document.addEventListener("DOMContentLoaded", () => {
     localStorage.removeItem(storageKey);
   });
 
+  syncStoreConfigUI();
+  updatePendingOrderBanner();
   loadDeliveryData();
   bindDeliveryEvents();
+  handleDeliveryAreasRealtimeRefresh("initial_load");
   updateCashChangeUI();
   updateOrderTicketModalMode();
   updateUI();
   updateDeliveryUI();
   updateStoreStatusUI();
+  inventoryRealtimeChannel = createInventoryRealtimeChannel();
+  refreshCatalogAvailability({
+    notify: true,
+    quiet: true,
+    reason: "initial_load"
+  });
   handleSharedOrderTicketFromUrl();
   setupExpandableCardDescriptions();
   window.setInterval(() => updateStoreStatusUI(), 60000);
+  window.setInterval(() => {
+    refreshCatalogAvailability({
+      notify: true,
+      quiet: true,
+      reason: "scheduled_refresh"
+    });
+  }, INVENTORY_REFRESH_INTERVAL_MS);
+  window.setInterval(() => {
+    handleDeliveryAreasRealtimeRefresh("scheduled_refresh");
+  }, DELIVERY_AREAS_REFRESH_INTERVAL_MS);
   window.addEventListener("resize", requestExpandableCardDescriptionsSync);
+  window.addEventListener("focus", () => {
+    refreshCatalogAvailability({
+      notify: true,
+      quiet: true,
+      reason: "window_focus"
+    });
+    handleDeliveryAreasRealtimeRefresh("window_focus");
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      return;
+    }
+
+    refreshCatalogAvailability({
+      notify: true,
+      quiet: true,
+      reason: "tab_visible"
+    });
+    handleDeliveryAreasRealtimeRefresh("tab_visible");
+  });
+  window.addEventListener("storage", event => {
+    if (event.key !== DELIVERY_AREAS_BROADCAST_STORAGE_KEY || !event.newValue) {
+      return;
+    }
+
+    handleDeliveryAreasRealtimeRefresh("admin_broadcast");
+  });
 
   if (document.fonts?.ready) {
     document.fonts.ready.then(() => {
@@ -4233,6 +5369,32 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("unhandledrejection", event => {
     logCheckoutError("Promise rejeitada sem tratamento no checkout.", event.reason);
   });
+
+  window.addEventListener("storage", event => {
+    if (event.key !== INVENTORY_BROADCAST_STORAGE_KEY || !event.newValue) {
+      return;
+    }
+
+    const payload = parseInventoryRealtimePayload(event.newValue);
+    if (!payload) {
+      return;
+    }
+
+    handleRealtimeInventoryUpdate(payload, {
+      notify: true,
+      quiet: true,
+      reason: "admin_broadcast"
+    });
+  });
+
+  if (inventoryRealtimeChannel) {
+    inventoryRealtimeChannel.addEventListener("message", event => {
+      handleRealtimeInventoryUpdate(event.data, {
+        notify: true,
+        reason: "admin_channel"
+      });
+    });
+  }
 
   document.addEventListener("keydown", event => {
     if (event.key === "Escape") {
