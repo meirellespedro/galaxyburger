@@ -93,7 +93,7 @@ test.afterEach(() => {
   }
 });
 
-test("painel exige login antes de listar bairros", async () => {
+test("painel exige login antes de listar regioes", async () => {
   configureDeliveryAreasFile();
 
   const response = await invokeHandler(adminDeliveryAreasHandler);
@@ -103,7 +103,7 @@ test("painel exige login antes de listar bairros", async () => {
   assert.equal(response.body.code, "admin_unauthorized");
 });
 
-test("painel cria, atualiza e remove bairros com persistencia publica", async () => {
+test("painel cria, atualiza e remove regioes com persistencia publica", async () => {
   process.env.ADMIN_PANEL_PASSWORD = "painel-seguro";
   configureDeliveryAreasFile();
   const cookie = await loginAdmin();
@@ -115,17 +115,18 @@ test("painel cria, atualiza e remove bairros com persistencia publica", async ()
     },
     body: {
       name: "Parque Laranja",
-      fee: "8,50",
-      status: "active",
+      zoneId: "zone_10",
       note: "Entrega teste."
     }
   });
 
   assert.equal(created.statusCode, 200);
   assert.equal(created.body.ok, true);
+  assert.equal(Array.isArray(created.body.deliveryAreas.zones), true);
   const createdArea = created.body.deliveryAreas.areas.find(area => area.name === "Parque Laranja");
   assert.ok(createdArea);
-  assert.equal(createdArea.fee, 8.5);
+  assert.equal(createdArea.zoneId, "zone_10");
+  assert.equal(createdArea.fee, 10);
 
   const updated = await invokeHandler(adminDeliveryAreasHandler, {
     method: "PUT",
@@ -134,7 +135,7 @@ test("painel cria, atualiza e remove bairros com persistencia publica", async ()
     },
     body: {
       id: createdArea.id,
-      status: "pickup_only",
+      zoneId: "pickup_only",
       note: "Retirada liberada."
     }
   });
@@ -150,6 +151,8 @@ test("painel cria, atualiza e remove bairros com persistencia publica", async ()
   assert.equal(publicListAfterUpdate.statusCode, 200);
   assert.equal(updatedArea.status, "pickup_only");
   assert.equal(updatedArea.pickupOnly, true);
+  assert.equal(updatedArea.zoneId, "pickup_only");
+  assert.equal(updatedArea.fee, 0);
 
   const removed = await invokeHandler(adminDeliveryAreasHandler, {
     method: "DELETE",
@@ -173,7 +176,7 @@ test("painel cria, atualiza e remove bairros com persistencia publica", async ()
   );
 });
 
-test("normaliza nome para impedir bairros duplicados com escrita diferente", async () => {
+test("normaliza nome para impedir regioes duplicadas com escrita diferente", async () => {
   process.env.ADMIN_PANEL_PASSWORD = "painel-seguro";
   configureDeliveryAreasFile();
   const cookie = await loginAdmin();
@@ -185,8 +188,7 @@ test("normaliza nome para impedir bairros duplicados com escrita diferente", asy
     },
     body: {
       name: "Campo-Grande Vip",
-      fee: 5,
-      status: "active"
+      zoneId: "zone_5"
     }
   });
 
@@ -200,14 +202,56 @@ test("normaliza nome para impedir bairros duplicados com escrita diferente", asy
     },
     body: {
       name: " campo grande vip ",
-      fee: 10,
-      status: "blocked"
+      zoneId: "blocked"
     }
   });
 
   assert.equal(duplicate.statusCode, 409);
   assert.equal(duplicate.body.ok, false);
   assert.equal(duplicate.body.code, "delivery_area_duplicate_name");
+});
+
+test("normaliza abreviacoes para impedir rua duplicada com escrita curta", async () => {
+  process.env.ADMIN_PANEL_PASSWORD = "painel-seguro";
+  configureDeliveryAreasFile();
+  const cookie = await loginAdmin();
+
+  const duplicate = await invokeHandler(adminDeliveryAreasHandler, {
+    method: "POST",
+    headers: {
+      cookie
+    },
+    body: {
+      name: "R. Augusta Candiani",
+      zoneId: "zone_10"
+    }
+  });
+
+  assert.equal(duplicate.statusCode, 409);
+  assert.equal(duplicate.body.ok, false);
+  assert.equal(duplicate.body.code, "delivery_area_duplicate_name");
+});
+
+test("bloqueia taxa fora da regra fixa ao receber payload legado com entrega ativa", async () => {
+  process.env.ADMIN_PANEL_PASSWORD = "painel-seguro";
+  configureDeliveryAreasFile();
+  const cookie = await loginAdmin();
+
+  const response = await invokeHandler(adminDeliveryAreasHandler, {
+    method: "POST",
+    headers: {
+      cookie
+    },
+    body: {
+      name: "Bairro Fora da Regra",
+      fee: 8,
+      status: "active"
+    }
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.equal(response.body.ok, false);
+  assert.equal(response.body.code, "delivery_area_invalid_fee_policy");
 });
 
 test("em producao sem persistencia configurada retorna erro amigavel", async () => {
@@ -223,8 +267,7 @@ test("em producao sem persistencia configurada retorna erro amigavel", async () 
     },
     body: {
       name: "Bairro Sem Storage",
-      fee: 7,
-      status: "active"
+      zoneId: "zone_10"
     }
   });
 

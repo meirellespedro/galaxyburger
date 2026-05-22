@@ -7,14 +7,78 @@ const DELIVERY_AREAS_FILE_ENV_KEY = "DELIVERY_AREAS_FILE_PATH";
 const DELIVERY_AREAS_BLOB_PATH_ENV_KEY = "DELIVERY_AREAS_BLOB_PATHNAME";
 const DELIVERY_AREAS_STORAGE_MODE_ENV_KEY = "DELIVERY_AREAS_STORAGE_MODE";
 const DEFAULT_BLOB_PATHNAME = "config/galaxy-burger/delivery-areas.json";
-const DELIVERY_AREAS_STATE_VERSION = 1;
+const DELIVERY_AREAS_STATE_VERSION = 3;
 const DELIVERY_AREA_STATUS_VALUES = new Set(["active", "blocked", "pickup_only"]);
-const DEFAULT_ACTIVE_NOTE = "Entrega liberada para este bairro.";
-const DEFAULT_BLOCKED_NOTE = "Bairro bloqueado para entrega.";
+const ACTIVE_DELIVERY_FEE_VALUES = Object.freeze([5, 10]);
+const DEFAULT_ACTIVE_NOTE = "Entrega liberada para esta regiao.";
+const DEFAULT_BLOCKED_NOTE = "Regiao bloqueada para entrega.";
 const DEFAULT_PICKUP_ONLY_NOTE = "Atendimento apenas com retirada no local.";
 const DELIVERY_NORMALIZATION_ABBREVIATIONS = Object.freeze(
   Object.entries(deliveryConfig.normalization?.abbreviations || {})
 );
+const DELIVERY_ZONE_IDS = Object.freeze({
+  zone5: "zone_5",
+  zone10: "zone_10",
+  pickupOnly: "pickup_only",
+  blocked: "blocked"
+});
+const FIXED_DELIVERY_ZONES = Object.freeze([
+  Object.freeze({
+    id: DELIVERY_ZONE_IDS.zone5,
+    name: "Ate 2,9 km",
+    fee: 5,
+    status: "active",
+    minDistanceKm: 0,
+    maxDistanceKm: 2.9,
+    label: "Ate 2,9 km - R$ 5,00"
+  }),
+  Object.freeze({
+    id: DELIVERY_ZONE_IDS.zone10,
+    name: "De 3 km ate 5 km",
+    fee: 10,
+    status: "active",
+    minDistanceKm: 3,
+    maxDistanceKm: 5,
+    label: "De 3 km ate 5 km - R$ 10,00"
+  }),
+  Object.freeze({
+    id: DELIVERY_ZONE_IDS.pickupOnly,
+    name: "A partir de 5,1 km",
+    fee: 0,
+    status: "pickup_only",
+    minDistanceKm: 5.1,
+    maxDistanceKm: 0,
+    label: "A partir de 5,1 km - somente retirada"
+  }),
+  Object.freeze({
+    id: DELIVERY_ZONE_IDS.blocked,
+    name: "Bloqueado",
+    fee: 0,
+    status: "blocked",
+    minDistanceKm: 0,
+    maxDistanceKm: 0,
+    label: "Entrega bloqueada para esta regiao"
+  })
+]);
+const DELIVERY_ZONE_ALIAS_MAP = Object.freeze({
+  [DELIVERY_ZONE_IDS.zone5]: DELIVERY_ZONE_IDS.zone5,
+  local: DELIVERY_ZONE_IDS.zone5,
+  "5": DELIVERY_ZONE_IDS.zone5,
+  "r$5": DELIVERY_ZONE_IDS.zone5,
+  [DELIVERY_ZONE_IDS.zone10]: DELIVERY_ZONE_IDS.zone10,
+  extended: DELIVERY_ZONE_IDS.zone10,
+  intermediaria: DELIVERY_ZONE_IDS.zone10,
+  intermediario: DELIVERY_ZONE_IDS.zone10,
+  "10": DELIVERY_ZONE_IDS.zone10,
+  "r$10": DELIVERY_ZONE_IDS.zone10,
+  [DELIVERY_ZONE_IDS.pickupOnly]: DELIVERY_ZONE_IDS.pickupOnly,
+  pickup: DELIVERY_ZONE_IDS.pickupOnly,
+  retirada: DELIVERY_ZONE_IDS.pickupOnly,
+  somente_retirada: DELIVERY_ZONE_IDS.pickupOnly,
+  [DELIVERY_ZONE_IDS.blocked]: DELIVERY_ZONE_IDS.blocked,
+  bloqueado: DELIVERY_ZONE_IDS.blocked,
+  blocked: DELIVERY_ZONE_IDS.blocked
+});
 
 function normalizeText(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
@@ -56,12 +120,25 @@ function normalizeMoneyValue(value) {
   return Number.isFinite(parsedValue) ? parsedValue : NaN;
 }
 
+function normalizeDeliveryZoneId(value) {
+  const normalizedZoneId = normalizeCompareText(value).replace(/[\s-]+/g, "_");
+  return DELIVERY_ZONE_ALIAS_MAP[normalizedZoneId] || "";
+}
+
 function createDeliveryAreaStorageError(code, message, statusCode = 503) {
   const error = new Error(message);
   error.code = code;
   error.statusCode = statusCode;
   error.status = "error";
   return error;
+}
+
+function createInvalidActiveFeePolicyError() {
+  return createDeliveryAreaStorageError(
+    "delivery_area_invalid_fee_policy",
+    "Regioes com entrega ativa devem usar taxa de R$ 5,00 ou R$ 10,00.",
+    422
+  );
 }
 
 function isVercelRuntime() {
@@ -111,72 +188,150 @@ function toTitleCase(value) {
     .join(" ");
 }
 
-function buildDefaultNoteForStatus(status) {
-  if (status === "blocked") return DEFAULT_BLOCKED_NOTE;
-  if (status === "pickup_only") return DEFAULT_PICKUP_ONLY_NOTE;
+function buildDefaultNoteForZone(zoneId) {
+  if (zoneId === DELIVERY_ZONE_IDS.blocked) return DEFAULT_BLOCKED_NOTE;
+  if (zoneId === DELIVERY_ZONE_IDS.pickupOnly) return DEFAULT_PICKUP_ONLY_NOTE;
   return DEFAULT_ACTIVE_NOTE;
 }
 
-function createSeedDeliveryArea({ name, fee, status, note = "" }, updatedAt) {
+function cloneFixedDeliveryZones(updatedAt = new Date().toISOString()) {
+  return FIXED_DELIVERY_ZONES.map(zone => ({
+    ...zone,
+    createdAt: updatedAt,
+    updatedAt
+  }));
+}
+
+function createDeliveryZoneMap(zones = []) {
+  const sourceZones = Array.isArray(zones) && zones.length ? zones : cloneFixedDeliveryZones();
+
+  return new Map(
+    sourceZones
+      .map(zone => ({
+        ...zone,
+        id: normalizeDeliveryZoneId(zone?.id) || ""
+      }))
+      .filter(zone => zone.id)
+      .map(zone => [zone.id, zone])
+  );
+}
+
+function resolveDeliveryZoneIdFromLegacy(input = {}, { strict = true } = {}) {
+  const explicitZoneId = normalizeDeliveryZoneId(input.zoneId || input.zone || input.deliveryZoneId);
+  if (explicitZoneId) {
+    return explicitZoneId;
+  }
+
+  const status = normalizeDeliveryAreaStatus(input.status);
+  if (status === "blocked") {
+    return DELIVERY_ZONE_IDS.blocked;
+  }
+  if (status === "pickup_only") {
+    return DELIVERY_ZONE_IDS.pickupOnly;
+  }
+
+  const fee = normalizeMoneyValue(input.fee);
+  const roundedFee = Number(Number.isFinite(fee) ? fee.toFixed(2) : 0);
+
+  if (!Number.isFinite(fee) || roundedFee <= 0) {
+    return DELIVERY_ZONE_IDS.zone5;
+  }
+
+  if (!ACTIVE_DELIVERY_FEE_VALUES.includes(roundedFee)) {
+    if (strict) {
+      throw createInvalidActiveFeePolicyError();
+    }
+
+    return roundedFee > 5 ? DELIVERY_ZONE_IDS.zone10 : DELIVERY_ZONE_IDS.zone5;
+  }
+
+  return roundedFee === 10 ? DELIVERY_ZONE_IDS.zone10 : DELIVERY_ZONE_IDS.zone5;
+}
+
+function resolveDeliveryZoneById(zoneId, zones = []) {
+  const normalizedZoneId = normalizeDeliveryZoneId(zoneId);
+  const zoneMap = createDeliveryZoneMap(zones);
+  return zoneMap.get(normalizedZoneId) || zoneMap.get(DELIVERY_ZONE_IDS.zone5) || cloneFixedDeliveryZones()[0];
+}
+
+function createSeedDeliveryArea({ name, zoneId, note = "" }, updatedAt) {
   const normalizedName = normalizeDeliveryAreaName(name);
   if (!normalizedName) {
     return null;
   }
 
-  const normalizedStatus = normalizeDeliveryAreaStatus(status);
-  const normalizedFee = Math.max(0, Number.isFinite(Number(fee)) ? Number(fee) : 0);
-
+  const resolvedZone = resolveDeliveryZoneById(zoneId);
   return {
     id: buildDeliveryAreaId(),
     name: toTitleCase(normalizedName),
     normalizedName,
-    fee: normalizedFee,
-    status: normalizedStatus,
-    note: normalizeText(note) || buildDefaultNoteForStatus(normalizedStatus),
+    zoneId: resolvedZone.id,
+    note: normalizeText(note) || buildDefaultNoteForZone(resolvedZone.id),
     createdAt: updatedAt,
     updatedAt
   };
 }
 
+function registerSeedDeliveryArea(collection, entry, now) {
+  const area = createSeedDeliveryArea(entry, now);
+
+  if (area && !collection.has(area.normalizedName)) {
+    collection.set(area.normalizedName, area);
+  }
+}
+
 function buildDefaultDeliveryAreasState(now = new Date().toISOString()) {
   const areasByNormalizedName = new Map();
-  const zones = Array.isArray(deliveryConfig.zones) ? deliveryConfig.zones : [];
+  const configZones = Array.isArray(deliveryConfig.zones) ? deliveryConfig.zones : [];
   const blockedRules = Array.isArray(deliveryConfig.blockedRules) ? deliveryConfig.blockedRules : [];
+  const zones = cloneFixedDeliveryZones(now);
 
-  zones.forEach(zone => {
-    const fee = Math.max(0, Number(zone?.fee || 0));
+  configZones.forEach(zone => {
+    const resolvedZoneId = resolveDeliveryZoneIdFromLegacy({
+      zoneId: zone?.id || zone?.value || zone?.zoneId,
+      status: zone?.status,
+      fee: zone?.fee
+    }, {
+      strict: false
+    });
     const neighborhoods = Array.isArray(zone?.neighborhoods) ? zone.neighborhoods : [];
+    const streetHints = Array.isArray(zone?.streetHints) ? zone.streetHints : [];
 
     neighborhoods.forEach(neighborhood => {
-      const area = createSeedDeliveryArea({
+      registerSeedDeliveryArea(areasByNormalizedName, {
         name: neighborhood,
-        fee,
-        status: "active",
-        note: zone?.label || DEFAULT_ACTIVE_NOTE
+        zoneId: resolvedZoneId,
+        note: zone?.label || buildDefaultNoteForZone(resolvedZoneId)
       }, now);
+    });
 
-      if (area && !areasByNormalizedName.has(area.normalizedName)) {
-        areasByNormalizedName.set(area.normalizedName, area);
-      }
+    streetHints.forEach(streetHint => {
+      registerSeedDeliveryArea(areasByNormalizedName, {
+        name: streetHint,
+        zoneId: resolvedZoneId,
+        note: zone?.label || buildDefaultNoteForZone(resolvedZoneId)
+      }, now);
     });
   });
 
   blockedRules.forEach(rule => {
     const neighborhoods = Array.isArray(rule?.neighborhoods) ? rule.neighborhoods : [];
+    const streetHints = Array.isArray(rule?.streetHints) ? rule.streetHints : [];
 
     neighborhoods.forEach(neighborhood => {
-      const area = createSeedDeliveryArea({
+      registerSeedDeliveryArea(areasByNormalizedName, {
         name: neighborhood,
-        fee: 0,
-        status: "blocked",
+        zoneId: DELIVERY_ZONE_IDS.blocked,
         note: normalizeText(rule?.name) || DEFAULT_BLOCKED_NOTE
       }, now);
+    });
 
-      if (!area) {
-        return;
-      }
-
-      areasByNormalizedName.set(area.normalizedName, area);
+    streetHints.forEach(streetHint => {
+      registerSeedDeliveryArea(areasByNormalizedName, {
+        name: streetHint,
+        zoneId: DELIVERY_ZONE_IDS.blocked,
+        note: normalizeText(rule?.name) || DEFAULT_BLOCKED_NOTE
+      }, now);
     });
   });
 
@@ -186,26 +341,45 @@ function buildDefaultDeliveryAreasState(now = new Date().toISOString()) {
   return {
     version: DELIVERY_AREAS_STATE_VERSION,
     updatedAt: now,
+    zones,
     areas
   };
+}
+
+function mergeMissingSeedDeliveryAreas(areas, updatedAt) {
+  const normalizedUpdatedAt = normalizeText(updatedAt) || new Date().toISOString();
+  const fallbackState = buildDefaultDeliveryAreasState(normalizedUpdatedAt);
+  const existingNormalizedNames = new Set(
+    areas.map(area => normalizeDeliveryAreaName(area?.normalizedName || area?.name)).filter(Boolean)
+  );
+  let didAddArea = false;
+
+  fallbackState.areas.forEach(area => {
+    if (existingNormalizedNames.has(area.normalizedName)) {
+      return;
+    }
+
+    areas.push({
+      ...area,
+      createdAt: normalizeText(area.createdAt) || normalizedUpdatedAt,
+      updatedAt: normalizeText(area.updatedAt) || normalizedUpdatedAt
+    });
+    existingNormalizedNames.add(area.normalizedName);
+    didAddArea = true;
+  });
+
+  return didAddArea;
 }
 
 function sanitizeDeliveryAreaRecord(area, existingAreas = [], options = {}) {
   const normalizedId = normalizeText(area?.id || options.fallbackId || "");
   const name = normalizeText(area?.name);
   const normalizedName = normalizeDeliveryAreaName(name);
-  const status = normalizeDeliveryAreaStatus(area?.status);
-  const note = normalizeText(area?.note);
-  const fee = normalizeMoneyValue(area?.fee);
   const createdAt = normalizeText(area?.createdAt || options.createdAt || "");
   const updatedAt = normalizeText(area?.updatedAt || options.updatedAt || "");
 
   if (!normalizedName) {
-    throw createDeliveryAreaStorageError("delivery_area_name_required", "Informe o nome do bairro.", 422);
-  }
-
-  if (!Number.isFinite(fee) || fee < 0) {
-    throw createDeliveryAreaStorageError("delivery_area_invalid_fee", "Informe uma taxa valida para o bairro.", 422);
+    throw createDeliveryAreaStorageError("delivery_area_name_required", "Informe o nome do bairro ou regiao.", 422);
   }
 
   const duplicatedArea = existingAreas.find(candidate =>
@@ -216,25 +390,59 @@ function sanitizeDeliveryAreaRecord(area, existingAreas = [], options = {}) {
   if (duplicatedArea) {
     throw createDeliveryAreaStorageError(
       "delivery_area_duplicate_name",
-      "Ja existe um bairro cadastrado com esse nome.",
+      "Ja existe um bairro ou regiao cadastrado com esse nome.",
       409
     );
   }
 
+  const zoneId = resolveDeliveryZoneIdFromLegacy({
+    zoneId: area?.zoneId || area?.zone || area?.deliveryZoneId,
+    status: area?.status,
+    fee: area?.fee
+  }, {
+    strict: options.strictFeePolicy !== false
+  });
+  const zone = resolveDeliveryZoneById(zoneId, options.zones);
+  const note = normalizeText(area?.note) || buildDefaultNoteForZone(zone.id);
+
   return {
     id: normalizedId || buildDeliveryAreaId(),
-    name,
+    name: toTitleCase(normalizedName),
     normalizedName,
-    fee: Number(fee.toFixed(2)),
-    status,
-    note: note || buildDefaultNoteForStatus(status),
+    zoneId: zone.id,
+    note,
     createdAt: createdAt || updatedAt || new Date().toISOString(),
     updatedAt: updatedAt || new Date().toISOString()
   };
 }
 
+function resolvePublicDeliveryArea(area, zones = []) {
+  const zone = resolveDeliveryZoneById(area?.zoneId, zones);
+
+  return {
+    id: normalizeText(area?.id),
+    name: normalizeText(area?.name),
+    normalizedName: normalizeDeliveryAreaName(area?.normalizedName || area?.name),
+    zoneId: zone.id,
+    zoneName: zone.name,
+    zoneLabel: zone.label,
+    minDistanceKm: Number(zone.minDistanceKm || 0),
+    maxDistanceKm: Number(zone.maxDistanceKm || 0),
+    fee: Number(zone.fee || 0),
+    status: zone.status,
+    note: normalizeText(area?.note) || buildDefaultNoteForZone(zone.id),
+    supportsDelivery: zone.status === "active",
+    pickupOnly: zone.status === "pickup_only",
+    blocked: zone.status === "blocked",
+    createdAt: normalizeText(area?.createdAt),
+    updatedAt: normalizeText(area?.updatedAt),
+    zoneUpdatedAt: normalizeText(zone.updatedAt)
+  };
+}
+
 function ensureDeliveryAreasStateShape(rawState) {
   const fallbackState = buildDefaultDeliveryAreasState();
+  const rawVersion = Number(rawState?.version) || 0;
   const state = rawState && typeof rawState === "object"
     ? {
         version: Number(rawState.version) || DELIVERY_AREAS_STATE_VERSION,
@@ -242,24 +450,25 @@ function ensureDeliveryAreasStateShape(rawState) {
         areas: Array.isArray(rawState.areas) ? rawState.areas.slice() : []
       }
     : fallbackState;
-
+  const zones = cloneFixedDeliveryZones(state.updatedAt || fallbackState.updatedAt);
   const sanitizedAreas = [];
-  let didChange = false;
+  let didChange = !rawState || !Array.isArray(rawState?.zones) || Number(rawState?.version) !== DELIVERY_AREAS_STATE_VERSION;
 
   state.areas.forEach((area, index) => {
     try {
       const sanitizedArea = sanitizeDeliveryAreaRecord(area, sanitizedAreas, {
         fallbackId: normalizeText(area?.id) || `legacy_area_${index + 1}`,
         createdAt: normalizeText(area?.createdAt) || state.updatedAt,
-        updatedAt: normalizeText(area?.updatedAt) || state.updatedAt
+        updatedAt: normalizeText(area?.updatedAt) || state.updatedAt,
+        strictFeePolicy: false,
+        zones
       });
 
       if (
-        normalizedIdChanged(area, sanitizedArea)
+        normalizeText(area?.id) !== sanitizedArea.id
         || normalizeText(area?.name) !== sanitizedArea.name
         || normalizeDeliveryAreaName(area?.normalizedName || area?.name) !== sanitizedArea.normalizedName
-        || Number(area?.fee) !== sanitizedArea.fee
-        || normalizeDeliveryAreaStatus(area?.status) !== sanitizedArea.status
+        || normalizeDeliveryZoneId(area?.zoneId || area?.zone || area?.deliveryZoneId) !== sanitizedArea.zoneId
         || normalizeText(area?.note) !== sanitizedArea.note
       ) {
         didChange = true;
@@ -270,6 +479,12 @@ function ensureDeliveryAreasStateShape(rawState) {
       didChange = true;
     }
   });
+
+  if (rawVersion > 0 && rawVersion < DELIVERY_AREAS_STATE_VERSION) {
+    if (mergeMissingSeedDeliveryAreas(sanitizedAreas, normalizeText(state.updatedAt) || fallbackState.updatedAt)) {
+      didChange = true;
+    }
+  }
 
   if (!sanitizedAreas.length) {
     return {
@@ -288,16 +503,13 @@ function ensureDeliveryAreasStateShape(rawState) {
 
   return {
     state: {
-      version: state.version,
+      version: DELIVERY_AREAS_STATE_VERSION,
       updatedAt: normalizeText(state.updatedAt) || fallbackState.updatedAt,
+      zones,
       areas: sortedAreas
     },
     didChange
   };
-}
-
-function normalizedIdChanged(left, right) {
-  return normalizeText(left?.id) !== normalizeText(right?.id);
 }
 
 async function getBlobSdk() {
@@ -310,7 +522,7 @@ async function getBlobSdk() {
   } catch {
     throw createDeliveryAreaStorageError(
       "delivery_area_blob_sdk_missing",
-      "A persistencia dos bairros ainda nao foi concluida no projeto. Instale a dependencia do Vercel Blob e publique novamente.",
+      "A persistencia das regioes ainda nao foi concluida no projeto. Instale a dependencia do Vercel Blob e publique novamente.",
       500
     );
   }
@@ -448,6 +660,8 @@ async function persistDeliveryAreasState(state, storageMode = resolvePreferredDe
 async function getDeliveryAreasSnapshot() {
   const storageResult = await readDeliveryAreasState();
   const state = storageResult.state;
+  const zones = cloneFixedDeliveryZones(state.updatedAt || new Date().toISOString());
+  const areas = state.areas.map(area => resolvePublicDeliveryArea(area, zones));
 
   return {
     version: state.version,
@@ -455,12 +669,15 @@ async function getDeliveryAreasSnapshot() {
     storageMode: storageResult.storageMode,
     persistenceConfigured: storageResult.persistenceConfigured,
     storageLabel: storageResult.storageLabel,
-    areas: state.areas.slice()
+    zones,
+    areas
   };
 }
 
 function getDeliveryAreaCounts(snapshot) {
-  const areas = Array.isArray(snapshot?.areas) ? snapshot.areas : [];
+  const areas = Array.isArray(snapshot?.areas)
+    ? snapshot.areas.map(area => ("status" in area ? area : resolvePublicDeliveryArea(area, snapshot?.zones)))
+    : [];
 
   return areas.reduce((counts, area) => {
     counts.total += 1;
@@ -515,22 +732,25 @@ async function createDeliveryArea(input) {
   const now = new Date().toISOString();
   const nextArea = sanitizeDeliveryAreaRecord(input, storageResult.state.areas, {
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    zones: storageResult.state.zones
   });
   const nextState = {
     ...storageResult.state,
+    version: DELIVERY_AREAS_STATE_VERSION,
     updatedAt: now,
+    zones: cloneFixedDeliveryZones(now),
     areas: storageResult.state.areas.concat(nextArea).sort((left, right) => left.name.localeCompare(right.name, "pt-BR"))
   };
 
   await persistDeliveryAreasState(nextState, storageResult.storageMode);
-  return nextArea;
+  return resolvePublicDeliveryArea(nextArea, nextState.zones);
 }
 
 async function updateDeliveryArea(areaId, input) {
   const normalizedId = normalizeText(areaId);
   if (!normalizedId) {
-    throw createDeliveryAreaStorageError("delivery_area_not_found", "Bairro nao encontrado para atualizacao.", 404);
+    throw createDeliveryAreaStorageError("delivery_area_not_found", "Regiao nao encontrada para atualizacao.", 404);
   }
 
   const storageResult = await readDeliveryAreasState();
@@ -544,7 +764,7 @@ async function updateDeliveryArea(areaId, input) {
 
   const areaIndex = storageResult.state.areas.findIndex(area => normalizeText(area.id) === normalizedId);
   if (areaIndex < 0) {
-    throw createDeliveryAreaStorageError("delivery_area_not_found", "Bairro nao encontrado para atualizacao.", 404);
+    throw createDeliveryAreaStorageError("delivery_area_not_found", "Regiao nao encontrada para atualizacao.", 404);
   }
 
   const currentArea = storageResult.state.areas[areaIndex];
@@ -555,7 +775,8 @@ async function updateDeliveryArea(areaId, input) {
     id: normalizedId
   }, storageResult.state.areas, {
     createdAt: currentArea.createdAt,
-    updatedAt: now
+    updatedAt: now,
+    zones: storageResult.state.zones
   });
 
   const nextAreas = storageResult.state.areas.slice();
@@ -563,18 +784,20 @@ async function updateDeliveryArea(areaId, input) {
 
   const nextState = {
     ...storageResult.state,
+    version: DELIVERY_AREAS_STATE_VERSION,
     updatedAt: now,
+    zones: cloneFixedDeliveryZones(now),
     areas: nextAreas.sort((left, right) => left.name.localeCompare(right.name, "pt-BR"))
   };
 
   await persistDeliveryAreasState(nextState, storageResult.storageMode);
-  return nextArea;
+  return resolvePublicDeliveryArea(nextArea, nextState.zones);
 }
 
 async function deleteDeliveryArea(areaId) {
   const normalizedId = normalizeText(areaId);
   if (!normalizedId) {
-    throw createDeliveryAreaStorageError("delivery_area_not_found", "Bairro nao encontrado para exclusao.", 404);
+    throw createDeliveryAreaStorageError("delivery_area_not_found", "Regiao nao encontrada para exclusao.", 404);
   }
 
   const storageResult = await readDeliveryAreasState();
@@ -588,12 +811,14 @@ async function deleteDeliveryArea(areaId) {
 
   const nextAreas = storageResult.state.areas.filter(area => normalizeText(area.id) !== normalizedId);
   if (nextAreas.length === storageResult.state.areas.length) {
-    throw createDeliveryAreaStorageError("delivery_area_not_found", "Bairro nao encontrado para exclusao.", 404);
+    throw createDeliveryAreaStorageError("delivery_area_not_found", "Regiao nao encontrada para exclusao.", 404);
   }
 
   const nextState = {
     ...storageResult.state,
+    version: DELIVERY_AREAS_STATE_VERSION,
     updatedAt: new Date().toISOString(),
+    zones: cloneFixedDeliveryZones(new Date().toISOString()),
     areas: nextAreas
   };
 
@@ -605,6 +830,9 @@ module.exports = {
   DELIVERY_AREAS_FILE_ENV_KEY,
   DELIVERY_AREAS_STORAGE_MODE_ENV_KEY,
   DELIVERY_AREA_STATUS_VALUES,
+  DELIVERY_ZONE_IDS,
+  ACTIVE_DELIVERY_FEE_VALUES,
+  FIXED_DELIVERY_ZONES,
   buildDefaultDeliveryAreasState,
   createDeliveryArea,
   createDeliveryAreaStorageError,
@@ -616,9 +844,11 @@ module.exports = {
   hasBlobStorageConfigured,
   normalizeDeliveryAreaName,
   normalizeDeliveryAreaStatus,
+  normalizeDeliveryZoneId,
   readDeliveryAreasState,
   resolveDeliveryAreasBlobPathname,
   resolveDeliveryAreasFilePath,
   resolvePreferredDeliveryAreasStorageMode,
+  resolvePublicDeliveryArea,
   updateDeliveryArea
 };

@@ -1,12 +1,15 @@
 const { createHmac, timingSafeEqual } = require("crypto");
 const deliveryConfig = require("../delivery-config");
 const {
+  ACTIVE_DELIVERY_FEE_VALUES,
   getDeliveryAreaById,
   getDeliveryAreaByName,
   normalizeDeliveryAreaName
 } = require("./_delivery-areas-store");
 
 const QUOTE_TTL_MS = 15 * 60 * 1000;
+const VIACEP_BASE_URL = "https://viacep.com.br/ws";
+const BRASIL_API_CEP_BASE_URL = "https://brasilapi.com.br/api/cep/v1";
 const DEFAULT_DEV_SECRET = "galaxy-burger-local-delivery-dev-secret";
 const INVALID_HOUSE_NUMBER_VALUES = new Set([
   "s/n",
@@ -19,15 +22,148 @@ const INVALID_HOUSE_NUMBER_VALUES = new Set([
 
 const SERVICE_AREA = Object.freeze(deliveryConfig.serviceArea || {});
 const DELIVERY_METADATA = Object.freeze(deliveryConfig.metadata || {});
+const STORE_ADDRESS = Object.freeze(deliveryConfig.store || {});
+const STORE_COORDINATES = Object.freeze(deliveryConfig.store?.coordinates || {});
+const DISTANCE_RULES = Object.freeze(deliveryConfig.distanceRules || {});
+const PRIORITY_ADDRESS_ZONES = Object.freeze(deliveryConfig.priorityAddressZones || {});
 const DELIVERY_NORMALIZATION_ABBREVIATIONS = Object.freeze(
   Object.entries(deliveryConfig.normalization?.abbreviations || {})
 );
+const ADDRESS_GEOCODE_CACHE = new Map();
 const DELIVERY_MESSAGES = Object.freeze({
   active: "Entrega disponivel para sua regiao. Taxa: {fee}.",
   blocked: "No momento nao entregamos nessa regiao. Voce pode escolher retirada no local.",
   pickupOnly: "Para essa regiao, no momento trabalhamos apenas com retirada no local.",
-  outOfRange: "No momento nao entregamos nessa regiao. Voce pode escolher retirada no local."
+  outOfRange: "No momento nao entregamos nessa regiao. Voce pode escolher retirada no local.",
+  incomplete: "Preencha o endereco completo para calcular a entrega."
 });
+const DISTANCE_RULE_ZONE_META = Object.freeze({
+  zone_5: Object.freeze({
+    zoneId: "zone_5",
+    fee: 5,
+    status: "active",
+    zoneLabel: "Ate 2,9 km da base - R$ 5,00"
+  }),
+  zone_10: Object.freeze({
+    zoneId: "zone_10",
+    fee: 10,
+    status: "active",
+    zoneLabel: "De 3 km ate 5 km da base - R$ 10,00"
+  }),
+  pickup_only: Object.freeze({
+    zoneId: "pickup_only",
+    fee: 0,
+    status: "pickup_only",
+    zoneLabel: "A partir de 5,1 km - somente retirada"
+  })
+});
+const ADDRESS_TYPE_PREFIX_PATTERN = /^(rua|avenida|alameda|travessa|estrada|rodovia|praca|praia)\s+/;
+const cepLookupCache = new Map();
+const ADDRESS_GEOCODE_PROVIDERS = Object.freeze([
+  {
+    name: "photon",
+    buildUrl(query) {
+      return `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`;
+    },
+    parsePayload(payload) {
+      const features = Array.isArray(payload?.features) ? payload.features : [];
+
+      for (const feature of features) {
+        const coordinates = Array.isArray(feature?.geometry?.coordinates)
+          ? feature.geometry.coordinates
+          : [];
+        const longitude = Number(coordinates[0]);
+        const latitude = Number(coordinates[1]);
+
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+          continue;
+        }
+
+        const type = normalizeCompareText(feature?.properties?.type);
+        return {
+          latitude,
+          longitude,
+          precision: type === "house"
+            ? "exact"
+            : type === "street"
+              ? "street"
+              : "approximate",
+          provider: "photon"
+        };
+      }
+
+      return null;
+    }
+  },
+  {
+    name: "nominatim",
+    buildUrl(query) {
+      return `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=br&limit=5&q=${encodeURIComponent(query)}`;
+    },
+    parsePayload(payload) {
+      const items = Array.isArray(payload) ? payload : [];
+
+      for (const item of items) {
+        const latitude = Number(item?.lat);
+        const longitude = Number(item?.lon);
+
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+          continue;
+        }
+
+        const addressType = normalizeCompareText(item?.addresstype || item?.type);
+        return {
+          latitude,
+          longitude,
+          precision: addressType === "house"
+            ? "exact"
+            : addressType === "road"
+              ? "street"
+              : "approximate",
+          provider: "nominatim"
+        };
+      }
+
+      return null;
+    }
+  }
+]);
+const CEP_LOOKUP_PROVIDERS = Object.freeze([
+  {
+    name: "viacep",
+    buildUrl: cep => `${VIACEP_BASE_URL}/${cep}/json/`,
+    parsePayload(payload) {
+      if (!payload || payload.erro) {
+        return null;
+      }
+
+      return {
+        cep: normalizeCep(payload.cep),
+        logradouro: normalizeText(payload.logradouro),
+        bairro: normalizeText(payload.bairro),
+        localidade: normalizeText(payload.localidade),
+        uf: normalizeText(payload.uf).toUpperCase()
+      };
+    }
+  },
+  {
+    name: "brasilapi",
+    buildUrl: cep => `${BRASIL_API_CEP_BASE_URL}/${cep}`,
+    parsePayload(payload) {
+      if (!payload || payload.type === "not_found") {
+        return null;
+      }
+
+      return {
+        cep: normalizeCep(payload.cep),
+        logradouro: normalizeText(payload.street),
+        bairro: normalizeText(payload.neighborhood),
+        localidade: normalizeText(payload.city),
+        uf: normalizeText(payload.state).toUpperCase()
+      };
+    }
+  }
+]);
 
 const deliveryQuoteHandler = async function handler(req, res) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -67,7 +203,8 @@ const deliveryQuoteHandler = async function handler(req, res) {
             calculateQuote: {
               method: "POST",
               path: "/api/delivery-quote",
-              requiredFields: ["street", "number", "neighborhood", "city", "state", "deliveryAreaId"]
+              requiredFields: ["cep", "street", "number"],
+              optionalFields: ["neighborhood", "complement", "reference", "city", "state", "deliveryAreaId"]
             },
             verifyQuote: {
               method: "GET",
@@ -93,6 +230,7 @@ const deliveryQuoteHandler = async function handler(req, res) {
       }
 
       const area = await assertCurrentDeliveryQuote(quote, {
+        deliveryAreaId: quote.deliveryAreaId,
         neighborhood: quote.deliveryAreaName
       });
 
@@ -110,9 +248,10 @@ const deliveryQuoteHandler = async function handler(req, res) {
           locationPrecision: quote.locationPrecision,
           geocoderSource: quote.geocoderSource,
           addressKey: quote.addressKey,
-          deliveryAreaId: quote.deliveryAreaId,
+          deliveryAreaId: area.id,
           deliveryAreaName: area.name,
           deliveryAreaStatus: area.status,
+          deliveryZoneId: area.zoneId,
           expiresAt: new Date(Number(quote.expiresAt || 0)).toISOString()
         }
       });
@@ -201,11 +340,165 @@ function normalizeAddressToken(value) {
     .trim();
 }
 
+function normalizeAddress(value) {
+  return normalizeAddressToken(value);
+}
+
+function buildNormalizedAddressVariants(value) {
+  const normalized = normalizeAddress(value);
+  const variants = new Set();
+
+  if (!normalized) {
+    return variants;
+  }
+
+  variants.add(normalized);
+  variants.add(normalized.replace(ADDRESS_TYPE_PREFIX_PATTERN, "").trim());
+  return new Set(Array.from(variants).filter(Boolean));
+}
+
+function matchesPriorityAddressZone(value, aliases = []) {
+  const candidateVariants = buildNormalizedAddressVariants(value);
+  if (!candidateVariants.size || !Array.isArray(aliases) || !aliases.length) {
+    return false;
+  }
+
+  return aliases.some(alias => {
+    const aliasVariants = buildNormalizedAddressVariants(alias);
+    return Array.from(aliasVariants).some(aliasVariant => candidateVariants.has(aliasVariant));
+  });
+}
+
+function normalizeCep(value) {
+  return String(value || "").replace(/\D/g, "").slice(0, 8);
+}
+
+function normalizeCoordinate(value) {
+  const coordinate = Number(value);
+  return Number.isFinite(coordinate) ? coordinate : NaN;
+}
+
+function hasValidCoordinates(point = {}) {
+  return Number.isFinite(normalizeCoordinate(point.latitude))
+    && Number.isFinite(normalizeCoordinate(point.longitude));
+}
+
+function toRadians(value) {
+  return (Number(value) * Math.PI) / 180;
+}
+
+function roundDistanceKm(value) {
+  const distance = Number(value);
+  const precisionDecimals = Math.max(0, Number(DISTANCE_RULES.precisionDecimals || 1));
+
+  if (!Number.isFinite(distance) || distance <= 0) {
+    return 0;
+  }
+
+  const multiplier = 10 ** precisionDecimals;
+  return Math.round(distance * multiplier) / multiplier;
+}
+
+function calculateAirDistanceKm(from, to) {
+  if (!hasValidCoordinates(from) || !hasValidCoordinates(to)) {
+    return 0;
+  }
+
+  const earthRadiusKm = 6371;
+  const latitudeDistance = toRadians(normalizeCoordinate(to.latitude) - normalizeCoordinate(from.latitude));
+  const longitudeDistance = toRadians(normalizeCoordinate(to.longitude) - normalizeCoordinate(from.longitude));
+  const fromLatitude = toRadians(normalizeCoordinate(from.latitude));
+  const toLatitude = toRadians(normalizeCoordinate(to.latitude));
+  const haversine =
+    Math.sin(latitudeDistance / 2) ** 2
+    + Math.cos(fromLatitude) * Math.cos(toLatitude) * Math.sin(longitudeDistance / 2) ** 2;
+  const centralAngle = 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+
+  return earthRadiusKm * centralAngle;
+}
+
+function buildGeocodeQueryCandidates(address = {}) {
+  const cep = normalizeCep(address.cep);
+  const baseParts = [
+    normalizeText(address.street),
+    normalizeText(address.number),
+    normalizeText(address.neighborhood),
+    normalizeText(address.city),
+    normalizeText(address.state).toUpperCase(),
+    cep ? `${cep.slice(0, 5)}-${cep.slice(5)}` : "",
+    normalizeText(STORE_ADDRESS.country || "Brasil")
+  ];
+  const fallbackParts = [
+    normalizeText(address.street),
+    normalizeText(address.neighborhood),
+    normalizeText(address.city),
+    normalizeText(address.state).toUpperCase(),
+    normalizeText(STORE_ADDRESS.country || "Brasil")
+  ];
+
+  return [...new Set([
+    baseParts.filter(Boolean).join(", "),
+    fallbackParts.filter(Boolean).join(", ")
+  ].filter(Boolean))];
+}
+
+function classifyDistanceZone(distanceKm) {
+  const normalizedDistance = roundDistanceKm(distanceKm);
+  const localMaxKm = Number(DISTANCE_RULES.localMaxKm || 2.9);
+  const extendedMaxKm = Number(DISTANCE_RULES.extendedMaxKm || 5);
+
+  if (normalizedDistance >= 0 && normalizedDistance <= localMaxKm) {
+    return {
+      ...DISTANCE_RULE_ZONE_META.zone_5,
+      distanceKm: normalizedDistance
+    };
+  }
+
+  if (normalizedDistance > 0 && normalizedDistance <= extendedMaxKm) {
+    return {
+      ...DISTANCE_RULE_ZONE_META.zone_10,
+      distanceKm: normalizedDistance
+    };
+  }
+
+  return {
+    ...DISTANCE_RULE_ZONE_META.pickup_only,
+    distanceKm: normalizedDistance
+  };
+}
+
+function createDynamicDeliveryArea(address, zone) {
+  return {
+    id: "",
+    name: normalizeText(address.street || address.neighborhood || "Endereco validado"),
+    status: zone.status,
+    zoneId: zone.zoneId,
+    zoneLabel: zone.zoneLabel,
+    note: zone.status === "active"
+      ? `Taxa automatica para enderecos ate ${zone.zoneId === "zone_5" ? "2,9 km" : "5 km"} da base.`
+      : "Atendimento apenas com retirada no local para distancias acima da faixa de entrega.",
+    updatedAt: ""
+  };
+}
+
+function buildAreaResponse(area) {
+  return {
+    id: normalizeText(area?.id),
+    name: normalizeText(area?.name),
+    status: normalizeText(area?.status || "active"),
+    zoneId: normalizeText(area?.zoneId),
+    zoneLabel: normalizeText(area?.zoneLabel),
+    note: normalizeText(area?.note || ""),
+    updatedAt: normalizeText(area?.updatedAt)
+  };
+}
+
 function buildDeliveryAddressKey(values = {}) {
   return [
+    normalizeCep(values.cep),
+    normalizeDeliveryAreaName(values.neighborhood),
     normalizeAddressToken(values.street),
     normalizeAddressToken(values.number),
-    normalizeAddressToken(values.neighborhood),
     normalizeAddressToken(values.city),
     normalizeText(values.state).toUpperCase()
   ].join("|");
@@ -214,30 +507,24 @@ function buildDeliveryAddressKey(values = {}) {
 function sanitizeSubmittedAddress(payload = {}) {
   return {
     deliveryAreaId: normalizeText(payload.deliveryAreaId || payload.neighborhoodId || payload.areaId),
+    cep: normalizeCep(payload.cep),
     street: normalizeText(payload.street),
     number: normalizeText(payload.number),
     neighborhood: normalizeText(payload.neighborhood),
     complement: normalizeText(payload.complement),
     reference: normalizeText(payload.reference),
-    city: normalizeText(payload.city),
-    state: normalizeText(payload.state).toUpperCase(),
-    cep: normalizeText(payload.cep)
+    city: normalizeText(payload.city || SERVICE_AREA.city),
+    state: normalizeText(payload.state || SERVICE_AREA.state).toUpperCase()
   };
 }
 
 function assertSubmittedAddress(address) {
-  const requiredFields = [
-    ["street", "Informe a rua."],
-    ["number", "Informe o numero da residencia."],
-    ["neighborhood", "Selecione o bairro."],
-    ["city", "Informe a cidade."],
-    ["state", "Informe o estado."],
-    ["deliveryAreaId", "Selecione o bairro para calcular a entrega."]
-  ];
-  const missing = requiredFields.find(([field]) => !address[field]);
+  if (!normalizeCep(address.cep) || !normalizeText(address.street) || !normalizeText(address.number)) {
+    throw createError("missing_address_field", DELIVERY_MESSAGES.incomplete, 422);
+  }
 
-  if (missing) {
-    throw createError("missing_address_field", missing[1], 422);
+  if (normalizeCep(address.cep).length !== 8) {
+    throw createError("invalid_cep", "Informe um CEP valido para calcular a entrega.", 422);
   }
 
   if (INVALID_HOUSE_NUMBER_VALUES.has(normalizeAddressToken(address.number))) {
@@ -279,13 +566,13 @@ function decodeBase64Url(value) {
 
 function getQuoteSecret() {
   const configuredSecret = normalizeText(process.env.DELIVERY_QUOTE_SECRET);
-  const isVercelRuntime = String(process.env.VERCEL || "") === "1" || Boolean(process.env.VERCEL_ENV);
+  const isRunningOnVercel = String(process.env.VERCEL || "") === "1" || Boolean(process.env.VERCEL_ENV);
 
   if (configuredSecret) {
     return configuredSecret;
   }
 
-  if (isVercelRuntime) {
+  if (isRunningOnVercel) {
     throw createError(
       "missing_secret",
       "A validacao de entrega nao foi configurada corretamente no servidor.",
@@ -340,10 +627,12 @@ function verifyQuoteToken(token) {
 }
 
 function formatCurrency(value) {
-  return Number(value || 0).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL"
-  });
+  return Number(value || 0)
+    .toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL"
+    })
+    .replace(/\u00a0/g, " ");
 }
 
 function buildActiveMessage(fee) {
@@ -371,34 +660,414 @@ function buildZoneLabelForArea(area) {
     return "Apenas retirada no local";
   }
 
+  if (normalizeText(area.zoneLabel)) {
+    return normalizeText(area.zoneLabel);
+  }
+
   if (area.status === "pickup_only") {
     return "Somente retirada no local";
   }
 
   if (area.status === "blocked") {
-    return "Entrega bloqueada para este bairro";
+    return "Entrega bloqueada para esta regiao";
   }
 
   return `Taxa cadastrada para ${area.name}`;
 }
 
-async function findDeliveryAreaForAddress(address) {
-  const byId = address.deliveryAreaId
-    ? await getDeliveryAreaById(address.deliveryAreaId)
+async function findDeliveryAreaMatchesForAddress(address) {
+  const streetArea = address.street
+    ? await getDeliveryAreaByName(address.street)
     : null;
+  const neighborhoodArea = address.neighborhood
+    ? await getDeliveryAreaByName(address.neighborhood)
+    : null;
+  const explicitArea = !address.deliveryAreaId
+    ? null
+    : await getDeliveryAreaById(address.deliveryAreaId);
 
-  if (byId) {
-    return byId;
+  return {
+    streetArea,
+    neighborhoodArea,
+    explicitArea
+  };
+}
+
+async function resolveAddressCoordinates(address) {
+  if (typeof globalThis.__GB_TEST_ADDRESS_GEO_LOOKUP__ === "function") {
+    const mockedCoordinates = await globalThis.__GB_TEST_ADDRESS_GEO_LOOKUP__(address);
+
+    if (mockedCoordinates && hasValidCoordinates(mockedCoordinates)) {
+      return {
+        latitude: normalizeCoordinate(mockedCoordinates.latitude),
+        longitude: normalizeCoordinate(mockedCoordinates.longitude),
+        precision: normalizeText(mockedCoordinates.precision) || "approximate",
+        provider: normalizeText(mockedCoordinates.provider) || "test"
+      };
+    }
+
+    if (mockedCoordinates === null) {
+      return null;
+    }
   }
 
-  if (!address.neighborhood) {
-    return null;
+  if (typeof globalThis.fetch !== "function") {
+    throw createError(
+      "delivery_distance_lookup_unavailable",
+      "Nao foi possivel calcular a distancia desta entrega no servidor agora. Tente novamente em instantes.",
+      503
+    );
   }
 
-  return getDeliveryAreaByName(address.neighborhood);
+  let hadNetworkFailure = false;
+  const queryCandidates = buildGeocodeQueryCandidates(address);
+
+  for (const query of queryCandidates) {
+    const cacheKey = normalizeAddressToken(query);
+    const cachedMatch = ADDRESS_GEOCODE_CACHE.get(cacheKey);
+
+    if (cachedMatch) {
+      return cachedMatch;
+    }
+
+    for (const provider of ADDRESS_GEOCODE_PROVIDERS) {
+      let response;
+
+      try {
+        response = await globalThis.fetch(provider.buildUrl(query), {
+          headers: {
+            Accept: "application/json",
+            "User-Agent": "GalaxyBurgerDelivery/1.0"
+          }
+        });
+      } catch {
+        hadNetworkFailure = true;
+        continue;
+      }
+
+      if (!response.ok) {
+        hadNetworkFailure = true;
+        continue;
+      }
+
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch {
+        hadNetworkFailure = true;
+        continue;
+      }
+
+      const parsedMatch = provider.parsePayload(payload);
+      if (!parsedMatch || !hasValidCoordinates(parsedMatch)) {
+        continue;
+      }
+
+      ADDRESS_GEOCODE_CACHE.set(cacheKey, parsedMatch);
+      return parsedMatch;
+    }
+  }
+
+  if (hadNetworkFailure) {
+    throw createError(
+      "delivery_distance_lookup_failed",
+      "Nao foi possivel calcular a distancia desta entrega agora. Tente novamente em instantes.",
+      503
+    );
+  }
+
+  return null;
+}
+
+async function resolveDeliveryRuleForAddress(officialAddress) {
+  const areaMatches = await findDeliveryAreaMatchesForAddress(officialAddress);
+  const blockingArea = [areaMatches.streetArea, areaMatches.neighborhoodArea, areaMatches.explicitArea]
+    .find(area => area && area.status !== "active");
+  const priorityZone5Aliases = Array.isArray(PRIORITY_ADDRESS_ZONES.zone_5)
+    ? PRIORITY_ADDRESS_ZONES.zone_5
+    : [];
+  const priorityZone10Aliases = Array.isArray(PRIORITY_ADDRESS_ZONES.zone_10)
+    ? PRIORITY_ADDRESS_ZONES.zone_10
+    : [];
+
+  if (blockingArea) {
+    return {
+      status: blockingArea.status,
+      fee: 0,
+      zone: normalizeText(blockingArea.zoneId || blockingArea.status),
+      zoneLabel: buildZoneLabelForArea(blockingArea),
+      distanceKm: 0,
+      routeDistanceKm: 0,
+      locationPrecision: DELIVERY_METADATA.locationPrecision || "manual_zone",
+      geocoderSource: DELIVERY_METADATA.geocoderSource || "manual_zone_registry",
+      deliveryArea: buildAreaResponse(blockingArea),
+      validationMode: "manual_area"
+    };
+  }
+
+  if (matchesPriorityAddressZone(officialAddress.street, priorityZone5Aliases)) {
+    const zone = DISTANCE_RULE_ZONE_META.zone_5;
+    const area = areaMatches.streetArea || createDynamicDeliveryArea(officialAddress, zone);
+
+    return {
+      status: "ready",
+      fee: zone.fee,
+      zone: zone.zoneId,
+      zoneLabel: zone.zoneLabel,
+      distanceKm: 0,
+      routeDistanceKm: 0,
+      locationPrecision: DELIVERY_METADATA.locationPrecision || "manual_zone",
+      geocoderSource: DELIVERY_METADATA.geocoderSource || "manual_zone_registry",
+      deliveryArea: buildAreaResponse({
+        ...area,
+        status: zone.status,
+        zoneId: zone.zoneId,
+        zoneLabel: zone.zoneLabel,
+        note: normalizeText(area?.note) || "Zona prioritaria de ate 2,9 km."
+      }),
+      validationMode: "priority_zone"
+    };
+  }
+
+  if (matchesPriorityAddressZone(officialAddress.street, priorityZone10Aliases)) {
+    const zone = DISTANCE_RULE_ZONE_META.zone_10;
+    const area = areaMatches.streetArea || createDynamicDeliveryArea(officialAddress, zone);
+
+    return {
+      status: "ready",
+      fee: zone.fee,
+      zone: zone.zoneId,
+      zoneLabel: zone.zoneLabel,
+      distanceKm: 0,
+      routeDistanceKm: 0,
+      locationPrecision: DELIVERY_METADATA.locationPrecision || "manual_zone",
+      geocoderSource: DELIVERY_METADATA.geocoderSource || "manual_zone_registry",
+      deliveryArea: buildAreaResponse({
+        ...area,
+        status: zone.status,
+        zoneId: zone.zoneId,
+        zoneLabel: zone.zoneLabel,
+        note: normalizeText(area?.note) || "Zona prioritaria de 3 km ate 5 km."
+      }),
+      validationMode: "priority_zone"
+    };
+  }
+
+  const storeCoordinates = {
+    latitude: normalizeCoordinate(STORE_COORDINATES.latitude),
+    longitude: normalizeCoordinate(STORE_COORDINATES.longitude)
+  };
+
+  if (hasValidCoordinates(storeCoordinates)) {
+    const addressCoordinates = await resolveAddressCoordinates(officialAddress);
+
+    if (addressCoordinates) {
+      const computedDistanceKm = calculateAirDistanceKm(storeCoordinates, addressCoordinates);
+      const distanceZone = classifyDistanceZone(computedDistanceKm);
+      const dynamicArea = areaMatches.streetArea
+        || areaMatches.neighborhoodArea
+        || createDynamicDeliveryArea(officialAddress, distanceZone);
+
+      return {
+        status: distanceZone.status === "active" ? "ready" : distanceZone.status,
+        fee: distanceZone.fee,
+        zone: distanceZone.zoneId,
+        zoneLabel: distanceZone.zoneLabel,
+        distanceKm: distanceZone.distanceKm,
+        routeDistanceKm: 0,
+        locationPrecision: normalizeText(addressCoordinates.precision) || "approximate",
+        geocoderSource: normalizeText(addressCoordinates.provider) || "photon",
+        deliveryArea: buildAreaResponse({
+          ...dynamicArea,
+          status: distanceZone.status,
+          zoneId: distanceZone.zoneId,
+          zoneLabel: distanceZone.zoneLabel,
+          note: dynamicArea?.note || createDynamicDeliveryArea(officialAddress, distanceZone).note
+        }),
+        validationMode: "distance"
+      };
+    }
+  }
+
+  if (areaMatches.streetArea) {
+    return {
+      status: areaMatches.streetArea.status === "active" ? "ready" : areaMatches.streetArea.status,
+      fee: Number(areaMatches.streetArea.fee || 0),
+      zone: normalizeText(areaMatches.streetArea.zoneId || areaMatches.streetArea.status),
+      zoneLabel: buildZoneLabelForArea(areaMatches.streetArea),
+      distanceKm: 0,
+      routeDistanceKm: 0,
+      locationPrecision: DELIVERY_METADATA.locationPrecision || "manual_zone",
+      geocoderSource: DELIVERY_METADATA.geocoderSource || "manual_zone_registry",
+      deliveryArea: buildAreaResponse(areaMatches.streetArea),
+      validationMode: "manual_area"
+    };
+  }
+
+  throw createError(
+    "delivery_distance_required",
+    "Nao foi possivel confirmar a distancia dessa entrega agora. Tente novamente em instantes ou escolha retirada no local.",
+    503
+  );
+}
+
+async function fetchCepAddress(cep) {
+  const normalizedCep = normalizeCep(cep);
+  if (!normalizedCep) {
+    throw createError("invalid_cep", "Informe um CEP valido para calcular a entrega.", 422);
+  }
+
+  if (cepLookupCache.has(normalizedCep)) {
+    return cepLookupCache.get(normalizedCep);
+  }
+
+  if (typeof globalThis.__GB_TEST_VIACEP_LOOKUP__ === "function") {
+    const mockedData = await globalThis.__GB_TEST_VIACEP_LOOKUP__(normalizedCep);
+    if (mockedData && typeof mockedData === "object") {
+      cepLookupCache.set(normalizedCep, mockedData);
+      return mockedData;
+    }
+  }
+
+  if (typeof globalThis.fetch !== "function") {
+    throw createError(
+      "delivery_cep_lookup_unavailable",
+      "Nao foi possivel validar o CEP no servidor agora. Tente novamente em instantes.",
+      503
+    );
+  }
+
+  let hadNetworkFailure = false;
+
+  for (const provider of CEP_LOOKUP_PROVIDERS) {
+    let response;
+
+    try {
+      response = await globalThis.fetch(provider.buildUrl(normalizedCep), {
+        headers: {
+          Accept: "application/json"
+        }
+      });
+    } catch {
+      hadNetworkFailure = true;
+      continue;
+    }
+
+    if (!response.ok) {
+      hadNetworkFailure = true;
+      continue;
+    }
+
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch {
+      hadNetworkFailure = true;
+      continue;
+    }
+
+    const normalizedPayload = provider.parsePayload(payload);
+    if (!normalizedPayload) {
+      continue;
+    }
+
+    cepLookupCache.set(normalizedCep, normalizedPayload);
+    return normalizedPayload;
+  }
+
+  if (hadNetworkFailure) {
+    throw createError(
+      "delivery_cep_lookup_failed",
+      "Nao foi possivel consultar o CEP agora. Tente novamente em instantes.",
+      503
+    );
+  }
+
+  throw createError("cep_not_found", "CEP nao encontrado. Confira os numeros e tente novamente.", 422);
+}
+
+async function resolveOfficialAddressFromCep(submittedAddress) {
+  const cepData = await fetchCepAddress(submittedAddress.cep);
+  const officialAddress = {
+    ...submittedAddress,
+    cep: normalizeCep(cepData.cep || submittedAddress.cep),
+    street: normalizeText(cepData.logradouro || submittedAddress.street),
+    neighborhood: normalizeText(cepData.bairro || submittedAddress.neighborhood),
+    city: normalizeText(cepData.localidade || submittedAddress.city),
+    state: normalizeText(cepData.uf || submittedAddress.state).toUpperCase()
+  };
+
+  if (!officialAddress.neighborhood || !officialAddress.city || !officialAddress.state) {
+    throw createError(
+      "delivery_neighborhood_unresolved",
+      "Nao foi possivel identificar o bairro por este CEP. Confira o endereco ou escolha retirada no local.",
+      422,
+      {
+        officialAddress
+      }
+    );
+  }
+
+  return officialAddress;
 }
 
 async function assertCurrentDeliveryQuote(quote, submittedAddress = {}) {
+  const validationMode = normalizeText(quote?.validationMode || "manual_area");
+  const hasFullAddress = Boolean(
+    normalizeCep(submittedAddress?.cep)
+    && normalizeText(submittedAddress?.street)
+    && normalizeText(submittedAddress?.number)
+  );
+
+  if (validationMode === "distance" || validationMode === "priority_zone") {
+    if (!hasFullAddress) {
+      const currentArea = quote?.deliveryAreaId
+        ? await getDeliveryAreaById(quote.deliveryAreaId)
+        : null;
+
+      if (currentArea?.status === "blocked") {
+        throw createError("delivery_area_blocked", getDeliveryMessageForStatus("blocked"), 409);
+      }
+
+      if (currentArea?.status === "pickup_only") {
+        throw createError("delivery_area_pickup_only", getDeliveryMessageForStatus("pickup_only"), 409);
+      }
+
+      return buildAreaResponse({
+        id: quote?.deliveryAreaId,
+        name: quote?.deliveryAreaName,
+        status: quote?.deliveryAreaStatus || (Number(quote?.fee || 0) > 0 ? "active" : "pickup_only"),
+        zoneId: quote?.deliveryZoneId || quote?.zone,
+        zoneLabel: quote?.zoneLabel,
+        note: ""
+      });
+    }
+
+    const officialAddress = await resolveOfficialAddressFromCep(sanitizeSubmittedAddress(submittedAddress));
+    const resolvedRule = await resolveDeliveryRuleForAddress(officialAddress);
+
+    if (resolvedRule.status === "blocked") {
+      throw createError("delivery_area_blocked", getDeliveryMessageForStatus("blocked"), 409);
+    }
+
+    if (resolvedRule.status === "pickup_only") {
+      throw createError("delivery_area_pickup_only", getDeliveryMessageForStatus("pickup_only"), 409);
+    }
+
+    if (
+      Number(resolvedRule.fee || 0) !== Number(quote.fee || 0)
+      || normalizeText(resolvedRule.zone) !== normalizeText(quote.zone)
+    ) {
+      throw createError(
+        "delivery_area_changed",
+        "A taxa de entrega desta regiao mudou. Calcule a entrega novamente antes de finalizar.",
+        409
+      );
+    }
+
+    return resolvedRule.deliveryArea;
+  }
+
   const currentArea = quote?.deliveryAreaId
     ? await getDeliveryAreaById(quote.deliveryAreaId)
     : await getDeliveryAreaByName(quote?.deliveryAreaName || submittedAddress.neighborhood);
@@ -406,16 +1075,7 @@ async function assertCurrentDeliveryQuote(quote, submittedAddress = {}) {
   if (!currentArea) {
     throw createError(
       "delivery_area_missing",
-      "O bairro selecionado nao esta mais cadastrado. Escolha outro bairro ou retirada no local.",
-      409
-    );
-  }
-
-  const submittedAreaName = normalizeDeliveryAreaName(submittedAddress.neighborhood || quote?.deliveryAreaName || "");
-  if (submittedAreaName && currentArea.normalizedName !== submittedAreaName) {
-    throw createError(
-      "delivery_area_mismatch",
-      "O bairro selecionado mudou. Calcule a entrega novamente antes de finalizar.",
+      "A regiao selecionada nao esta mais cadastrada. Escolha outra regiao ou retirada no local.",
       409
     );
   }
@@ -428,15 +1088,19 @@ async function assertCurrentDeliveryQuote(quote, submittedAddress = {}) {
     throw createError("delivery_area_pickup_only", getDeliveryMessageForStatus("pickup_only"), 409);
   }
 
-  if (currentArea.updatedAt !== quote.deliveryAreaUpdatedAt || Number(currentArea.fee || 0) !== Number(quote.fee || 0)) {
+  if (
+    currentArea.updatedAt !== quote.deliveryAreaUpdatedAt
+    || Number(currentArea.fee || 0) !== Number(quote.fee || 0)
+    || normalizeText(currentArea.zoneId) !== normalizeText(quote.deliveryZoneId)
+  ) {
     throw createError(
       "delivery_area_changed",
-      "A taxa de entrega deste bairro mudou. Calcule a entrega novamente antes de finalizar.",
+      "A taxa de entrega desta regiao mudou. Calcule a entrega novamente antes de finalizar.",
       409
     );
   }
 
-  return currentArea;
+  return buildAreaResponse(currentArea);
 }
 
 function buildQuoteCode(addressKey, issuedAt) {
@@ -444,69 +1108,67 @@ function buildQuoteCode(addressKey, issuedAt) {
   return `GB-${rawCode.slice(0, 8)}`;
 }
 
-async function buildDeliveryQuote(payload) {
-  const submittedAddress = sanitizeSubmittedAddress(payload);
-  assertSubmittedAddress(submittedAddress);
-
-  if (!isSupportedServiceArea(submittedAddress)) {
-    return {
-      status: "out_of_range",
-      fee: 0,
-      zone: "out_of_range",
-      zoneLabel: "Apenas retirada no local",
-      distanceKm: 0,
-      routeDistanceKm: 0,
-      locationPrecision: DELIVERY_METADATA.locationPrecision || "manual_zone",
-      geocoderSource: DELIVERY_METADATA.geocoderSource || "manual_zone_registry",
-      distanceLabel: "Apenas retirada no local",
-      message: getDeliveryMessageForStatus("out_of_range"),
-      address: submittedAddress
-    };
-  }
-
-  const area = await findDeliveryAreaForAddress(submittedAddress);
-
-  if (!area) {
-    return {
-      status: "out_of_range",
-      fee: 0,
-      zone: "out_of_range",
-      zoneLabel: "Apenas retirada no local",
-      distanceKm: 0,
-      routeDistanceKm: 0,
-      locationPrecision: DELIVERY_METADATA.locationPrecision || "manual_zone",
-      geocoderSource: DELIVERY_METADATA.geocoderSource || "manual_zone_registry",
-      distanceLabel: "Apenas retirada no local",
-      message: getDeliveryMessageForStatus("out_of_range"),
-      address: submittedAddress
-    };
-  }
-
-  const validatedAddress = {
-    ...submittedAddress,
-    neighborhood: area.name
-  };
-
-  if (area.status === "blocked" || area.status === "pickup_only") {
-    return {
-      status: area.status,
-      fee: 0,
-      zone: area.status,
-      zoneLabel: buildZoneLabelForArea(area),
-      distanceKm: 0,
-      routeDistanceKm: 0,
-      locationPrecision: DELIVERY_METADATA.locationPrecision || "manual_zone",
-      geocoderSource: DELIVERY_METADATA.geocoderSource || "manual_zone_registry",
-      distanceLabel: buildZoneLabelForArea(area),
-      message: getDeliveryMessageForStatus(area.status),
-      address: validatedAddress,
+function buildUnavailableResponse(status, address, area = null, metadata = {}) {
+  return {
+    status,
+    fee: 0,
+    zone: normalizeText(area?.zoneId || status || "out_of_range"),
+    zoneLabel: buildZoneLabelForArea(area),
+    distanceKm: Number(metadata.distanceKm || 0),
+    routeDistanceKm: Number(metadata.routeDistanceKm || 0),
+    locationPrecision: normalizeText(metadata.locationPrecision || DELIVERY_METADATA.locationPrecision || "manual_zone"),
+    geocoderSource: normalizeText(metadata.geocoderSource || DELIVERY_METADATA.geocoderSource || "manual_zone_registry"),
+    distanceLabel: buildZoneLabelForArea(area),
+    message: getDeliveryMessageForStatus(status),
+    address,
+    ...(area ? {
       deliveryArea: {
         id: area.id,
         name: area.name,
         status: area.status,
+        zoneId: area.zoneId,
+        zoneLabel: area.zoneLabel,
         note: area.note || ""
       }
-    };
+    } : {})
+  };
+}
+
+async function buildDeliveryQuote(payload) {
+  const submittedAddress = sanitizeSubmittedAddress(payload);
+  assertSubmittedAddress(submittedAddress);
+  const officialAddress = await resolveOfficialAddressFromCep(submittedAddress);
+
+  if (!isSupportedServiceArea(officialAddress)) {
+    return buildUnavailableResponse("out_of_range", officialAddress);
+  }
+
+  const resolvedRule = await resolveDeliveryRuleForAddress(officialAddress);
+  const area = resolvedRule.deliveryArea;
+
+  const validatedAddress = {
+    ...officialAddress,
+    deliveryAreaId: area.id,
+    city: normalizeText(officialAddress.city || SERVICE_AREA.city),
+    state: normalizeText(officialAddress.state || SERVICE_AREA.state).toUpperCase()
+  };
+
+  if (resolvedRule.status === "blocked" || resolvedRule.status === "pickup_only") {
+    return buildUnavailableResponse(resolvedRule.status, validatedAddress, area, {
+      distanceKm: resolvedRule.distanceKm,
+      routeDistanceKm: resolvedRule.routeDistanceKm,
+      locationPrecision: resolvedRule.locationPrecision,
+      geocoderSource: resolvedRule.geocoderSource
+    });
+  }
+
+  const activeFee = Number(resolvedRule.fee || area.fee || 0);
+  if (!ACTIVE_DELIVERY_FEE_VALUES.includes(activeFee)) {
+    throw createError(
+      "delivery_area_invalid_policy",
+      "Esta regiao ainda nao esta configurada corretamente para entrega. Escolha retirada no local ou fale com a loja.",
+      409
+    );
   }
 
   const issuedAt = Date.now();
@@ -514,38 +1176,42 @@ async function buildDeliveryQuote(payload) {
   const addressKey = buildDeliveryAddressKey(validatedAddress);
   const quotePayload = {
     code: buildQuoteCode(addressKey, issuedAt),
-    fee: Number(area.fee || 0),
-    zone: "delivery_area",
-    zoneLabel: buildZoneLabelForArea(area),
-    distanceKm: 0,
-    routeDistanceKm: 0,
-    locationPrecision: DELIVERY_METADATA.locationPrecision || "manual_zone",
-    geocoderSource: DELIVERY_METADATA.geocoderSource || "manual_zone_registry",
+    fee: activeFee,
+    zone: normalizeText(resolvedRule.zone || area.zoneId),
+    zoneLabel: normalizeText(resolvedRule.zoneLabel || buildZoneLabelForArea(area)),
+    distanceKm: Number(resolvedRule.distanceKm || 0),
+    routeDistanceKm: Number(resolvedRule.routeDistanceKm || 0),
+    locationPrecision: normalizeText(resolvedRule.locationPrecision || DELIVERY_METADATA.locationPrecision || "manual_zone"),
+    geocoderSource: normalizeText(resolvedRule.geocoderSource || DELIVERY_METADATA.geocoderSource || "manual_zone_registry"),
     addressKey,
     issuedAt,
     expiresAt,
     deliveryAreaId: area.id,
     deliveryAreaName: area.name,
-    deliveryAreaUpdatedAt: area.updatedAt,
-    deliveryAreaStatus: area.status
+    deliveryAreaUpdatedAt: normalizeText(area.updatedAt),
+    deliveryAreaStatus: area.status,
+    deliveryZoneId: normalizeText(area.zoneId || resolvedRule.zone),
+    validationMode: normalizeText(resolvedRule.validationMode || "manual_area")
   };
 
   return {
     status: "ready",
-    fee: Number(area.fee || 0),
-    zone: "delivery_area",
-    zoneLabel: buildZoneLabelForArea(area),
-    distanceKm: 0,
-    routeDistanceKm: 0,
+    fee: activeFee,
+    zone: quotePayload.zone,
+    zoneLabel: quotePayload.zoneLabel,
+    distanceKm: quotePayload.distanceKm,
+    routeDistanceKm: quotePayload.routeDistanceKm,
     locationPrecision: quotePayload.locationPrecision,
     geocoderSource: quotePayload.geocoderSource,
-    distanceLabel: buildZoneLabelForArea(area),
-    message: getDeliveryMessageForStatus("active", area.fee),
+    distanceLabel: quotePayload.zoneLabel,
+    message: getDeliveryMessageForStatus("active", activeFee),
     address: validatedAddress,
     deliveryArea: {
       id: area.id,
       name: area.name,
       status: area.status,
+      zoneId: area.zoneId,
+      zoneLabel: area.zoneLabel,
       note: area.note || ""
     },
     quote: {
@@ -565,6 +1231,7 @@ module.exports._internals = {
   buildDeliveryQuote,
   createError,
   getQuoteSecret,
+  normalizeAddress,
   isSupportedServiceArea,
   normalizeAddressToken,
   normalizeCompareText,

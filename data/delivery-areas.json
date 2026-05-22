@@ -1,0 +1,682 @@
+{
+  "version": 3,
+  "updatedAt": "2026-05-22T01:39:41.793Z",
+  "zones": [
+    {
+      "id": "zone_5",
+      "name": "Ate 2,9 km",
+      "fee": 5,
+      "status": "active",
+      "minDistanceKm": 0,
+      "maxDistanceKm": 2.9,
+      "label": "Ate 2,9 km - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "zone_10",
+      "name": "De 3 km ate 5 km",
+      "fee": 10,
+      "status": "active",
+      "minDistanceKm": 3,
+      "maxDistanceKm": 5,
+      "label": "De 3 km ate 5 km - R$ 10,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "pickup_only",
+      "name": "A partir de 5,1 km",
+      "fee": 0,
+      "status": "pickup_only",
+      "minDistanceKm": 5.1,
+      "maxDistanceKm": 0,
+      "label": "A partir de 5,1 km - somente retirada",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "blocked",
+      "name": "Bloqueado",
+      "fee": 0,
+      "status": "blocked",
+      "minDistanceKm": 0,
+      "maxDistanceKm": 0,
+      "label": "Entrega bloqueada para esta regiao",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    }
+  ],
+  "areas": [
+    {
+      "id": "area_4e19de25d75b",
+      "name": "Avenida Albardao",
+      "normalizedName": "avenida albardao",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_b8583482607a",
+      "name": "Avenida Alhambra",
+      "normalizedName": "avenida alhambra",
+      "zoneId": "blocked",
+      "note": "Regiao fora da area",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_da42a9879eae",
+      "name": "Avenida Andre Vesalio",
+      "normalizedName": "avenida andre vesalio",
+      "zoneId": "zone_10",
+      "note": "De 3 km ate 5 km da base - R$ 10,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_059cdaf76081",
+      "name": "Avenida Belmiro Valverde",
+      "normalizedName": "avenida belmiro valverde",
+      "zoneId": "blocked",
+      "note": "Regiao fora da area",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_8c05b4f878a1",
+      "name": "Avenida Brasil",
+      "normalizedName": "avenida brasil",
+      "zoneId": "blocked",
+      "note": "Regiao fora da area",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_8ec90cf6f80d",
+      "name": "Avenida Campista",
+      "normalizedName": "avenida campista",
+      "zoneId": "blocked",
+      "note": "Regiao fora da area",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_6212b065148b",
+      "name": "Avenida Canal",
+      "normalizedName": "avenida canal",
+      "zoneId": "blocked",
+      "note": "Regiao fora da area",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_b3cf2a32b1bf",
+      "name": "Avenida Canal Pista 1",
+      "normalizedName": "avenida canal pista 1",
+      "zoneId": "blocked",
+      "note": "Regiao fora da area",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_62c266e2bee7",
+      "name": "Avenida Canal Pista 2",
+      "normalizedName": "avenida canal pista 2",
+      "zoneId": "blocked",
+      "note": "Regiao fora da area",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_fa1e1dde6be3",
+      "name": "Avenida Cesario De Melo",
+      "normalizedName": "avenida cesario de melo",
+      "zoneId": "zone_10",
+      "note": "De 3 km ate 5 km da base - R$ 10,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_1e68859218e4",
+      "name": "Avenida Do Catarinense",
+      "normalizedName": "avenida do catarinense",
+      "zoneId": "blocked",
+      "note": "Regiao fora da area",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_111d55355dbc",
+      "name": "Avenida Do Nortista",
+      "normalizedName": "avenida do nortista",
+      "zoneId": "blocked",
+      "note": "Regiao fora da area",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_048052dcd67c",
+      "name": "Avenida Dom Sebastiao I",
+      "normalizedName": "avenida dom sebastiao i",
+      "zoneId": "zone_10",
+      "note": "De 3 km ate 5 km da base - R$ 10,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_41fa515e0af8",
+      "name": "Avenida Farroupilha",
+      "normalizedName": "avenida farroupilha",
+      "zoneId": "zone_10",
+      "note": "De 3 km ate 5 km da base - R$ 10,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_d3f3495cbd38",
+      "name": "Avenida Glicinia",
+      "normalizedName": "avenida glicinia",
+      "zoneId": "blocked",
+      "note": "Regiao fora da area",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_c72c5222bd32",
+      "name": "Avenida Manuel Caldeira De Alvarenga",
+      "normalizedName": "avenida manuel caldeira de alvarenga",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_6c2c0d3dbfa7",
+      "name": "Barra De Guaratiba",
+      "normalizedName": "barra de guaratiba",
+      "zoneId": "zone_5",
+      "note": "Regiao fora da area",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_ee84b256ab00",
+      "name": "Boulevard Carioca",
+      "normalizedName": "boulevard carioca",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_11b42abf16ef",
+      "name": "Campo Grande",
+      "normalizedName": "campo grande",
+      "zoneId": "zone_5",
+      "note": "De 3 km ate 5 km da base - R$ 10,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_4b9513e8d3c5",
+      "name": "Campo Grande Centro",
+      "normalizedName": "campo grande centro",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_8399b646f192",
+      "name": "Centro De Campo Grande",
+      "normalizedName": "centro de campo grande",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_9f0cd5b4a33d",
+      "name": "Cosmos",
+      "normalizedName": "cosmos",
+      "zoneId": "zone_5",
+      "note": "De 3 km ate 5 km da base - R$ 10,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_2852e9e7856c",
+      "name": "Guaratiba",
+      "normalizedName": "guaratiba",
+      "zoneId": "zone_5",
+      "note": "Regiao fora da area",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_07ffc03babd2",
+      "name": "Ilha De Guaratiba",
+      "normalizedName": "ilha de guaratiba",
+      "zoneId": "zone_5",
+      "note": "Regiao fora da area",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_4be6292e960e",
+      "name": "Inhoaiba",
+      "normalizedName": "inhoaiba",
+      "zoneId": "zone_5",
+      "note": "De 3 km ate 5 km da base - R$ 10,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_cf56e45827ed",
+      "name": "Mendanha",
+      "normalizedName": "mendanha",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_9445b3e78e66",
+      "name": "Paciencia",
+      "normalizedName": "paciencia",
+      "zoneId": "zone_5",
+      "note": "Regiao fora da area",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_944fa3339a2d",
+      "name": "Pedra De Guaratiba",
+      "normalizedName": "pedra de guaratiba",
+      "zoneId": "zone_5",
+      "note": "Regiao fora da area",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_246dc6ba5766",
+      "name": "Rua Almeida Lisboa",
+      "normalizedName": "rua almeida lisboa",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_dbf89a368227",
+      "name": "Rua Ana Barcelos",
+      "normalizedName": "rua ana barcelos",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_cdced176a8c6",
+      "name": "Rua Anfrisio Fialho",
+      "normalizedName": "rua anfrisio fialho",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_d4e2cc63e906",
+      "name": "Rua Aratiba",
+      "normalizedName": "rua aratiba",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_18c7f4c7210d",
+      "name": "Rua Arcilio Papini",
+      "normalizedName": "rua arcilio papini",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_742008c546e5",
+      "name": "Rua Augusta Candiani",
+      "normalizedName": "rua augusta candiani",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_3d2961c40b6e",
+      "name": "Rua Barao Do Rio Verde",
+      "normalizedName": "rua barao do rio verde",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_c4eb9e72a755",
+      "name": "Rua Campo Grande",
+      "normalizedName": "rua campo grande",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_4bd25f9a4e8f",
+      "name": "Rua Carlos Werneck",
+      "normalizedName": "rua carlos werneck",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_5a5423117c5b",
+      "name": "Rua Cordilheira",
+      "normalizedName": "rua cordilheira",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_54c8b109b95e",
+      "name": "Rua Embaixador Muniz Cordilho",
+      "normalizedName": "rua embaixador muniz cordilho",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_351e90856e3e",
+      "name": "Rua Embaixador Muniz Gordilho",
+      "normalizedName": "rua embaixador muniz gordilho",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_a033c223190a",
+      "name": "Rua Gramado",
+      "normalizedName": "rua gramado",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_ad5a7768cd7c",
+      "name": "Rua Guaraciaba",
+      "normalizedName": "rua guaraciaba",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_b638f63d18cd",
+      "name": "Rua Iraci Doyle",
+      "normalizedName": "rua iraci doyle",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_8fbd1cdd3411",
+      "name": "Rua Jocelin Fraga",
+      "normalizedName": "rua jocelin fraga",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_da956d156f90",
+      "name": "Rua Jose Piragibe",
+      "normalizedName": "rua jose piragibe",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_1bb9eefedb6d",
+      "name": "Rua Levino Fanzeres",
+      "normalizedName": "rua levino fanzeres",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_5b03adc089f7",
+      "name": "Rua Lucelia",
+      "normalizedName": "rua lucelia",
+      "zoneId": "zone_10",
+      "note": "De 3 km ate 5 km da base - R$ 10,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_09601f0600fa",
+      "name": "Rua Major Armando De Sousa Melo",
+      "normalizedName": "rua major armando de sousa melo",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_8fa196be7dc3",
+      "name": "Rua Maria Francisca",
+      "normalizedName": "rua maria francisca",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_503b93faa5d7",
+      "name": "Rua Pampeiro",
+      "normalizedName": "rua pampeiro",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_e0cf5791a0db",
+      "name": "Rua Ponche Verde",
+      "normalizedName": "rua ponche verde",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_4235775f3764",
+      "name": "Rua Professor Ramiro De Matos",
+      "normalizedName": "rua professor ramiro de matos",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_94a0293c1682",
+      "name": "Rua Ramalho Novo",
+      "normalizedName": "rua ramalho novo",
+      "zoneId": "zone_10",
+      "note": "De 3 km ate 5 km da base - R$ 10,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_3ea4b03c85d6",
+      "name": "Rua Rio Pardo",
+      "normalizedName": "rua rio pardo",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_d99e79c8bcd6",
+      "name": "Rua Soldado Lindo Sardagna",
+      "normalizedName": "rua soldado lindo sardagna",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_4f398978af44",
+      "name": "Rua Soldado Lino Sardagna",
+      "normalizedName": "rua soldado lino sardagna",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_c237ab3fe02b",
+      "name": "Rua Tabai",
+      "normalizedName": "rua tabai",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_8a675dec116d",
+      "name": "Rua Toroqua",
+      "normalizedName": "rua toroqua",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_faf25ba9a1f6",
+      "name": "Rua Tupacerata",
+      "normalizedName": "rua tupacerata",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_7c99bdef3a69",
+      "name": "Rua Umbu",
+      "normalizedName": "rua umbu",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_b80e079f9618",
+      "name": "Rua Varzea Alegre",
+      "normalizedName": "rua varzea alegre",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_13212b9c01e7",
+      "name": "Rua Wolf Klabin",
+      "normalizedName": "rua wolf klabin",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_25d0bc83cf6a",
+      "name": "Santa Cruz",
+      "normalizedName": "santa cruz",
+      "zoneId": "zone_5",
+      "note": "Regiao fora da area",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_6e73b5c3abc3",
+      "name": "Santissimo",
+      "normalizedName": "santissimo",
+      "zoneId": "zone_5",
+      "note": "De 3 km ate 5 km da base - R$ 10,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_dd9fa871cd89",
+      "name": "Sao Basilio",
+      "normalizedName": "sao basilio",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_53a28ebaf615",
+      "name": "Sao Claudio",
+      "normalizedName": "sao claudio",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_2995bd7d4839",
+      "name": "Senador Vasconcelos",
+      "normalizedName": "senador vasconcelos",
+      "zoneId": "zone_5",
+      "note": "De 3 km ate 5 km da base - R$ 10,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_e7120c04da71",
+      "name": "Sepetiba",
+      "normalizedName": "sepetiba",
+      "zoneId": "zone_5",
+      "note": "Regiao fora da area",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_40cecae1888c",
+      "name": "Vila Nova",
+      "normalizedName": "vila nova",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    },
+    {
+      "id": "area_d00cabe62e67",
+      "name": "Vila Nova Campo Grande",
+      "normalizedName": "vila nova campo grande",
+      "zoneId": "zone_5",
+      "note": "Ate 2,9 km da base - R$ 5,00",
+      "createdAt": "2026-05-22T01:39:41.793Z",
+      "updatedAt": "2026-05-22T01:39:41.793Z"
+    }
+  ]
+}

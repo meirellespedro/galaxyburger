@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260520-4">
+  <link rel="stylesheet" href="style.css?v=20260521-2">
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -55,9 +55,9 @@
     }
   </script>
   <script src="store-config.js?v=20260520-3" defer></script>
-  <script src="delivery-config.js?v=20260520-3" defer></script>
+  <script src="delivery-config.js?v=20260521-1" defer></script>
   <script src="catalog-config.js?v=20260520-3" defer></script>
-  <script src="carrinho.js?v=20260520-6" defer></script>
+  <script src="carrinho.js?v=20260521-3" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
@@ -849,7 +849,7 @@
 
         <div id="delivery-address-group">
           <div class="address-field address-field-full">
-            <p class="field-helper delivery-manual-helper" id="delivery-manual-helper">O CEP &eacute; opcional para preencher o endere&ccedil;o. Para calcular a entrega, informe rua, n&uacute;mero, selecione o bairro, cidade e estado.</p>
+            <p class="field-helper delivery-manual-helper" id="delivery-manual-helper">Para calcular a entrega com seguran&ccedil;a, informe o CEP, a rua e o n&uacute;mero. O bairro, a cidade e o estado s&atilde;o identificados automaticamente pelo CEP.</p>
           </div>
 
           <div class="address-grid address-grid-main">
@@ -875,10 +875,8 @@
 
             <div class="address-field">
               <label class="field-label" for="customer-neighborhood">Bairro</label>
-              <select id="customer-neighborhood" autocomplete="address-level3">
-                <option value="">Carregando bairros...</option>
-              </select>
-              <p class="field-helper" id="customer-neighborhood-helper">Selecione seu bairro para calcular a entrega.</p>
+              <input id="customer-neighborhood" type="text" autocomplete="address-level3" placeholder="Identificado pelo CEP" readonly>
+              <p class="field-helper" id="customer-neighborhood-helper">Informe um CEP v&aacute;lido para identificar o bairro automaticamente.</p>
             </div>
           </div>
 
@@ -897,12 +895,12 @@
           <div class="address-grid address-grid-region">
             <div class="address-field">
               <label class="field-label" for="customer-city">Cidade</label>
-              <input id="customer-city" type="text" autocomplete="address-level2" placeholder="Cidade">
+              <input id="customer-city" type="text" autocomplete="address-level2" placeholder="Cidade da entrega" readonly>
             </div>
 
             <div class="address-field">
               <label class="field-label" for="customer-state">Estado</label>
-              <input id="customer-state" type="text" autocomplete="address-level1" placeholder="UF" maxlength="2">
+              <input id="customer-state" type="text" autocomplete="address-level1" placeholder="UF" maxlength="2" readonly>
             </div>
           </div>
 
@@ -914,9 +912,9 @@
             <input id="delivery-distance-range" type="hidden" value="">
             <div id="delivery-quote-summary" class="delivery-quote-summary">Preencha o endere&ccedil;o completo para calcular a entrega.</div>
             <ul class="delivery-policy-list" aria-label="Pol&iacute;tica autom&aacute;tica de entrega">
-              <li>Entregas mais pr&oacute;ximas: R$ 5,00</li>
-              <li>Entregas entre 3 km e 5 km: R$ 10,00</li>
-              <li>Fora da nossa &aacute;rea: somente retirada no local</li>
+              <li>At&eacute; 2,9 km da hamburgueria: R$ 5,00</li>
+              <li>De 3 km at&eacute; 5 km: R$ 10,00</li>
+              <li>A partir de 5,1 km: somente retirada no local</li>
             </ul>
             <p class="field-helper delivery-range-hint">A taxa n&atilde;o &eacute; escolhida pelo cliente. A Galaxy Burger confirma o endere&ccedil;o antes de liberar o pedido.</p>
             <label class="delivery-estimate-terms" id="delivery-estimate-terms">

@@ -18,7 +18,7 @@
   const DELIVERY_STATUS_META = Object.freeze({
     active: {
       label: "Entrega ativa",
-      description: "Entrega liberada para este bairro.",
+      description: "Entrega liberada com taxa fixa de R$ 5,00 ou R$ 10,00.",
       badgeClass: "is-active"
     },
     pickup_only: {
@@ -32,6 +32,40 @@
       badgeClass: "is-blocked"
     }
   });
+  const DELIVERY_ZONE_META = Object.freeze({
+    zone_5: {
+      label: "Ate 2,9 km",
+      description: "Entrega ativa com taxa fixa de R$ 5,00.",
+      helper: "Use esta zona para enderecos proximos da hamburgueria, ate 2,9 km.",
+      fee: 5,
+      status: "active",
+      badgeClass: "is-active"
+    },
+    zone_10: {
+      label: "De 3 km ate 5 km",
+      description: "Entrega ativa com taxa fixa de R$ 10,00.",
+      helper: "Use esta zona para regioes entre 3 km e 5 km da hamburgueria.",
+      fee: 10,
+      status: "active",
+      badgeClass: "is-active"
+    },
+    pickup_only: {
+      label: "Somente retirada",
+      description: "Atendimento apenas com retirada no local.",
+      helper: "Acima de 5 km, mantenha a regiao como somente retirada.",
+      fee: 0,
+      status: "pickup_only",
+      badgeClass: "is-pickup"
+    },
+    blocked: {
+      label: "Bloqueado",
+      description: "No momento sem entrega para esta regiao.",
+      helper: "Use bloqueado quando a regiao nao puder receber pedido temporariamente.",
+      fee: 0,
+      status: "blocked",
+      badgeClass: "is-blocked"
+    }
+  });
 
   let dashboardState = createDashboardState();
   let inventoryRealtimeChannel = null;
@@ -40,6 +74,7 @@
     inventoryRealtimeChannel = createInventoryRealtimeChannel();
     syncBrandCopy();
     bindAdminEvents();
+    syncDeliveryAreaZoneField();
     bindRealtimeSync();
     restoreAdminSession();
 
@@ -70,6 +105,7 @@
         persistenceConfigured: true
       },
       deliveryAreas: {
+        zones: [],
         areas: [],
         counts: {
           total: 0,
@@ -101,22 +137,29 @@
       .toLowerCase();
   }
 
-  function normalizeMoneyValue(value) {
-    if (typeof value === "string") {
-      const compactValue = value.replace(/\s+/g, "").replace(/\./g, "").replace(",", ".");
-      const parsedStringValue = Number(compactValue);
-      return Number.isFinite(parsedStringValue) ? parsedStringValue : NaN;
-    }
-
-    const parsedValue = Number(value);
-    return Number.isFinite(parsedValue) ? parsedValue : NaN;
-  }
-
   function formatCurrency(value) {
     return Number(value || 0).toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL"
     });
+  }
+
+  function getDeliveryZoneMeta(zoneId) {
+    return DELIVERY_ZONE_META[normalizeText(zoneId)] || DELIVERY_ZONE_META.zone_5;
+  }
+
+  function syncDeliveryAreaZoneField() {
+    const fields = getDeliveryAreaFormFields();
+    const zoneMeta = getDeliveryZoneMeta(fields.zone?.value);
+
+    if (!fields.zone) {
+      return;
+    }
+
+    const zoneHelper = document.getElementById("admin-delivery-zone-helper");
+    if (zoneHelper) {
+      zoneHelper.textContent = zoneMeta.helper;
+    }
   }
 
   function formatDateTime(value) {
@@ -171,6 +214,7 @@
     deliveryAreaList?.addEventListener("click", handleDeliveryAreaActionClick);
     deliveryForm?.addEventListener("submit", handleDeliveryAreaSubmit);
     deliveryCancelButton?.addEventListener("click", resetDeliveryAreaForm);
+    getDeliveryAreaFormFields().zone?.addEventListener("change", syncDeliveryAreaZoneField);
   }
 
   function bindRealtimeSync() {
@@ -428,6 +472,7 @@
 
   function applyDeliveryAreasPayload(deliveryAreas) {
     dashboardState.deliveryAreas = {
+      zones: Array.isArray(deliveryAreas.zones) ? deliveryAreas.zones.slice() : [],
       areas: Array.isArray(deliveryAreas.areas) ? deliveryAreas.areas.slice() : [],
       counts: deliveryAreas.counts || {
         total: 0,
@@ -463,6 +508,7 @@
     renderInventoryGroups();
     renderDeliveryAreaList();
     syncDeliveryAreaFormLabels();
+    syncDeliveryAreaZoneField();
   }
 
   function renderLastUpdated() {
@@ -643,7 +689,9 @@
       const haystack = [
         area?.name,
         area?.note,
-        DELIVERY_STATUS_META[area?.status]?.label
+        DELIVERY_STATUS_META[area?.status]?.label,
+        area?.zoneLabel,
+        area?.zoneName
       ].map(normalizeCompareText).join(" ");
 
       return haystack.includes(searchTerm);
@@ -660,8 +708,8 @@
     if (!areas.length) {
       container.innerHTML = `
         <div class="admin-empty-state">
-          <strong>Nenhum bairro encontrado</strong>
-          <p>Ajuste a busca, troque o filtro ou cadastre um novo bairro.</p>
+          <strong>Nenhuma regiao encontrada</strong>
+          <p>Ajuste a busca, troque o filtro ou cadastre uma nova regiao.</p>
         </div>
       `;
       return;
@@ -675,9 +723,10 @@
   function renderDeliveryAreaCard(area) {
     const status = normalizeText(area?.status) || "active";
     const statusMeta = DELIVERY_STATUS_META[status] || DELIVERY_STATUS_META.active;
+    const zoneMeta = getDeliveryZoneMeta(area?.zoneId);
     const feeLabel = status === "active"
-      ? `Taxa: ${formatCurrency(area?.fee)}`
-      : "Taxa: retirada no local";
+      ? normalizeText(area?.zoneLabel || zoneMeta.label)
+      : normalizeText(area?.zoneLabel || zoneMeta.label || "Taxa: retirada no local");
     const note = normalizeText(area?.note) || statusMeta.description;
 
     return `
@@ -696,9 +745,10 @@
 
         <div class="admin-delivery-actions">
           <button type="button" class="admin-delivery-chip" data-delivery-action="edit" data-delivery-id="${escapeHtml(area.id)}">Editar</button>
-          <button type="button" class="admin-delivery-chip is-active ${status === "active" ? "is-selected" : ""}" data-delivery-action="status" data-delivery-id="${escapeHtml(area.id)}" data-delivery-status="active">Entrega</button>
-          <button type="button" class="admin-delivery-chip is-pickup ${status === "pickup_only" ? "is-selected" : ""}" data-delivery-action="status" data-delivery-id="${escapeHtml(area.id)}" data-delivery-status="pickup_only">Retirada</button>
-          <button type="button" class="admin-delivery-chip is-blocked ${status === "blocked" ? "is-selected" : ""}" data-delivery-action="status" data-delivery-id="${escapeHtml(area.id)}" data-delivery-status="blocked">Bloquear</button>
+          <button type="button" class="admin-delivery-chip is-active ${normalizeText(area?.zoneId) === "zone_5" ? "is-selected" : ""}" data-delivery-action="zone" data-delivery-id="${escapeHtml(area.id)}" data-delivery-zone="zone_5">R$ 5</button>
+          <button type="button" class="admin-delivery-chip is-active ${normalizeText(area?.zoneId) === "zone_10" ? "is-selected" : ""}" data-delivery-action="zone" data-delivery-id="${escapeHtml(area.id)}" data-delivery-zone="zone_10">R$ 10</button>
+          <button type="button" class="admin-delivery-chip is-pickup ${normalizeText(area?.zoneId) === "pickup_only" ? "is-selected" : ""}" data-delivery-action="zone" data-delivery-id="${escapeHtml(area.id)}" data-delivery-zone="pickup_only">Retirada</button>
+          <button type="button" class="admin-delivery-chip is-blocked ${normalizeText(area?.zoneId) === "blocked" ? "is-selected" : ""}" data-delivery-action="zone" data-delivery-id="${escapeHtml(area.id)}" data-delivery-zone="blocked">Bloquear</button>
           <button type="button" class="admin-delivery-chip is-danger" data-delivery-action="delete" data-delivery-id="${escapeHtml(area.id)}">Excluir</button>
         </div>
       </article>
@@ -711,11 +761,11 @@
     const isEditing = Boolean(dashboardState.editingDeliveryAreaId);
 
     if (title) {
-      title.textContent = isEditing ? "Editar bairro" : "Novo bairro";
+      title.textContent = isEditing ? "Editar regiao" : "Nova regiao";
     }
 
     if (saveButton) {
-      saveButton.textContent = isEditing ? "Salvar alteracoes" : "Salvar bairro";
+      saveButton.textContent = isEditing ? "Salvar alteracoes" : "Salvar regiao";
     }
   }
 
@@ -724,8 +774,7 @@
       form: document.getElementById("admin-delivery-form"),
       id: document.getElementById("admin-delivery-id"),
       name: document.getElementById("admin-delivery-name"),
-      fee: document.getElementById("admin-delivery-fee"),
-      status: document.getElementById("admin-delivery-status"),
+      zone: document.getElementById("admin-delivery-zone"),
       note: document.getElementById("admin-delivery-note"),
       saveButton: document.getElementById("admin-delivery-save-button"),
       cancelButton: document.getElementById("admin-delivery-cancel-button")
@@ -741,11 +790,11 @@
     dashboardState.editingDeliveryAreaId = normalizeText(area.id);
     if (fields.id) fields.id.value = normalizeText(area.id);
     if (fields.name) fields.name.value = normalizeText(area.name);
-    if (fields.fee) fields.fee.value = Number(area.fee || 0).toFixed(2).replace(".", ",");
-    if (fields.status) fields.status.value = normalizeText(area.status) || "active";
+    if (fields.zone) fields.zone.value = normalizeText(area.zoneId) || "zone_5";
     if (fields.note) fields.note.value = normalizeText(area.note);
+    syncDeliveryAreaZoneField();
     syncDeliveryAreaFormLabels();
-    setDeliveryMessage(`Editando o bairro ${area.name}.`);
+    setDeliveryMessage(`Editando a regiao ${area.name}.`);
     fields.name?.focus();
     fields.form.scrollIntoView({
       behavior: "smooth",
@@ -761,14 +810,15 @@
       fields.form.reset();
     }
     if (fields.id) fields.id.value = "";
-    if (fields.status) fields.status.value = "active";
+    if (fields.zone) fields.zone.value = "zone_5";
+    syncDeliveryAreaZoneField();
     syncDeliveryAreaFormLabels();
     clearDeliveryMessageIfEditingNotice();
   }
 
   function clearDeliveryMessageIfEditingNotice() {
     const messageEl = document.getElementById("admin-delivery-message");
-    if (messageEl && /^Editando o bairro /i.test(normalizeText(messageEl.textContent))) {
+    if (messageEl && /^Editando a regiao /i.test(normalizeText(messageEl.textContent))) {
       setDeliveryMessage("");
     }
   }
@@ -778,20 +828,19 @@
 
     const fields = getDeliveryAreaFormFields();
     const name = normalizeText(fields.name?.value);
-    const fee = normalizeMoneyValue(fields.fee?.value);
-    const status = normalizeText(fields.status?.value) || "active";
+    const zoneId = normalizeText(fields.zone?.value) || "zone_5";
     const note = normalizeText(fields.note?.value);
     const areaId = normalizeText(fields.id?.value || dashboardState.editingDeliveryAreaId);
 
     if (!name) {
-      setDeliveryMessage("Informe o nome do bairro.", true);
+      setDeliveryMessage("Informe o nome do bairro ou regiao.", true);
       fields.name?.focus();
       return;
     }
 
-    if (!Number.isFinite(fee) || fee < 0) {
-      setDeliveryMessage("Informe uma taxa valida para o bairro.", true);
-      fields.fee?.focus();
+    if (!normalizeText(zoneId)) {
+      setDeliveryMessage("Escolha uma zona valida para esta regiao.", true);
+      fields.zone?.focus();
       return;
     }
 
@@ -809,8 +858,7 @@
         body: JSON.stringify({
           id: areaId,
           name,
-          fee,
-          status,
+          zoneId,
           note
         })
       });
@@ -834,12 +882,12 @@
       });
 
       if (payload.deliveryAreas.persistenceConfigured === false) {
-        setDeliveryMessage("O bairro foi atualizado visualmente, mas a hospedagem ainda precisa de persistencia para salvar em producao.");
+        setDeliveryMessage("A regiao foi atualizada visualmente, mas a hospedagem ainda precisa de persistencia para salvar em producao.");
       } else {
-        setDeliveryMessage(areaId ? "Bairro atualizado com sucesso." : "Bairro criado com sucesso.");
+        setDeliveryMessage(areaId ? "Regiao atualizada com sucesso." : "Regiao criada com sucesso.");
       }
     } catch (error) {
-      setDeliveryMessage(error.message || "Nao foi possivel salvar o bairro agora.", true);
+      setDeliveryMessage(error.message || "Nao foi possivel salvar a regiao agora.", true);
     } finally {
       setDeliveryAreaFormBusy(false);
     }
@@ -864,7 +912,7 @@
     }
 
     if (action === "delete") {
-      const confirmed = window.confirm(`Excluir o bairro "${area.name}"?`);
+      const confirmed = window.confirm(`Excluir a regiao "${area.name}"?`);
       if (!confirmed) {
         return;
       }
@@ -873,12 +921,12 @@
       return;
     }
 
-    if (action === "status") {
-      await updateDeliveryAreaStatus(areaId, normalizeText(button.dataset.deliveryStatus) || "active", area.name);
+    if (action === "zone") {
+      await updateDeliveryAreaZone(areaId, normalizeText(button.dataset.deliveryZone) || "zone_5", area.name);
     }
   }
 
-  async function updateDeliveryAreaStatus(areaId, status, areaName) {
+  async function updateDeliveryAreaZone(areaId, zoneId, areaName) {
     setDeliveryAreaRowBusy(areaId, true);
     setDeliveryMessage("");
 
@@ -892,7 +940,7 @@
         },
         body: JSON.stringify({
           id: areaId,
-          status
+          zoneId
         })
       });
       const payload = await safeReadJson(response);
@@ -909,12 +957,12 @@
       applyDeliveryAreasPayload(payload.deliveryAreas);
       broadcastDeliveryAreasUpdate({
         areaId,
-        status,
+        status: zoneId,
         updatedAt: payload.deliveryAreas.updatedAt || new Date().toISOString()
       });
-      setDeliveryMessage(`Status do bairro ${areaName} atualizado para ${DELIVERY_STATUS_META[status]?.label || "novo status"}.`);
+      setDeliveryMessage(`Zona da regiao ${areaName} atualizada para ${getDeliveryZoneMeta(zoneId).label}.`);
     } catch (error) {
-      setDeliveryMessage(error.message || "Nao foi possivel atualizar o status do bairro.", true);
+      setDeliveryMessage(error.message || "Nao foi possivel atualizar a zona da regiao.", true);
     } finally {
       setDeliveryAreaRowBusy(areaId, false);
     }
@@ -944,7 +992,7 @@
       }
 
       if (!response.ok || !payload?.ok || !payload.deliveryAreas) {
-        throw new Error(payload?.message || "Nao foi possivel excluir o bairro.");
+        throw new Error(payload?.message || "Nao foi possivel excluir a regiao.");
       }
 
       applyDeliveryAreasPayload(payload.deliveryAreas);
@@ -956,9 +1004,9 @@
         status: "deleted",
         updatedAt: payload.deliveryAreas.updatedAt || new Date().toISOString()
       });
-      setDeliveryMessage(`Bairro ${areaName} excluido com sucesso.`);
+      setDeliveryMessage(`Regiao ${areaName} excluida com sucesso.`);
     } catch (error) {
-      setDeliveryMessage(error.message || "Nao foi possivel excluir o bairro.", true);
+      setDeliveryMessage(error.message || "Nao foi possivel excluir a regiao.", true);
     } finally {
       setDeliveryAreaRowBusy(areaId, false);
     }
@@ -1053,7 +1101,7 @@
     const saveButton = fields.saveButton;
     const cancelButton = fields.cancelButton;
 
-    [fields.name, fields.fee, fields.status, fields.note, cancelButton].forEach(field => {
+    [fields.name, fields.zone, fields.note, cancelButton].forEach(field => {
       if (field) {
         field.disabled = Boolean(isBusy);
       }
@@ -1061,7 +1109,7 @@
 
     if (saveButton) {
       if (!saveButton.dataset.defaultLabel) {
-        saveButton.dataset.defaultLabel = saveButton.textContent.trim() || "Salvar bairro";
+        saveButton.dataset.defaultLabel = saveButton.textContent.trim() || "Salvar regiao";
       }
 
       saveButton.disabled = Boolean(isBusy);

@@ -1,0 +1,276 @@
+{
+  "version": 1,
+  "updatedAt": "2026-05-20T00:00:00.000Z",
+  "items": {
+    "burger-poro-cosmico": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Poró cósmico ( TOP 1, O MAIS PEDIDO )",
+      "category": "burger"
+    },
+    "burger-saturno": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Saturno",
+      "category": "burger"
+    },
+    "burger-orion": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "ORION",
+      "category": "burger"
+    },
+    "burger-alfa-tasty": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Alfa Tasty",
+      "category": "burger"
+    },
+    "burger-et-da-casa": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "ET da casa",
+      "category": "burger"
+    },
+    "burger-baconstelacao": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Baconstelação",
+      "category": "burger"
+    },
+    "burger-picles-das-galaxias": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Picles das galáxias",
+      "category": "burger"
+    },
+    "burger-estrela-classica": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Estrela clássica",
+      "category": "burger"
+    },
+    "burger-venus-salada": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Vênus salada",
+      "category": "burger"
+    },
+    "burger-ovini-smash": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Ovini Smash 2.0",
+      "category": "burger"
+    },
+    "burger-cheddar-estrelar": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Cheddar Estrelar",
+      "category": "burger"
+    },
+    "burger-cometa-de-fogo": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Cometa de fogo",
+      "category": "burger"
+    },
+    "combo-individual-orion": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Combo individual Orion",
+      "category": "combo"
+    },
+    "combo-individual-saturno": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Combo individual Saturno",
+      "category": "combo"
+    },
+    "combo-venus-casal": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Combo Vênus casal",
+      "category": "combo"
+    },
+    "combo-classico": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Combo clássico",
+      "category": "combo"
+    },
+    "combo-orion-familia": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Combo Orion família",
+      "category": "combo"
+    },
+    "combo-aliens": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Combo Aliens",
+      "category": "combo"
+    },
+    "combo-kids": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Combo Kids",
+      "category": "combo"
+    },
+    "combo-galaxy": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Combo Galaxy",
+      "category": "combo"
+    },
+    "side-onion-crocante": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "15 Onions crocante",
+      "category": "side"
+    },
+    "side-batata-grande": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Batata Grande",
+      "category": "side"
+    },
+    "side-batata-grande-catupiry": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Batata Grande (catupiry)",
+      "category": "side"
+    },
+    "side-batata-grande-cheddar": {
+      "available": false,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Batata Grande (cheddar)",
+      "category": "side"
+    },
+    "side-batata-pequena": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Batata pequena",
+      "category": "side"
+    },
+    "side-nuggets": {
+      "available": false,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Nuggets",
+      "category": "side"
+    },
+    "drink-coca-cola-350": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Coca-Cola Comum 350ML",
+      "category": "drink"
+    },
+    "drink-coca-cola-zero-350": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Coca-Cola Zero 350 ml",
+      "category": "drink"
+    },
+    "drink-pepsi-350": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Pepsi lata 350ml",
+      "category": "drink"
+    },
+    "drink-pepsi-black-350": {
+      "available": false,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Pepsi Black lata 350ml",
+      "category": "drink"
+    },
+    "drink-fanta-laranja": {
+      "available": false,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Fanta Laranja",
+      "category": "drink"
+    },
+    "drink-guarana-350": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Guaraná lata 350ml",
+      "category": "drink"
+    },
+    "drink-sprite-350": {
+      "available": false,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Sprite lata 350ml",
+      "category": "drink"
+    },
+    "drink-fanta-uva": {
+      "available": false,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Fanta uva",
+      "category": "drink"
+    },
+    "drink-guaracamp-285": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Guaracamp copo 285ml",
+      "category": "drink"
+    },
+    "extra-farofa-bacon": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Farofa de Bacon",
+      "category": "extra"
+    },
+    "extra-carne": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Carne",
+      "category": "extra"
+    },
+    "extra-bacon": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Bacon",
+      "category": "extra"
+    },
+    "extra-cheddar": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Cheddar",
+      "category": "extra"
+    },
+    "extra-mussarela": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Mussarela",
+      "category": "extra"
+    },
+    "extra-molho-billy-jack": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Molho Billy Jack",
+      "category": "extra"
+    },
+    "extra-maionese-verde": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Maionese Verde",
+      "category": "extra"
+    },
+    "extra-molho-tasty": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Molho Tasty",
+      "category": "extra"
+    },
+    "extra-molho-bacon": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Molho de Bacon",
+      "category": "extra"
+    },
+    "extra-geleia-pimenta": {
+      "available": true,
+      "updatedAt": "2026-05-20T00:00:00.000Z",
+      "name": "Geleia de pimenta",
+      "category": "extra"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "hamburgeria",
+  "private": true,
+  "dependencies": {
+    "@vercel/blob": "latest"
+  }
+}

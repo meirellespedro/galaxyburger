@@ -26,3 +26,7 @@ Thumbs.db
 desktop.ini
 .idea/
 .vscode/
+
+.vercel
+.env*.local
+data/order-tickets/

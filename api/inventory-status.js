@@ -1,9 +1,9 @@
 const {
-  getDeliveryAreaCounts,
-  getDeliveryAreasSnapshot
-} = require("./_delivery-areas-store");
+  getInventoryCounts,
+  getInventorySnapshot
+} = require("./_inventory-store");
 
-module.exports = function deliveryAreasHandler(req, res) {
+module.exports = function inventoryStatusHandler(req, res) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -27,22 +27,28 @@ module.exports = function deliveryAreasHandler(req, res) {
 
   return (async () => {
     try {
-      const snapshot = await getDeliveryAreasSnapshot();
+      const snapshot = await getInventorySnapshot();
 
       res.status(200).json({
         ok: true,
         status: "ready",
         updatedAt: snapshot.updatedAt,
+        storageMode: snapshot.storageMode,
         persistenceConfigured: snapshot.persistenceConfigured,
-        zones: snapshot.zones,
-        counts: getDeliveryAreaCounts(snapshot),
-        areas: snapshot.areas
+        counts: getInventoryCounts(snapshot),
+        products: snapshot.products.map(product => ({
+          id: product.id,
+          name: product.name,
+          category: product.category,
+          available: Boolean(product.available),
+          stockUpdatedAt: product.stockUpdatedAt || snapshot.updatedAt
+        }))
       });
     } catch (error) {
       res.status(Number(error.statusCode || 500)).json({
         ok: false,
-        code: error.code || "delivery_areas_failed",
-        message: error.message || "Nao foi possivel consultar os bairros de entrega agora."
+        code: error.code || "inventory_status_failed",
+        message: error.message || "Nao foi possivel consultar o estoque agora."
       });
     }
   })();

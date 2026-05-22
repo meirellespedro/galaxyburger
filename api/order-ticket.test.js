@@ -14,6 +14,24 @@ const {
 let testOrderTicketDirectory = "";
 let testDeliveryAreasDirectory = "";
 let testDeliveryAreasFilePath = "";
+const DELIVERY_CEP_FIXTURES = Object.freeze({
+  "rua soldado lindo sardagna": {
+    cep: "23080710",
+    neighborhood: "Campo Grande",
+    city: "Rio de Janeiro",
+    state: "RJ",
+    street: "Rua Soldado Lindo Sardagna",
+    coordinates: { latitude: -22.8951939, longitude: -43.5736632, precision: "street", provider: "photon" }
+  },
+  "vila nova": {
+    cep: "23070010",
+    neighborhood: "Vila Nova",
+    city: "Rio de Janeiro",
+    state: "RJ",
+    street: "Rua Embaixador Muniz Gordilho",
+    coordinates: { latitude: -22.9049152, longitude: -43.5780493, precision: "exact", provider: "photon" }
+  }
+});
 
 async function invokeHandler(handler, { method = "POST", body = {}, query = {} } = {}) {
   const req = {
@@ -106,15 +124,52 @@ function findAreaByName(state, name) {
 }
 
 function buildDeliveryAddress(area, overrides = {}) {
-  return {
-    cep: "23070-010",
-    street: "Rua sem cadastro",
-    number: "45",
+  const fixture = DELIVERY_CEP_FIXTURES[normalizeDeliveryAreaName(area.name)] || {
+    cep: "23070010",
     neighborhood: area.name,
     city: "Rio de Janeiro",
     state: "RJ",
+    street: "Rua Exemplo"
+  };
+
+  return {
     deliveryAreaId: area.id,
+    neighborhood: fixture.neighborhood,
+    street: fixture.street,
+    number: "45",
+    city: fixture.city,
+    state: fixture.state,
+    cep: fixture.cep,
     ...overrides
+  };
+}
+
+function installViaCepMock() {
+  globalThis.__GB_TEST_VIACEP_LOOKUP__ = async cep => {
+    const fixture = Object.values(DELIVERY_CEP_FIXTURES).find(item => item.cep === cep);
+
+    if (!fixture) {
+      return { erro: true };
+    }
+
+    return {
+      cep: fixture.cep,
+      logradouro: fixture.street,
+      bairro: fixture.neighborhood,
+      localidade: fixture.city,
+      uf: fixture.state
+    };
+  };
+}
+
+function installAddressGeoMock() {
+  globalThis.__GB_TEST_ADDRESS_GEO_LOOKUP__ = async address => {
+    const streetKey = normalizeDeliveryAreaName(address?.street);
+    const fixture = Object.values(DELIVERY_CEP_FIXTURES).find(item =>
+      normalizeDeliveryAreaName(item.street) === streetKey
+    );
+
+    return fixture?.coordinates || null;
   };
 }
 
@@ -132,6 +187,8 @@ test.afterEach(() => {
   delete process.env.DELIVERY_AREAS_STORAGE_MODE;
   delete process.env.VERCEL_ENV;
   delete process.env.VERCEL;
+  delete globalThis.__GB_TEST_VIACEP_LOOKUP__;
+  delete globalThis.__GB_TEST_ADDRESS_GEO_LOOKUP__;
 
   if (testOrderTicketDirectory) {
     fs.rmSync(testOrderTicketDirectory, { recursive: true, force: true });
@@ -257,9 +314,11 @@ test("bloqueia combo com bebida indisponivel", async () => {
   assert.equal(response.body.code, "invalid_combo_option");
 });
 
-test("prepara pedido de entrega com taxa validada", async () => {
+test("prepara pedido de entrega com taxa validada pela regiao selecionada", async () => {
   process.env.DELIVERY_QUOTE_SECRET = "test-secret";
   configureLocalOrderTicketStorage();
+  installViaCepMock();
+  installAddressGeoMock();
   const state = configureLocalDeliveryAreasState();
   const area = findAreaByName(state, "Vila Nova");
 
@@ -286,13 +345,48 @@ test("prepara pedido de entrega com taxa validada", async () => {
   assert.equal(response.body.order.isPickup, false);
   assert.equal(response.body.order.deliveryFeeValue, 5);
   assert.equal(response.body.order.totalValue, 54.8);
-  assert.equal(response.body.order.deliveryQuote.zone, "delivery_area");
-  assert.equal(response.body.order.deliveryQuote.deliveryAreaId, area.id);
+  assert.equal(response.body.order.deliveryQuote.zone, "zone_5");
+  assert.ok(response.body.order.deliveryQuote.deliveryAreaId);
+  assert.match(response.body.whatsAppMessage, /Entrega: R\$ 5,00/);
+});
+
+test("prepara pedido de entrega com taxa de R$ 5,00 para rua proxima cadastrada", async () => {
+  process.env.DELIVERY_QUOTE_SECRET = "test-secret";
+  configureLocalOrderTicketStorage();
+  installViaCepMock();
+  installAddressGeoMock();
+  const state = configureLocalDeliveryAreasState();
+  const area = findAreaByName(state, "Rua Soldado Lindo Sardagna");
+
+  const quote = await invokeHandler(deliveryHandler, {
+    body: buildDeliveryAddress(area)
+  });
+
+  const response = await invokeHandler(orderHandler, {
+    body: buildBaseOrderPayload({
+      fulfillment: "delivery",
+      delivery: {
+        quoteToken: quote.body.quote.token,
+        values: buildDeliveryAddress(area, {
+          street: "R. Soldado Lindo Sardagna"
+        })
+      }
+    })
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.ok, true);
+  assert.equal(response.body.order.deliveryFeeValue, 5);
+  assert.equal(response.body.order.deliveryQuote.zone, "zone_5");
+  assert.match(response.body.order.addressData.compactAddressLine, /Campo Grande/);
+  assert.match(response.body.whatsAppMessage, /Entrega: R\$ 5,00/);
 });
 
 test("bloqueia entrega com endereco diferente da taxa validada", async () => {
   process.env.DELIVERY_QUOTE_SECRET = "test-secret";
   configureLocalOrderTicketStorage();
+  installViaCepMock();
+  installAddressGeoMock();
   const state = configureLocalDeliveryAreasState();
   const area = findAreaByName(state, "Vila Nova");
 
@@ -318,9 +412,11 @@ test("bloqueia entrega com endereco diferente da taxa validada", async () => {
   assert.equal(response.body.code, "delivery_address_mismatch");
 });
 
-test("bloqueia pedido quando a taxa do bairro muda depois da validacao", async () => {
+test("bloqueia pedido quando a rua validada fica bloqueada depois da cotacao", async () => {
   process.env.DELIVERY_QUOTE_SECRET = "test-secret";
   configureLocalOrderTicketStorage();
+  installViaCepMock();
+  installAddressGeoMock();
   const state = configureLocalDeliveryAreasState();
   const area = findAreaByName(state, "Vila Nova");
 
@@ -329,8 +425,8 @@ test("bloqueia pedido quando a taxa do bairro muda depois da validacao", async (
   });
 
   const nextState = JSON.parse(JSON.stringify(state));
-  const changedArea = findAreaByName(nextState, "Vila Nova");
-  changedArea.fee = 7;
+  const changedArea = nextState.areas.find(candidate => candidate.id === quote.body.deliveryArea.id);
+  changedArea.zoneId = "blocked";
   changedArea.updatedAt = "2026-05-21T13:00:00.000Z";
   nextState.updatedAt = changedArea.updatedAt;
   saveDeliveryAreasState(nextState);
@@ -347,7 +443,7 @@ test("bloqueia pedido quando a taxa do bairro muda depois da validacao", async (
 
   assert.equal(response.statusCode, 409);
   assert.equal(response.body.ok, false);
-  assert.equal(response.body.code, "delivery_area_changed");
+  assert.equal(response.body.code, "delivery_area_blocked");
 });
 
 test("mantem fallback para token na URL quando a persistencia curta nao esta disponivel", async () => {

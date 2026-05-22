@@ -40,7 +40,7 @@ module.exports = async function adminDeliveryAreasHandler(req, res) {
       const areaId = String(payload.id || payload.areaId || "").trim();
 
       if (!areaId) {
-        throw createAdminError("missing_delivery_area_id", "Informe qual bairro sera atualizado.", 422);
+        throw createAdminError("missing_delivery_area_id", "Informe qual regiao sera atualizada.", 422);
       }
 
       const area = await updateDeliveryArea(areaId, payload);
@@ -59,7 +59,7 @@ module.exports = async function adminDeliveryAreasHandler(req, res) {
       const areaId = String(payload.id || payload.areaId || "").trim();
 
       if (!areaId) {
-        throw createAdminError("missing_delivery_area_id", "Informe qual bairro sera removido.", 422);
+        throw createAdminError("missing_delivery_area_id", "Informe qual regiao sera removida.", 422);
       }
 
       await deleteDeliveryArea(areaId);
@@ -81,7 +81,7 @@ module.exports = async function adminDeliveryAreasHandler(req, res) {
     res.status(Number(error.statusCode || 500)).json({
       ok: false,
       code: error.code || "admin_delivery_areas_failed",
-      message: error.message || "Nao foi possivel salvar os bairros agora."
+      message: error.message || "Nao foi possivel salvar as regioes agora."
     });
   }
 };
@@ -130,6 +130,7 @@ async function buildAdminDeliveryAreasPayload() {
       storageMode: snapshot.storageMode,
       persistenceConfigured: snapshot.persistenceConfigured,
       storageLabel: snapshot.storageLabel,
+      zones: snapshot.zones,
       counts: getDeliveryAreaCounts(snapshot),
       areas: snapshot.areas
     }

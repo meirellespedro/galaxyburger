@@ -17,6 +17,10 @@
       city: "Rio de Janeiro",
       state: "RJ",
       cep: "23070010",
+      coordinates: Object.freeze({
+        latitude: -22.9049152,
+        longitude: -43.5780493
+      }),
       country: "Brasil"
     }),
     serviceArea: Object.freeze({
@@ -26,10 +30,19 @@
     }),
     normalization: Object.freeze({
       abbreviations: Object.freeze({
+        al: "alameda",
+        av: "avenida",
         cg: "campo grande",
+        estr: "estrada",
         jd: "jardim",
+        pc: "praca",
+        pr: "praia",
+        r: "rua",
+        rod: "rodovia",
         sta: "santa",
         sto: "santo",
+        trav: "travessa",
+        tv: "travessa",
         vl: "vila"
       })
     }),
@@ -41,6 +54,23 @@
     metadata: Object.freeze({
       locationPrecision: "manual_zone",
       geocoderSource: "manual_zone_registry"
+    }),
+    distanceRules: Object.freeze({
+      strategy: "air_distance_open_geocoder",
+      localMaxKm: 2.9,
+      extendedMaxKm: 5,
+      precisionDecimals: 1
+    }),
+    priorityAddressZones: Object.freeze({
+      zone_5: Object.freeze([
+        "rua augusta candiani",
+        "augusta candiani",
+        "rua soldado lindo sardagna",
+        "soldado lindo sardagna",
+        "rua soldado lino sardagna",
+        "soldado lino sardagna"
+      ]),
+      zone_10: Object.freeze([])
     }),
     blockedRules: Object.freeze([
       Object.freeze({
@@ -70,11 +100,12 @@
     ]),
     zones: Object.freeze([
       Object.freeze({
-        value: "local",
-        name: "Regi\u00e3o pr\u00f3xima",
+        id: "zone_5",
+        value: "zone_5",
+        name: "Ate 2,9 km",
         fee: 5,
-        maxDistanceKm: 3,
-        label: "At\u00e9 3 km da base - R$ 5,00",
+        maxDistanceKm: 2.9,
+        label: "Ate 2,9 km da base - R$ 5,00",
         neighborhoods: Object.freeze([
           "centro de campo grande",
           "campo grande centro",
@@ -86,11 +117,36 @@
         ]),
         streetHints: Object.freeze([
           "rua embaixador muniz gordilho",
+          "rua embaixador muniz cordilho",
+          "rua augusta candiani",
+          "rua almeida lisboa",
+          "rua anfrisio fialho",
+          "rua aratiba",
+          "rua arcilio papini",
+          "rua barao do rio verde",
+          "boulevard carioca",
+          "rua carlos werneck",
+          "rua cordilheira",
+          "rua gramado",
+          "rua guaraciaba",
+          "rua iraci doyle",
           "rua jocelin fraga",
+          "rua jose piragibe",
+          "rua levino fanzeres",
+          "rua major armando de sousa melo",
+          "rua maria francisca",
+          "rua pampeiro",
+          "rua ponche verde",
+          "rua professor ramiro de matos",
+          "rua rio pardo",
           "rua soldado lindo sardagna",
           "rua soldado lino sardagna",
+          "rua tabai",
           "rua toroqua",
+          "rua tupacerata",
+          "rua umbu",
           "rua varzea alegre",
+          "rua wolf klabin",
           "rua ana barcelos",
           "avenida manuel caldeira de alvarenga",
           "avenida albardao",
@@ -98,11 +154,13 @@
         ])
       }),
       Object.freeze({
-        value: "extended",
-        name: "Regi\u00e3o intermedi\u00e1ria",
+        id: "zone_10",
+        value: "zone_10",
+        name: "De 3 km ate 5 km",
         fee: 10,
+        minDistanceKm: 3,
         maxDistanceKm: 5,
-        label: "De 3 km at\u00e9 5 km da base - R$ 10,00",
+        label: "De 3 km ate 5 km da base - R$ 10,00",
         neighborhoods: Object.freeze([
           "campo grande",
           "inhoaiba",

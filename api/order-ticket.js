@@ -14,6 +14,9 @@ const storeConfig = require("../store-config");
 const deliveryQuoteApi = require("./delivery-quote.js");
 const { getInventorySnapshot } = require("./_inventory-store");
 const {
+  ACTIVE_DELIVERY_FEE_VALUES
+} = require("./_delivery-areas-store");
+const {
   canPersistSharedOrderTicket,
   createPersistedOrderTicketRef,
   isPersistedOrderTicketRef,
@@ -179,10 +182,12 @@ function buildStoreAddressLabel(address = {}) {
 }
 
 function formatCurrency(value) {
-  return Number(value || 0).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL"
-  });
+  return Number(value || 0)
+    .toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL"
+    })
+    .replace(/\u00a0/g, " ");
 }
 
 function formatDistanceKm(value) {
@@ -394,11 +399,14 @@ async function resolveDeliveryOrderContext(payload = {}) {
     throw createError("invalid_delivery_fee", "A taxa de entrega validada voltou com valor invalido.", 409);
   }
 
+  if (!ACTIVE_DELIVERY_FEE_VALUES.includes(validatedFee)) {
+    throw createError("invalid_delivery_fee_policy", "A taxa validada desta entrega precisa ser de R$ 5,00 ou R$ 10,00.", 409);
+  }
+
   const validatedDeliveryValues = currentArea
     ? {
         ...rawDeliveryValues,
-        deliveryAreaId: normalizeText(currentArea.id),
-        neighborhood: normalizeText(currentArea.name)
+        deliveryAreaId: normalizeText(currentArea.id)
       }
     : rawDeliveryValues;
 
@@ -408,16 +416,18 @@ async function resolveDeliveryOrderContext(payload = {}) {
     expiresAt: new Date(Number(quote.expiresAt || 0)).toISOString(),
     fee: validatedFee,
     distanceKm: Number(quote.distanceKm || 0),
-    routeDistanceKm: Number(quote.routeDistanceKm || quote.distanceKm || 0),
+    routeDistanceKm: Number(quote.routeDistanceKm || 0),
     zone: normalizeText(quote.zone),
     zoneLabel: normalizeText(quote.zoneLabel),
     addressKey: quote.addressKey,
     deliveryAreaId: normalizeText(currentArea?.id || quote.deliveryAreaId),
     deliveryAreaName: normalizeText(currentArea?.name || quote.deliveryAreaName),
     deliveryAreaStatus: normalizeText(currentArea?.status || quote.deliveryAreaStatus),
+    deliveryZoneId: normalizeText(currentArea?.zoneId || quote.deliveryZoneId),
     deliveryAreaUpdatedAt: normalizeText(currentArea?.updatedAt || quote.deliveryAreaUpdatedAt),
     locationPrecision: normalizeText(quote.locationPrecision),
     geocoderSource: normalizeText(quote.geocoderSource),
+    validationMode: normalizeText(quote.validationMode || "manual_area"),
     validationStatus: "verified"
   };
 
@@ -539,7 +549,7 @@ function buildWhatsAppOrderMessage(order, ticketUrl) {
     lines.push(
       "",
       "Validacao da entrega:",
-      `${order.deliveryQuote.code}${order.deliveryQuote.zoneLabel ? ` | ${order.deliveryQuote.zoneLabel}` : ""}${order.deliveryQuote.routeDistanceKm ? ` | ${formatDistanceKm(order.deliveryQuote.routeDistanceKm)}` : ""}`
+      `${order.deliveryQuote.code}${order.deliveryQuote.zoneLabel ? ` | ${order.deliveryQuote.zoneLabel}` : ""}${order.deliveryQuote.routeDistanceKm ? ` | ${formatDistanceKm(order.deliveryQuote.routeDistanceKm)}` : order.deliveryQuote.distanceKm ? ` | ${formatDistanceKm(order.deliveryQuote.distanceKm)}` : ""}`
     );
   }
 
