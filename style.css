@@ -3422,10 +3422,43 @@ body.ticket-view-active .order-ticket-modal-content {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  align-items: center;
 }
 
 .admin-toolbar-btn {
-  min-height: 46px;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 16px;
+  gap: 8px;
+  font-size: 0.94rem;
+  letter-spacing: 0.01em;
+  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.2);
+}
+
+.admin-toolbar-btn.btn-primary {
+  border-color: rgba(255, 133, 107, 0.46);
+  background: linear-gradient(180deg, #ff7c62 0%, #ef4c3d 100%);
+  box-shadow: 0 18px 30px rgba(239, 76, 61, 0.26);
+}
+
+.admin-toolbar-btn.btn-secondary,
+.admin-toolbar-btn.outline-link {
+  border-color: rgba(125, 255, 198, 0.18);
+  background: linear-gradient(180deg, rgba(15, 25, 31, 0.96), rgba(7, 14, 20, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 14px 24px rgba(0, 0, 0, 0.18);
+}
+
+.admin-toolbar-btn.outline-link {
+  margin-top: 0;
+  color: rgba(245, 248, 251, 0.88);
+}
+
+.admin-toolbar-btn.outline-link:hover,
+.admin-toolbar-btn.outline-link:focus-visible {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--text);
 }
 
 .admin-stats-grid {
@@ -3530,6 +3563,7 @@ body.ticket-view-active .order-ticket-modal-content {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .admin-delivery-areas-list {
@@ -3616,30 +3650,58 @@ body.ticket-view-active .order-ticket-modal-content {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+  align-items: center;
 }
 
-.admin-delivery-chip {
-  min-height: 40px;
-  padding: 0 14px;
+.admin-delivery-chip,
+.admin-stock-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 15px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
   color: var(--text);
   cursor: pointer;
-  transition: transform var(--transition), border-color var(--transition), background var(--transition);
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition:
+    transform var(--transition),
+    border-color var(--transition),
+    background var(--transition),
+    box-shadow var(--transition),
+    color var(--transition);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .admin-delivery-chip:hover,
-.admin-delivery-chip:focus-visible {
+.admin-delivery-chip:focus-visible,
+.admin-stock-chip:hover,
+.admin-stock-chip:focus-visible {
   transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 12px 18px rgba(0, 0, 0, 0.16);
+}
+
+.admin-delivery-chip[data-delivery-action="edit"] {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
 }
 
 .admin-delivery-chip.is-active {
   border-color: rgba(125, 255, 198, 0.28);
+  color: #e6fff5;
 }
 
 .admin-delivery-chip.is-pickup {
   border-color: rgba(255, 215, 141, 0.24);
+  color: #fff1d1;
 }
 
 .admin-delivery-chip.is-blocked,
@@ -3652,22 +3714,31 @@ body.ticket-view-active .order-ticket-modal-content {
 }
 
 .admin-delivery-chip.is-selected {
-  background: rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.06));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 14px 22px rgba(0, 0, 0, 0.2);
 }
 
 .admin-delivery-chip.is-active.is-selected {
-  background: rgba(125, 255, 198, 0.16);
+  background: linear-gradient(180deg, rgba(125, 255, 198, 0.22), rgba(125, 255, 198, 0.12));
+  border-color: rgba(125, 255, 198, 0.34);
   color: #d8fff0;
+  box-shadow: 0 14px 24px rgba(70, 168, 124, 0.18);
 }
 
 .admin-delivery-chip.is-pickup.is-selected {
-  background: rgba(255, 215, 141, 0.16);
+  background: linear-gradient(180deg, rgba(255, 215, 141, 0.2), rgba(255, 215, 141, 0.1));
+  border-color: rgba(255, 215, 141, 0.3);
   color: #ffe9be;
+  box-shadow: 0 14px 24px rgba(156, 113, 28, 0.18);
 }
 
 .admin-delivery-chip.is-blocked.is-selected {
-  background: rgba(240, 70, 84, 0.16);
+  background: linear-gradient(180deg, rgba(240, 70, 84, 0.22), rgba(240, 70, 84, 0.1));
+  border-color: rgba(240, 70, 84, 0.3);
   color: #ffe3e6;
+  box-shadow: 0 14px 24px rgba(157, 38, 51, 0.18);
 }
 
 .admin-category-head {
@@ -3719,29 +3790,19 @@ body.ticket-view-active .order-ticket-modal-content {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
-}
-
-.admin-stock-chip {
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text);
-  cursor: pointer;
-  transition: transform var(--transition), border-color var(--transition), background var(--transition);
+  align-items: center;
 }
 
 .admin-stock-chip:hover,
 .admin-stock-chip:focus-visible {
-  transform: translateY(-1px);
   border-color: rgba(125, 255, 198, 0.28);
 }
 
 .admin-stock-chip.is-active {
-  background: rgba(125, 255, 198, 0.16);
+  background: linear-gradient(180deg, rgba(125, 255, 198, 0.22), rgba(125, 255, 198, 0.12));
   border-color: rgba(125, 255, 198, 0.32);
   color: #d8fff0;
+  box-shadow: 0 14px 24px rgba(70, 168, 124, 0.18);
 }
 
 .admin-stock-chip.is-danger {
@@ -3749,9 +3810,19 @@ body.ticket-view-active .order-ticket-modal-content {
 }
 
 .admin-stock-chip.is-danger.is-active {
-  background: rgba(240, 70, 84, 0.16);
+  background: linear-gradient(180deg, rgba(240, 70, 84, 0.22), rgba(240, 70, 84, 0.1));
   border-color: rgba(240, 70, 84, 0.28);
   color: #ffe3e6;
+  box-shadow: 0 14px 24px rgba(157, 38, 51, 0.18);
+}
+
+.admin-toolbar-btn:disabled,
+.admin-delivery-chip:disabled,
+.admin-stock-chip:disabled {
+  transform: none;
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .admin-empty-state {
@@ -3794,6 +3865,7 @@ body.ticket-view-active .order-ticket-modal-content {
   .admin-stock-chip {
     flex: 1 1 auto;
     justify-content: center;
+    width: 100%;
   }
 
   .admin-stats-grid,
