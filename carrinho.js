@@ -65,6 +65,7 @@ const STORE_HOURS = Object.freeze(SHARED_STORE_CONFIG.checkout?.hours || {
   5: Object.freeze({ openMinutes: 19 * 60, closeMinutes: 23 * 60 + 59 }),
   6: Object.freeze({ openMinutes: 19 * 60, closeMinutes: 23 * 60 + 59 })
 });
+const STORE_TEMPORARY_CLOSURE = normalizeStoreTemporaryClosure(SHARED_STORE_CONFIG.checkout?.temporaryClosure);
 
 const VIA_CEP_BASE_URL = "https://viacep.com.br/ws";
 const DELIVERY_QUOTE_API_URL = "/api/delivery-quote";
@@ -189,6 +190,26 @@ function formatCep(value) {
 
 function normalizeText(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function normalizeStoreTemporaryClosure(closure) {
+  if (!closure || closure.enabled === false) {
+    return null;
+  }
+
+  const reopenAtValue = normalizeText(closure.reopenAt);
+  if (!reopenAtValue) {
+    return null;
+  }
+
+  const reopenAt = new Date(reopenAtValue);
+  if (Number.isNaN(reopenAt.getTime())) {
+    return null;
+  }
+
+  return Object.freeze({
+    reopenAt
+  });
 }
 
 function normalizeCompareText(value) {
@@ -868,6 +889,23 @@ function formatStoreTimeLabel(totalMinutes) {
   return minutes ? `${hours}h${String(minutes).padStart(2, "0")}` : `${hours}h`;
 }
 
+function getStoreDateKey(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: STORE_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
+
+function formatStoreShortDateLabel(date = new Date()) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: STORE_TIME_ZONE,
+    day: "2-digit",
+    month: "2-digit"
+  }).format(date);
+}
+
 function getStoreClockParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: STORE_TIME_ZONE,
@@ -886,6 +924,40 @@ function getStoreClockParts(now = new Date()) {
     hour,
     minute,
     currentMinutes: hour * 60 + minute
+  };
+}
+
+function getRelativeStoreDayOffset(targetDate, referenceDate = new Date()) {
+  const targetKey = getStoreDateKey(targetDate);
+  const referenceKey = getStoreDateKey(referenceDate);
+
+  if (targetKey === referenceKey) {
+    return 0;
+  }
+
+  const tomorrow = new Date(referenceDate.getTime() + 24 * 60 * 60 * 1000);
+  if (targetKey === getStoreDateKey(tomorrow)) {
+    return 1;
+  }
+
+  return null;
+}
+
+function getActiveStoreTemporaryClosure(now = new Date()) {
+  if (!STORE_TEMPORARY_CLOSURE) {
+    return null;
+  }
+
+  if (now.getTime() >= STORE_TEMPORARY_CLOSURE.reopenAt.getTime()) {
+    return null;
+  }
+
+  const reopenClock = getStoreClockParts(STORE_TEMPORARY_CLOSURE.reopenAt);
+
+  return {
+    ...STORE_TEMPORARY_CLOSURE,
+    reopenDayIndex: reopenClock.dayIndex,
+    reopenMinutes: reopenClock.currentMinutes
   };
 }
 
@@ -922,6 +994,26 @@ function getStoreAvailability(now = new Date()) {
   const isScheduledOpen = Boolean(todaySchedule)
     && clock.currentMinutes >= todaySchedule.openMinutes
     && clock.currentMinutes <= todaySchedule.closeMinutes;
+  const temporaryClosure = getActiveStoreTemporaryClosure(now);
+
+  if (temporaryClosure) {
+    return {
+      ...clock,
+      todaySchedule,
+      scheduleEnforced,
+      isScheduledOpen,
+      isOpen: false,
+      nextOpen: {
+        type: "temporary_closure",
+        date: temporaryClosure.reopenAt,
+        dayIndex: temporaryClosure.reopenDayIndex,
+        openMinutes: temporaryClosure.reopenMinutes,
+        offset: getRelativeStoreDayOffset(temporaryClosure.reopenAt, now)
+      },
+      temporaryClosure
+    };
+  }
+
   const isOpen = !scheduleEnforced || isScheduledOpen;
 
   return {
@@ -937,6 +1029,21 @@ function getStoreAvailability(now = new Date()) {
 function formatNextOpeningMessage(nextOpen) {
   if (!nextOpen) {
     return "Consulte a loja para o pr\u00f3ximo hor\u00e1rio.";
+  }
+
+  if (nextOpen.type === "temporary_closure" && nextOpen.date instanceof Date) {
+    const timeLabel = formatStoreTimeLabel(nextOpen.openMinutes);
+    const relativeDayOffset = nextOpen.offset ?? getRelativeStoreDayOffset(nextOpen.date);
+
+    if (relativeDayOffset === 0) {
+      return `A pr\u00f3xima abertura \u00e9 hoje, \u00e0s ${timeLabel}.`;
+    }
+
+    if (relativeDayOffset === 1) {
+      return `A pr\u00f3xima abertura \u00e9 amanh\u00e3, \u00e0s ${timeLabel}.`;
+    }
+
+    return `A pr\u00f3xima abertura \u00e9 ${STORE_WEEKDAY_LABELS[nextOpen.dayIndex]}, ${formatStoreShortDateLabel(nextOpen.date)}, \u00e0s ${timeLabel}.`;
   }
 
   const timeLabel = formatStoreTimeLabel(nextOpen.openMinutes);

@@ -34,6 +34,10 @@
       minimumOrderAmount: 20,
       timeZone: "America/Sao_Paulo",
       scheduleMode: "live",
+      temporaryClosure: Object.freeze({
+        enabled: true,
+        reopenAt: "2026-05-23T19:00:00-03:00"
+      }),
       hours: Object.freeze({
         0: Object.freeze({ openMinutes: 19 * 60, closeMinutes: 23 * 60 + 59 }),
         1: Object.freeze({ openMinutes: 19 * 60, closeMinutes: 23 * 60 + 59 }),
