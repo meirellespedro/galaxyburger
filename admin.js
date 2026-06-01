@@ -761,7 +761,6 @@
         <section class="admin-category-group">
           <div class="admin-category-head">
             <h4>${escapeHtml(CATEGORY_LABELS[category] || category)}</h4>
-            <span>${products.length} ${products.length === 1 ? "produto" : "produtos"}</span>
           </div>
 
           <div class="admin-product-list">
