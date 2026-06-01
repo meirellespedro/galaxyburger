@@ -799,6 +799,21 @@ async function resolveDeliveryRuleForAddress(officialAddress) {
     };
   }
 
+  if (areaMatches.streetArea) {
+    return {
+      status: areaMatches.streetArea.status === "active" ? "ready" : areaMatches.streetArea.status,
+      fee: Number(areaMatches.streetArea.fee || 0),
+      zone: normalizeText(areaMatches.streetArea.zoneId || areaMatches.streetArea.status),
+      zoneLabel: buildZoneLabelForArea(areaMatches.streetArea),
+      distanceKm: 0,
+      routeDistanceKm: 0,
+      locationPrecision: DELIVERY_METADATA.locationPrecision || "manual_zone",
+      geocoderSource: DELIVERY_METADATA.geocoderSource || "manual_zone_registry",
+      deliveryArea: buildAreaResponse(areaMatches.streetArea),
+      validationMode: "manual_area"
+    };
+  }
+
   if (matchesPriorityAddressZone(officialAddress.street, priorityZone5Aliases)) {
     const zone = DISTANCE_RULE_ZONE_META.zone_5;
     const area = areaMatches.streetArea || createDynamicDeliveryArea(officialAddress, zone);
@@ -881,21 +896,6 @@ async function resolveDeliveryRuleForAddress(officialAddress) {
         validationMode: "distance"
       };
     }
-  }
-
-  if (areaMatches.streetArea) {
-    return {
-      status: areaMatches.streetArea.status === "active" ? "ready" : areaMatches.streetArea.status,
-      fee: Number(areaMatches.streetArea.fee || 0),
-      zone: normalizeText(areaMatches.streetArea.zoneId || areaMatches.streetArea.status),
-      zoneLabel: buildZoneLabelForArea(areaMatches.streetArea),
-      distanceKm: 0,
-      routeDistanceKm: 0,
-      locationPrecision: DELIVERY_METADATA.locationPrecision || "manual_zone",
-      geocoderSource: DELIVERY_METADATA.geocoderSource || "manual_zone_registry",
-      deliveryArea: buildAreaResponse(areaMatches.streetArea),
-      validationMode: "manual_area"
-    };
   }
 
   throw createError(

@@ -232,6 +232,54 @@ test("calcula taxa de R$ 10,00 para regiao da zona intermediaria", async () => {
   assert.equal(response.body.message, "Entrega disponivel para sua regiao. Taxa: R$ 10,00.");
 });
 
+test("usa a taxa cadastrada na rua mesmo com numero diferente quando a distancia seria menor", async () => {
+  process.env.DELIVERY_QUOTE_SECRET = "test-secret";
+  const customStreet = "Rua Teste Prioridade Do Painel";
+  globalThis.__GB_TEST_VIACEP_LOOKUP__ = async cep => ({
+    cep,
+    logradouro: customStreet,
+    bairro: "Vila Nova",
+    localidade: "Rio de Janeiro",
+    uf: "RJ"
+  });
+  globalThis.__GB_TEST_ADDRESS_GEO_LOOKUP__ = async () => ({
+    latitude: -22.9049152,
+    longitude: -43.5780493,
+    precision: "exact",
+    provider: "photon"
+  });
+  const { filePath, state } = configureDeliveryAreasState();
+
+  state.areas.push({
+    id: "area_rua_teste_prioridade_do_painel_custom",
+    name: customStreet,
+    zoneId: "zone_10",
+    fee: 10,
+    status: "active",
+    note: "Taxa cadastrada no painel administrativo."
+  });
+  state.updatedAt = "2026-05-21T12:30:00.000Z";
+  saveDeliveryAreasState(filePath, state);
+
+  const response = await invokeHandler({
+    body: {
+      cep: "23070099",
+      street: customStreet,
+      number: "999",
+      neighborhood: "Vila Nova",
+      city: "Rio de Janeiro",
+      state: "RJ"
+    }
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.ok, true);
+  assert.equal(response.body.status, "ready");
+  assert.equal(response.body.zone, "zone_10");
+  assert.equal(response.body.fee, 10);
+  assert.equal(response.body.deliveryArea.name, customStreet);
+});
+
 test("calcula taxa de R$ 5,00 para Rua Augusta Candiani", async () => {
   process.env.DELIVERY_QUOTE_SECRET = "test-secret";
   installViaCepMock();
