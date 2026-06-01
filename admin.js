@@ -197,10 +197,14 @@
       return "sem atualização registrada";
     }
 
-    return new Intl.DateTimeFormat("pt-BR", {
-      dateStyle: "short",
+    const date = new Intl.DateTimeFormat("pt-BR", {
+      dateStyle: "short"
+    }).format(new Date(timestamp));
+    const time = new Intl.DateTimeFormat("pt-BR", {
       timeStyle: "short"
     }).format(new Date(timestamp));
+
+    return `${date} - ${time}`;
   }
 
   function syncBrandCopy() {
