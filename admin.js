@@ -30,23 +30,23 @@
     },
     blocked: {
       label: "Bloqueado",
-      description: "No momento sem entrega para esta regiao.",
+      description: "No momento sem entrega para esta região.",
       badgeClass: "is-blocked"
     }
   });
   const DELIVERY_ZONE_META = Object.freeze({
     zone_5: {
-      label: "Ate 2,9 km",
+      label: "Até 2,9 km",
       description: "Entrega ativa com taxa fixa de R$ 5,00.",
-      helper: "Use esta zona para enderecos proximos da hamburgueria, ate 2,9 km.",
+      helper: "Use esta zona para endereços próximos da hamburgueria, até 2,9 km.",
       fee: 5,
       status: "active",
       badgeClass: "is-active"
     },
     zone_10: {
-      label: "De 3 km ate 5 km",
+      label: "De 3 km até 5 km",
       description: "Entrega ativa com taxa fixa de R$ 10,00.",
-      helper: "Use esta zona para regioes entre 3 km e 5 km da hamburgueria.",
+      helper: "Use esta zona para regiões entre 3 km e 5 km da hamburgueria.",
       fee: 10,
       status: "active",
       badgeClass: "is-active"
@@ -54,15 +54,15 @@
     pickup_only: {
       label: "Somente retirada",
       description: "Atendimento apenas com retirada no local.",
-      helper: "Acima de 5 km, mantenha a regiao como somente retirada.",
+      helper: "Acima de 5 km, mantenha a região como somente retirada.",
       fee: 0,
       status: "pickup_only",
       badgeClass: "is-pickup"
     },
     blocked: {
       label: "Bloqueado",
-      description: "No momento sem entrega para esta regiao.",
-      helper: "Use bloqueado quando a regiao nao puder receber pedido temporariamente.",
+      description: "No momento sem entrega para esta região.",
+      helper: "Use bloqueado quando a região não puder receber pedido temporariamente.",
       fee: 0,
       status: "blocked",
       badgeClass: "is-blocked"
@@ -70,13 +70,13 @@
   });
   const STORE_STATUS_MODE_META = Object.freeze({
     auto: {
-      label: "Horario automatico",
-      description: "O site segue o horario padrao configurado para liberar ou bloquear pedidos.",
+      label: "Horário automático",
+      description: "O site segue o horário padrão configurado para liberar ou bloquear pedidos.",
       badgeClass: "is-auto"
     },
     force_open: {
       label: "Pedidos abertos manualmente",
-      description: "Os pedidos foram liberados manualmente pelo painel, mesmo fora do horario automatico.",
+      description: "Os pedidos foram liberados manualmente pelo painel, mesmo fora do horário automático.",
       badgeClass: "is-active"
     },
     force_closed: {
@@ -194,7 +194,7 @@
   function formatDateTime(value) {
     const timestamp = Number(new Date(value || "").getTime());
     if (!Number.isFinite(timestamp) || !timestamp) {
-      return "sem atualizacao registrada";
+      return "sem atualização registrada";
     }
 
     return new Intl.DateTimeFormat("pt-BR", {
@@ -305,7 +305,7 @@
       const payload = await safeReadJson(response);
 
       if (!response.ok || !payload?.ok) {
-        throw new Error(payload?.message || "Nao foi possivel validar a sessao do painel.");
+        throw new Error(payload?.message || "Não foi possível validar a sessão do painel.");
       }
 
       dashboardState.authenticated = Boolean(payload.authenticated);
@@ -320,7 +320,7 @@
     } catch (error) {
       dashboardState.authenticated = false;
       updateAdminPanels();
-      setLoginMessage(error.message || "Nao foi possivel abrir o painel agora.", true);
+      setLoginMessage(error.message || "Não foi possível abrir o painel agora.", true);
     }
   }
 
@@ -347,7 +347,7 @@
       const payload = await safeReadJson(response);
 
       if (!response.ok || !payload?.ok) {
-        throw new Error(payload?.message || "Nao foi possivel entrar no painel.");
+        throw new Error(payload?.message || "Não foi possível entrar no painel.");
       }
 
       dashboardState.authenticated = true;
@@ -356,7 +356,7 @@
         passwordInput.value = "";
       }
 
-      setDashboardMessage("Sessao iniciada. Painel sincronizado com sucesso.");
+      setDashboardMessage("Sessão iniciada. Painel sincronizado com sucesso.");
       await loadDashboardData({
         showMessage: false,
         background: true
@@ -364,7 +364,7 @@
     } catch (error) {
       dashboardState.authenticated = false;
       updateAdminPanels();
-      setLoginMessage(error.message || "Nao foi possivel entrar no painel.", true);
+      setLoginMessage(error.message || "Não foi possível entrar no painel.", true);
     } finally {
       setLoginBusy(false, loginButton?.dataset.defaultLabel || "Entrar no painel");
     }
@@ -382,14 +382,14 @@
         }
       });
     } catch {
-      // A prioridade aqui e limpar a UI local.
+      // A prioridade aqui é limpar a UI local.
     }
 
     dashboardState = createDashboardState();
     updateAdminPanels();
     renderDashboard();
     resetDeliveryAreaForm();
-    setLoginMessage("Sessao encerrada.");
+    setLoginMessage("Sessão encerrada.");
   }
 
   async function loadDashboardData({ showMessage = false, background = false } = {}) {
@@ -418,7 +418,7 @@
         setDashboardMessage("Painel atualizado com sucesso.");
       }
     } catch (error) {
-      setDashboardMessage(error.message || "Nao foi possivel atualizar o painel agora.", true);
+      setDashboardMessage(error.message || "Não foi possível atualizar o painel agora.", true);
     } finally {
       if (!background) {
         setToolbarBusy(refreshButton, false, refreshButton?.dataset.defaultLabel || "Atualizar tudo");
@@ -443,7 +443,7 @@
       }
 
       if (!response.ok || !payload?.ok || !payload.inventory) {
-        throw new Error(payload?.message || "Nao foi possivel carregar o estoque agora.");
+        throw new Error(payload?.message || "Não foi possível carregar o estoque agora.");
       }
 
       applyInventoryPayload(payload.inventory);
@@ -453,7 +453,7 @@
       return true;
     } catch (error) {
       if (!background) {
-        setInventoryMessage(error.message || "Nao foi possivel carregar o estoque agora.", true);
+        setInventoryMessage(error.message || "Não foi possível carregar o estoque agora.", true);
       }
       throw error;
     }
@@ -476,7 +476,7 @@
       }
 
       if (!response.ok || !payload?.ok || !payload.storeStatus) {
-        throw new Error(payload?.message || "Nao foi possivel carregar o status da loja agora.");
+        throw new Error(payload?.message || "Não foi possível carregar o status da loja agora.");
       }
 
       applyStoreStatusPayload(payload.storeStatus);
@@ -486,7 +486,7 @@
       return true;
     } catch (error) {
       if (!background) {
-        setStoreStatusMessage(error.message || "Nao foi possivel carregar o status da loja agora.", true);
+        setStoreStatusMessage(error.message || "Não foi possível carregar o status da loja agora.", true);
       }
       throw error;
     }
@@ -509,17 +509,17 @@
       }
 
       if (!response.ok || !payload?.ok || !payload.deliveryAreas) {
-        throw new Error(payload?.message || "Nao foi possivel carregar as regioes agora.");
+        throw new Error(payload?.message || "Não foi possível carregar as regiões agora.");
       }
 
       applyDeliveryAreasPayload(payload.deliveryAreas);
       if (showMessage) {
-        setDeliveryMessage("Regioes atualizadas com sucesso.");
+        setDeliveryMessage("Regiões atualizadas com sucesso.");
       }
       return true;
     } catch (error) {
       if (!background) {
-        setDeliveryMessage(error.message || "Nao foi possivel carregar as regioes agora.", true);
+        setDeliveryMessage(error.message || "Não foi possível carregar as regiões agora.", true);
       }
       throw error;
     }
@@ -528,7 +528,7 @@
   function handleSessionExpired() {
     dashboardState.authenticated = false;
     updateAdminPanels();
-    setLoginMessage("Sua sessao expirou. Entre novamente para continuar.", true);
+    setLoginMessage("Sua sessão expirou. Entre novamente para continuar.", true);
   }
 
   function applyInventoryPayload(inventory) {
@@ -606,13 +606,13 @@
 
     const storeStatusUpdatedAt = dashboardState.storeStatus.updatedAt
       ? `Pedidos: ${formatDateTime(dashboardState.storeStatus.updatedAt)}`
-      : "Pedidos sem atualizacao";
+      : "Pedidos sem atualização";
     const deliveryUpdatedAt = dashboardState.deliveryAreas.updatedAt
-      ? `Bairros: ${formatDateTime(dashboardState.deliveryAreas.updatedAt)}`
-      : "Bairros sem atualizacao";
+      ? `Regiões: ${formatDateTime(dashboardState.deliveryAreas.updatedAt)}`
+      : "Regiões sem atualização";
     const inventoryUpdatedAt = dashboardState.inventory.updatedAt
       ? `Estoque: ${formatDateTime(dashboardState.inventory.updatedAt)}`
-      : "Estoque sem atualizacao";
+      : "Estoque sem atualização";
 
     lastUpdated.textContent = `${storeStatusUpdatedAt} | ${deliveryUpdatedAt} | ${inventoryUpdatedAt}.`;
   }
@@ -633,7 +633,7 @@
 
     if (deliveryNote) {
       deliveryNote.textContent = buildStorageNote(
-        "regioes",
+        "regiões",
         dashboardState.deliveryAreas.storageLabel,
         dashboardState.deliveryAreas.persistenceConfigured
       );
@@ -651,9 +651,9 @@
   }
 
   function buildStorageNote(scopeLabel, storageLabel, persistenceConfigured) {
-    const label = normalizeText(storageLabel) || "armazenamento nao identificado";
+    const label = normalizeText(storageLabel) || "armazenamento não identificado";
     if (persistenceConfigured === false) {
-      return `Armazenamento dos ${scopeLabel}: ${label}. Publice com persistencia configurada para salvar em producao.`;
+      return `Armazenamento dos ${scopeLabel}: ${label}. Publique com persistência configurada para salvar em produção.`;
     }
 
     return `Armazenamento dos ${scopeLabel}: ${label}.`;
@@ -693,8 +693,8 @@
 
     if (updated) {
       updated.textContent = dashboardState.storeStatus.updatedAt
-        ? `Ultima alteracao: ${formatDateTime(dashboardState.storeStatus.updatedAt)}`
-        : "Sem atualizacao registrada.";
+        ? `Última alteração: ${formatDateTime(dashboardState.storeStatus.updatedAt)}`
+        : "Sem atualização registrada.";
     }
 
     buttons.forEach(button => {
@@ -774,7 +774,7 @@
 
   function renderProductCard(product) {
     const isAvailable = Boolean(product.available);
-    const statusLabel = isAvailable ? "Disponivel" : "Esgotado";
+    const statusLabel = isAvailable ? "Disponível" : "Esgotado";
 
     return `
       <article class="admin-product-card" data-admin-product-row="${escapeHtml(product.id)}">
@@ -791,7 +791,7 @@
             data-admin-product-id="${escapeHtml(product.id)}"
             data-admin-available="true"
           >
-            Disponivel
+            Disponível
           </button>
           <button
             type="button"
@@ -841,8 +841,8 @@
     if (!areas.length) {
       container.innerHTML = `
         <div class="admin-empty-state">
-          <strong>Nenhuma regiao encontrada</strong>
-          <p>Ajuste a busca, troque o filtro ou cadastre uma nova regiao.</p>
+          <strong>Nenhuma região encontrada</strong>
+          <p>Ajuste a busca, troque o filtro ou cadastre uma nova região.</p>
         </div>
       `;
       return;
@@ -886,11 +886,11 @@
     const isEditing = Boolean(dashboardState.editingDeliveryAreaId);
 
     if (title) {
-      title.textContent = isEditing ? "Editar regiao" : "Nova regiao";
+      title.textContent = isEditing ? "Editar região" : "Nova região";
     }
 
     if (saveButton) {
-      saveButton.textContent = isEditing ? "Salvar alteracoes" : "Salvar regiao";
+      saveButton.textContent = isEditing ? "Salvar alterações" : "Salvar região";
     }
   }
 
@@ -919,7 +919,7 @@
     if (fields.note) fields.note.value = normalizeText(area.note);
     syncDeliveryAreaZoneField();
     syncDeliveryAreaFormLabels();
-    setDeliveryMessage(`Editando a regiao ${area.name}.`);
+    setDeliveryMessage(`Editando a região ${area.name}.`);
     fields.name?.focus();
     fields.form.scrollIntoView({
       behavior: "smooth",
@@ -943,7 +943,7 @@
 
   function clearDeliveryMessageIfEditingNotice() {
     const messageEl = document.getElementById("admin-delivery-message");
-    if (messageEl && /^Editando a regiao /i.test(normalizeText(messageEl.textContent))) {
+    if (messageEl && /^Editando a região /i.test(normalizeText(messageEl.textContent))) {
       setDeliveryMessage("");
     }
   }
@@ -958,13 +958,13 @@
     const areaId = normalizeText(fields.id?.value || dashboardState.editingDeliveryAreaId);
 
     if (!name) {
-      setDeliveryMessage("Informe o nome da regiao.", true);
+      setDeliveryMessage("Informe o nome da região.", true);
       fields.name?.focus();
       return;
     }
 
     if (!normalizeText(zoneId)) {
-      setDeliveryMessage("Escolha uma zona valida para esta regiao.", true);
+      setDeliveryMessage("Escolha uma zona válida para esta região.", true);
       fields.zone?.focus();
       return;
     }
@@ -995,7 +995,7 @@
       }
 
       if (!response.ok || !payload?.ok || !payload.deliveryAreas) {
-        throw new Error(payload?.message || "Nao foi possivel salvar a regiao agora.");
+        throw new Error(payload?.message || "Não foi possível salvar a região agora.");
       }
 
       applyDeliveryAreasPayload(payload.deliveryAreas);
@@ -1007,12 +1007,12 @@
       });
 
       if (payload.deliveryAreas.persistenceConfigured === false) {
-        setDeliveryMessage("A regiao foi atualizada visualmente, mas a hospedagem ainda precisa de persistencia para salvar em producao.");
+        setDeliveryMessage("A região foi atualizada visualmente, mas a hospedagem ainda precisa de persistência para salvar em produção.");
       } else {
-        setDeliveryMessage(areaId ? "Regiao atualizada com sucesso." : "Regiao criada com sucesso.");
+        setDeliveryMessage(areaId ? "Região atualizada com sucesso." : "Região criada com sucesso.");
       }
     } catch (error) {
-      setDeliveryMessage(error.message || "Nao foi possivel salvar a regiao agora.", true);
+      setDeliveryMessage(error.message || "Não foi possível salvar a região agora.", true);
     } finally {
       setDeliveryAreaFormBusy(false);
     }
@@ -1037,7 +1037,7 @@
     }
 
     if (action === "delete") {
-      const confirmed = window.confirm(`Excluir a regiao "${area.name}"?`);
+      const confirmed = window.confirm(`Excluir a região "${area.name}"?`);
       if (!confirmed) {
         return;
       }
@@ -1076,7 +1076,7 @@
       }
 
       if (!response.ok || !payload?.ok || !payload.deliveryAreas) {
-        throw new Error(payload?.message || "Nao foi possivel atualizar o status da regiao.");
+        throw new Error(payload?.message || "Não foi possível atualizar o status da região.");
       }
 
       applyDeliveryAreasPayload(payload.deliveryAreas);
@@ -1085,9 +1085,9 @@
         status: zoneId,
         updatedAt: payload.deliveryAreas.updatedAt || new Date().toISOString()
       });
-      setDeliveryMessage(`Zona da regiao ${areaName} atualizada para ${getDeliveryZoneMeta(zoneId).label}.`);
+      setDeliveryMessage(`Zona da região ${areaName} atualizada para ${getDeliveryZoneMeta(zoneId).label}.`);
     } catch (error) {
-      setDeliveryMessage(error.message || "Nao foi possivel atualizar a zona da regiao.", true);
+      setDeliveryMessage(error.message || "Não foi possível atualizar a zona da região.", true);
     } finally {
       setDeliveryAreaRowBusy(areaId, false);
     }
@@ -1117,7 +1117,7 @@
       }
 
       if (!response.ok || !payload?.ok || !payload.deliveryAreas) {
-        throw new Error(payload?.message || "Nao foi possivel excluir a regiao.");
+        throw new Error(payload?.message || "Não foi possível excluir a região.");
       }
 
       applyDeliveryAreasPayload(payload.deliveryAreas);
@@ -1129,9 +1129,9 @@
         status: "deleted",
         updatedAt: payload.deliveryAreas.updatedAt || new Date().toISOString()
       });
-      setDeliveryMessage(`Regiao ${areaName} excluida com sucesso.`);
+      setDeliveryMessage(`Região ${areaName} excluída com sucesso.`);
     } catch (error) {
-      setDeliveryMessage(error.message || "Nao foi possivel excluir a regiao.", true);
+      setDeliveryMessage(error.message || "Não foi possível excluir a região.", true);
     } finally {
       setDeliveryAreaRowBusy(areaId, false);
     }
@@ -1171,7 +1171,7 @@
       }
 
       if (!response.ok || !payload?.ok || !payload.storeStatus) {
-        throw new Error(payload?.message || "Nao foi possivel atualizar o status da loja.");
+        throw new Error(payload?.message || "Não foi possível atualizar o status da loja.");
       }
 
       applyStoreStatusPayload(payload.storeStatus);
@@ -1181,12 +1181,12 @@
       });
 
       if (payload.storeStatus.persistenceConfigured === false) {
-        setStoreStatusMessage("O status visual foi atualizado, mas a hospedagem ainda precisa de armazenamento persistente para salvar isso em producao.");
+        setStoreStatusMessage("O status visual foi atualizado, mas a hospedagem ainda precisa de armazenamento persistente para salvar isso em produção.");
       } else {
         setStoreStatusMessage(`Status da loja atualizado para ${getStoreStatusModeMeta(overrideMode).label.toLowerCase()}.`);
       }
     } catch (error) {
-      setStoreStatusMessage(error.message || "Nao foi possivel atualizar o status da loja agora.", true);
+      setStoreStatusMessage(error.message || "Não foi possível atualizar o status da loja agora.", true);
     } finally {
       setStoreStatusActionsBusy(false);
     }
@@ -1228,7 +1228,7 @@
       }
 
       if (!response.ok || !payload?.ok || !payload.inventory) {
-        throw new Error(payload?.message || "Nao foi possivel salvar o novo status do produto.");
+        throw new Error(payload?.message || "Não foi possível salvar o novo status do produto.");
       }
 
       applyInventoryPayload(payload.inventory);
@@ -1238,12 +1238,12 @@
         updatedAt: payload.inventory.updatedAt || new Date().toISOString()
       });
       if (payload.inventory.persistenceConfigured === false) {
-        setInventoryMessage("O status visual foi atualizado, mas a hospedagem ainda precisa de armazenamento persistente para salvar o estoque em producao.");
+        setInventoryMessage("O status visual foi atualizado, mas a hospedagem ainda precisa de armazenamento persistente para salvar o estoque em produção.");
       } else {
-        setInventoryMessage(`Status salvo. O produto agora esta marcado como ${available ? "disponivel" : "esgotado"}.`);
+        setInventoryMessage(`Status salvo. O produto agora está marcado como ${available ? "disponível" : "esgotado"}.`);
       }
     } catch (error) {
-      setInventoryMessage(error.message || "Nao foi possivel salvar a alteracao agora.", true);
+      setInventoryMessage(error.message || "Não foi possível salvar a alteração agora.", true);
     } finally {
       setInventoryRowBusy(productId, false);
     }
@@ -1304,7 +1304,7 @@
 
     if (saveButton) {
       if (!saveButton.dataset.defaultLabel) {
-        saveButton.dataset.defaultLabel = saveButton.textContent.trim() || "Salvar regiao";
+        saveButton.dataset.defaultLabel = saveButton.textContent.trim() || "Salvar região";
       }
 
       saveButton.disabled = Boolean(isBusy);

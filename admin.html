@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20260601-6">
   <script src="store-config.js?v=20260522-1" defer></script>
-  <script src="admin.js?v=20260601-5" defer></script>
+  <script src="admin.js?v=20260601-6" defer></script>
 </head>
 <body class="admin-body">
   <div class="space-dust" aria-hidden="true"></div>
@@ -23,7 +23,7 @@
     <section class="admin-panel admin-login-panel" id="admin-login-panel">
       <span class="section-kicker">Painel administrativo</span>
       <h1 id="admin-brand-title">Controle operacional da Galaxy Burger</h1>
-      <p>Entre com a senha do painel para atualizar regioes de entrega, taxas e estoque sem mexer no c&oacute;digo.</p>
+      <p>Entre com a senha do painel para atualizar regiões de entrega, taxas e estoque sem mexer no código.</p>
 
       <form id="admin-login-form" class="admin-form" autocomplete="off">
         <label class="admin-field">
@@ -41,7 +41,7 @@
         <div>
           <span class="section-kicker">Gest&atilde;o segura</span>
           <h2>Painel do dono</h2>
-          <p id="admin-last-updated">Carregando informa&ccedil;&otilde;es do painel...</p>
+          <p id="admin-last-updated">Carregando informações do painel...</p>
         </div>
 
         <div class="admin-dashboard-actions">
@@ -55,7 +55,7 @@
       <section class="admin-section">
         <div class="admin-section-head">
           <div>
-            <span class="section-kicker">Operacao</span>
+            <span class="section-kicker">Operação</span>
             <h3>Abra ou feche os pedidos com um clique</h3>
           </div>
         </div>
@@ -64,18 +64,18 @@
           <div class="admin-store-status-copy">
             <div class="admin-delivery-status-row">
               <strong id="admin-store-status-title">Carregando status operacional...</strong>
-              <span id="admin-store-status-badge" class="admin-status-badge is-auto">Horario automatico</span>
+              <span id="admin-store-status-badge" class="admin-status-badge is-auto">Horário automático</span>
             </div>
-            <p id="admin-store-status-copy">O painel vai mostrar aqui se o site esta seguindo o horario normal, aberto manualmente ou fechado manualmente.</p>
+            <p id="admin-store-status-copy">O painel vai mostrar aqui se o site está seguindo o horário normal, aberto manualmente ou fechado manualmente.</p>
             <div class="admin-delivery-meta">
-              <span id="admin-store-status-updated">Sem atualizacao registrada.</span>
+              <span id="admin-store-status-updated">Sem atualização registrada.</span>
             </div>
           </div>
 
           <div id="admin-store-status-actions" class="admin-store-status-actions">
             <button type="button" class="admin-delivery-chip is-active" data-store-status-mode="force_open">Abrir pedidos</button>
             <button type="button" class="admin-delivery-chip is-blocked" data-store-status-mode="force_closed">Fechar pedidos</button>
-            <button type="button" class="admin-delivery-chip" data-store-status-mode="auto">Seguir horario</button>
+            <button type="button" class="admin-delivery-chip" data-store-status-mode="auto">Seguir horário</button>
           </div>
 
           <p id="admin-store-status-message" class="admin-inline-message" aria-live="polite"></p>
@@ -86,14 +86,14 @@
         <div class="admin-section-head">
           <div>
             <span class="section-kicker">Entrega</span>
-            <h3>Gerencie as regioes atendidas</h3>
-            <p>Cadastre regioes de entrega com uma leitura mais limpa, rapida e consistente.</p>
+            <h3>Gerencie as regiões atendidas</h3>
+            <p>Cadastre regiões de entrega com uma leitura mais limpa, rápida e consistente.</p>
           </div>
         </div>
 
         <div class="admin-stats-grid admin-stats-grid-4">
           <article class="admin-stat-card">
-            <span>Total de regioes</span>
+            <span>Total de regiões</span>
             <strong id="admin-delivery-stat-total">0</strong>
           </article>
           <article class="admin-stat-card">
@@ -115,13 +115,13 @@
             <div class="admin-delivery-builder-head">
               <div class="admin-delivery-builder-heading">
                 <span class="section-kicker">Cadastro</span>
-                <h4 id="admin-delivery-form-title">Nova regiao</h4>
-                <p class="admin-delivery-builder-lead">Cadastre regioes de entrega com um fluxo guiado, visual e mais facil de ler em poucos segundos.</p>
+                <h4 id="admin-delivery-form-title">Nova região</h4>
+                <p class="admin-delivery-builder-lead">Cadastre regiões de entrega com um fluxo guiado, visual e mais fácil de ler em poucos segundos.</p>
               </div>
 
               <div class="admin-delivery-builder-meta" aria-hidden="true">
                 <span>Fluxo guiado</span>
-                <strong>Cadastro rapido</strong>
+                <strong>Cadastro rápido</strong>
               </div>
             </div>
 
@@ -130,55 +130,55 @@
                 <input id="admin-delivery-id" type="hidden" value="">
 
                 <label class="admin-field">
-                  <span>Nome da regiao</span>
+                  <span>Nome da região</span>
                   <input id="admin-delivery-name" name="name" type="text" placeholder="Ex.: Campo Grande centro" required>
                 </label>
 
                 <label class="admin-field">
                   <span>Zona de entrega</span>
                   <select id="admin-delivery-zone" name="zoneId" required>
-                    <option value="zone_5">Ate 2,9 km - R$ 5,00</option>
-                    <option value="zone_10">De 3 km ate 5 km - R$ 10,00</option>
+                    <option value="zone_5">Até 2,9 km - R$ 5,00</option>
+                    <option value="zone_10">De 3 km até 5 km - R$ 10,00</option>
                     <option value="pickup_only">A partir de 5,1 km - somente retirada</option>
                     <option value="blocked">Bloqueado</option>
                   </select>
                 </label>
 
-                <p class="field-helper admin-field-helper admin-delivery-zone-helper" id="admin-delivery-zone-helper">Use R$ 5,00 para areas proximas, R$ 10,00 para a faixa de 3 km a 5 km e retirada para tudo acima disso.</p>
+                <p class="field-helper admin-field-helper admin-delivery-zone-helper" id="admin-delivery-zone-helper">Use R$ 5,00 para áreas próximas, R$ 10,00 para a faixa de 3 km a 5 km e retirada para tudo acima disso.</p>
 
                 <label class="admin-field">
                   <span>Observa&ccedil;&atilde;o</span>
-                  <textarea id="admin-delivery-note" name="note" rows="4" placeholder="Opcional. Ex.: atendimento mais r&aacute;pido nesta regi&atilde;o."></textarea>
+                  <textarea id="admin-delivery-note" name="note" rows="4" placeholder="Opcional. Ex.: atendimento mais rápido nesta região."></textarea>
                 </label>
 
                 <div class="admin-inline-actions admin-delivery-actions-row">
-                  <button id="admin-delivery-save-button" class="btn-primary admin-toolbar-btn" type="submit">Salvar regiao</button>
+                  <button id="admin-delivery-save-button" class="btn-primary admin-toolbar-btn" type="submit">Salvar região</button>
                   <button id="admin-delivery-cancel-button" class="btn-secondary admin-toolbar-btn" type="button">Limpar</button>
                 </div>
               </form>
 
               <aside class="admin-delivery-guide" aria-label="Guia visual das zonas">
                 <div class="admin-delivery-guide-head">
-                  <span class="section-kicker">Mapa rapido</span>
+                  <span class="section-kicker">Mapa rápido</span>
                   <h5>Leitura visual das faixas</h5>
-                  <p>Referencia rapida para cadastrar sem depender de memoria durante a operacao.</p>
+                  <p>Referência rápida para cadastrar sem depender de memória durante a operação.</p>
                 </div>
 
                 <div class="admin-delivery-zone-legend">
                   <article class="admin-delivery-zone-legend-card is-zone-5">
                     <div class="admin-delivery-zone-legend-head">
-                      <strong>Ate 2,9 km</strong>
+                      <strong>Até 2,9 km</strong>
                       <span>R$ 5,00</span>
                     </div>
-                    <p>Entrega ativa para areas proximas e de acesso rapido.</p>
+                    <p>Entrega ativa para áreas próximas e de acesso rápido.</p>
                   </article>
 
                   <article class="admin-delivery-zone-legend-card is-zone-10">
                     <div class="admin-delivery-zone-legend-head">
-                      <strong>De 3 km ate 5 km</strong>
+                      <strong>De 3 km até 5 km</strong>
                       <span>R$ 10,00</span>
                     </div>
-                    <p>Entrega ativa para areas intermediarias, com rota um pouco mais longa.</p>
+                    <p>Entrega ativa para áreas intermediárias, com rota um pouco mais longa.</p>
                   </article>
 
                   <article class="admin-delivery-zone-legend-card is-pickup">
@@ -186,7 +186,7 @@
                       <strong>Somente retirada</strong>
                       <span>Sem taxa</span>
                     </div>
-                    <p>Use quando a regiao nao recebe entrega, mas ainda atende retirada no local.</p>
+                    <p>Use quando a região não recebe entrega, mas ainda atende retirada no local.</p>
                   </article>
 
                   <article class="admin-delivery-zone-legend-card is-blocked">
@@ -194,7 +194,7 @@
                       <strong>Bloqueado</strong>
                       <span>Pausado</span>
                     </div>
-                    <p>Bloqueia novos pedidos ate a regiao voltar ao fluxo normal.</p>
+                    <p>Bloqueia novos pedidos até a região voltar ao fluxo normal.</p>
                   </article>
                 </div>
               </aside>
@@ -205,13 +205,13 @@
             <div class="admin-card-head">
               <div>
                 <span class="section-kicker">Lista</span>
-                <h4>Regioes cadastradas</h4>
+                <h4>Regiões cadastradas</h4>
               </div>
             </div>
 
             <div class="admin-filter-row admin-filter-row-dual">
               <label class="admin-field admin-search-field">
-                <span>Buscar regiao</span>
+                <span>Buscar região</span>
                 <input id="admin-delivery-search-input" type="search" placeholder="Ex.: cosmos, campo grande...">
               </label>
 
@@ -236,7 +236,7 @@
         <div class="admin-section-head">
           <div>
             <span class="section-kicker">Estoque</span>
-            <h3>Atualize a disponibilidade do card&aacute;pio</h3>
+            <h3>Atualize a disponibilidade do cardápio</h3>
           </div>
         </div>
 
@@ -246,7 +246,7 @@
             <strong id="admin-stat-total">0</strong>
           </article>
           <article class="admin-stat-card">
-            <span>Dispon&iacute;veis</span>
+            <span>Disponíveis</span>
             <strong id="admin-stat-available">0</strong>
           </article>
           <article class="admin-stat-card">
