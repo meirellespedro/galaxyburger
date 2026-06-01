@@ -3551,36 +3551,18 @@ body.ticket-view-active .order-ticket-modal-content {
 }
 
 .admin-delivery-builder-card {
-  position: relative;
-  overflow: hidden;
-  gap: 20px;
-  padding: 24px;
-  border-color: rgba(125, 255, 198, 0.14);
-  background:
-    radial-gradient(circle at 12% 12%, rgba(125, 255, 198, 0.09), transparent 24%),
-    radial-gradient(circle at 88% 8%, rgba(255, 211, 122, 0.08), transparent 22%),
-    linear-gradient(180deg, rgba(7, 11, 16, 0.96), rgba(4, 7, 12, 0.9));
-  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.28);
-}
-
-.admin-delivery-builder-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(125, 255, 198, 0.08), transparent 34%, rgba(240, 70, 84, 0.05) 72%, transparent 100%);
-  pointer-events: none;
-}
-
-.admin-delivery-builder-card > * {
-  position: relative;
-  z-index: 1;
+  gap: 18px;
+  padding: 22px;
+  border-color: rgba(125, 255, 198, 0.12);
+  background: linear-gradient(180deg, rgba(8, 12, 17, 0.94), rgba(5, 8, 12, 0.95));
+  box-shadow: 0 20px 38px rgba(0, 0, 0, 0.22);
 }
 
 .admin-delivery-builder-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px 16px;
+  align-items: start;
 }
 
 .admin-delivery-builder-heading {
@@ -3592,9 +3574,9 @@ body.ticket-view-active .order-ticket-modal-content {
 .admin-delivery-builder-heading h4 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(2rem, 2.4vw, 2.7rem);
+  font-size: clamp(1.55rem, 1.9vw, 2.15rem);
   letter-spacing: 0.05em;
-  line-height: 0.92;
+  line-height: 1.05;
 }
 
 .admin-delivery-builder-lead {
@@ -3605,88 +3587,51 @@ body.ticket-view-active .order-ticket-modal-content {
   font-size: 0.96rem;
 }
 
-.admin-delivery-builder-badge {
+.admin-delivery-builder-meta {
   display: grid;
   gap: 6px;
-  min-width: 176px;
-  padding: 14px 16px;
-  border-radius: 20px;
-  border: 1px solid rgba(125, 255, 198, 0.15);
-  background: rgba(4, 8, 12, 0.78);
+  min-width: 0;
+  justify-items: start;
+  align-self: start;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(125, 255, 198, 0.12);
+  background: rgba(4, 8, 12, 0.74);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
-.admin-delivery-builder-badge span {
+.admin-delivery-builder-meta span {
   font-size: 0.74rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
-.admin-delivery-builder-badge strong {
+.admin-delivery-builder-meta strong {
   font-size: 1rem;
   color: var(--text);
 }
 
 .admin-delivery-builder-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(290px, 0.9fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1.12fr) minmax(270px, 0.88fr);
+  gap: 16px;
   align-items: start;
 }
 
-.admin-delivery-form-panel {
-  gap: 18px;
-  padding: 20px;
-  border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(7, 11, 16, 0.95), rgba(4, 7, 12, 0.88));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.admin-delivery-form-panel .admin-field span {
-  color: rgba(245, 248, 251, 0.82);
-}
-
-.admin-delivery-zone-callout {
+.admin-delivery-form {
   display: grid;
-  gap: 10px;
-  padding: 16px 18px;
-  border-radius: 20px;
-  border: 1px solid rgba(125, 255, 198, 0.14);
-  background: linear-gradient(180deg, rgba(125, 255, 198, 0.08), rgba(4, 8, 12, 0.88));
+  gap: 16px;
 }
 
-.admin-delivery-zone-callout-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.admin-delivery-zone-callout-head span {
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(125, 255, 198, 0.82);
-}
-
-.admin-delivery-zone-callout-head strong {
-  color: var(--text);
-  font-size: 0.96rem;
-  line-height: 1.45;
-  max-width: 22ch;
-  text-align: right;
-}
-
-.admin-delivery-zone-callout .admin-field-helper {
+.admin-delivery-zone-helper {
   margin: 0;
+  padding: 12px 14px;
+  border-left: 3px solid rgba(125, 255, 198, 0.82);
+  border-radius: 14px;
+  background: rgba(125, 255, 198, 0.08);
   color: #d8fff0;
-}
-
-.admin-delivery-note-field textarea {
-  min-height: 156px;
+  line-height: 1.5;
 }
 
 .admin-delivery-actions-row {
@@ -3695,11 +3640,11 @@ body.ticket-view-active .order-ticket-modal-content {
 
 .admin-delivery-guide {
   display: grid;
-  gap: 16px;
-  padding: 20px;
-  border-radius: 24px;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(9, 12, 18, 0.96), rgba(4, 7, 12, 0.9));
+  background: linear-gradient(180deg, rgba(8, 12, 17, 0.9), rgba(4, 7, 12, 0.94));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
@@ -3711,7 +3656,7 @@ body.ticket-view-active .order-ticket-modal-content {
 .admin-delivery-guide-head h5 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(1.5rem, 2vw, 2rem);
+  font-size: clamp(1.35rem, 1.7vw, 1.8rem);
   letter-spacing: 0.05em;
   line-height: 0.95;
 }
@@ -3724,7 +3669,7 @@ body.ticket-view-active .order-ticket-modal-content {
 
 .admin-delivery-zone-legend {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 
@@ -3732,8 +3677,8 @@ body.ticket-view-active .order-ticket-modal-content {
   --accent: rgba(255, 255, 255, 0.25);
   display: grid;
   gap: 8px;
-  padding: 16px;
-  border-radius: 18px;
+  padding: 14px 15px;
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
   position: relative;
@@ -3795,26 +3740,7 @@ body.ticket-view-active .order-ticket-modal-content {
   margin: 0;
   color: var(--muted);
   line-height: 1.5;
-  font-size: 0.93rem;
-}
-
-.admin-delivery-guide-foot {
-  padding: 16px 16px 2px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.admin-delivery-guide-foot strong {
-  display: block;
-  margin-bottom: 6px;
-  font-family: var(--font-display);
-  font-size: 1.2rem;
-  letter-spacing: 0.05em;
-}
-
-.admin-delivery-guide-foot p {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.55;
+  font-size: 0.9rem;
 }
 
 .admin-field-grid {
@@ -4129,12 +4055,11 @@ body.ticket-view-active .order-ticket-modal-content {
 
 @media (max-width: 1080px) {
   .admin-delivery-builder-head {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
 
-  .admin-delivery-builder-badge {
+  .admin-delivery-builder-meta {
     width: 100%;
-    min-width: 0;
   }
 
   .admin-delivery-builder-layout {
@@ -4157,7 +4082,6 @@ body.ticket-view-active .order-ticket-modal-content {
   .admin-section-head,
   .admin-card-head,
   .admin-delivery-card,
-  .admin-delivery-zone-callout-head,
   .admin-delivery-zone-legend-head,
   .admin-product-card,
   .admin-category-head {
@@ -4190,17 +4114,11 @@ body.ticket-view-active .order-ticket-modal-content {
   }
 
   .admin-delivery-builder-card,
-  .admin-delivery-form-panel,
   .admin-delivery-guide {
     padding: 18px;
   }
 
-  .admin-delivery-zone-legend {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-delivery-zone-callout-head strong {
-    max-width: none;
-    text-align: left;
+  .admin-delivery-builder-meta {
+    justify-items: start;
   }
 }
