@@ -105,6 +105,7 @@ test("painel exige login antes de listar regioes", async () => {
 
 test("painel cria, atualiza e remove regioes com persistencia publica", async () => {
   process.env.ADMIN_PANEL_PASSWORD = "painel-seguro";
+  process.env.ADMIN_PANEL_SECRET = "painel-secret";
   configureDeliveryAreasFile();
   const cookie = await loginAdmin();
 
@@ -178,6 +179,7 @@ test("painel cria, atualiza e remove regioes com persistencia publica", async ()
 
 test("normaliza nome para impedir regioes duplicadas com escrita diferente", async () => {
   process.env.ADMIN_PANEL_PASSWORD = "painel-seguro";
+  process.env.ADMIN_PANEL_SECRET = "painel-secret";
   configureDeliveryAreasFile();
   const cookie = await loginAdmin();
 
@@ -213,6 +215,7 @@ test("normaliza nome para impedir regioes duplicadas com escrita diferente", asy
 
 test("normaliza abreviacoes para impedir rua duplicada com escrita curta", async () => {
   process.env.ADMIN_PANEL_PASSWORD = "painel-seguro";
+  process.env.ADMIN_PANEL_SECRET = "painel-secret";
   configureDeliveryAreasFile();
   const cookie = await loginAdmin();
 
@@ -234,6 +237,7 @@ test("normaliza abreviacoes para impedir rua duplicada com escrita curta", async
 
 test("bloqueia taxa fora da regra fixa ao receber payload legado com entrega ativa", async () => {
   process.env.ADMIN_PANEL_PASSWORD = "painel-seguro";
+  process.env.ADMIN_PANEL_SECRET = "painel-secret";
   configureDeliveryAreasFile();
   const cookie = await loginAdmin();
 

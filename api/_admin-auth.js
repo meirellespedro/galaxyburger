@@ -2,8 +2,6 @@ const { createHash, createHmac, timingSafeEqual } = require("crypto");
 
 const ADMIN_SESSION_COOKIE_NAME = "gb_admin_session";
 const ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1000;
-const DEFAULT_DEV_ADMIN_PASSWORD = "galaxy-admin-local";
-const DEFAULT_DEV_ADMIN_SECRET = "galaxy-admin-local-secret";
 
 function normalizeText(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
@@ -36,15 +34,11 @@ function getAdminPassword() {
     return configuredPassword;
   }
 
-  if (isProductionRuntime()) {
-    throw createAdminError(
-      "missing_admin_password",
-      "A senha do painel administrativo ainda não foi configurada no servidor.",
-      500
-    );
-  }
-
-  return DEFAULT_DEV_ADMIN_PASSWORD;
+  throw createAdminError(
+    "missing_admin_password",
+    "A senha do painel administrativo ainda nao foi configurada neste ambiente.",
+    500
+  );
 }
 
 function getAdminSessionSecret() {
@@ -58,15 +52,11 @@ function getAdminSessionSecret() {
     return configuredSecret;
   }
 
-  if (isProductionRuntime()) {
-    throw createAdminError(
-      "missing_admin_session_secret",
-      "O painel administrativo ainda não foi configurado corretamente no servidor.",
-      500
-    );
-  }
-
-  return DEFAULT_DEV_ADMIN_SECRET;
+  throw createAdminError(
+    "missing_admin_session_secret",
+    "O painel administrativo ainda nao foi configurado corretamente neste ambiente.",
+    500
+  );
 }
 
 function validateAdminPassword(password) {
@@ -150,7 +140,7 @@ function getAdminSession(req) {
 function requireAdminSession(req) {
   const session = getAdminSession(req);
   if (!session) {
-    throw createAdminError("admin_unauthorized", "Faça login para acessar o painel administrativo.", 401);
+    throw createAdminError("admin_unauthorized", "Faca login para acessar o painel administrativo.", 401);
   }
 
   return session;

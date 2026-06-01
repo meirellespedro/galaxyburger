@@ -10,7 +10,6 @@ const {
 const QUOTE_TTL_MS = 15 * 60 * 1000;
 const VIACEP_BASE_URL = "https://viacep.com.br/ws";
 const BRASIL_API_CEP_BASE_URL = "https://brasilapi.com.br/api/cep/v1";
-const DEFAULT_DEV_SECRET = "galaxy-burger-local-delivery-dev-secret";
 const INVALID_HOUSE_NUMBER_VALUES = new Set([
   "s/n",
   "s n",
@@ -566,21 +565,16 @@ function decodeBase64Url(value) {
 
 function getQuoteSecret() {
   const configuredSecret = normalizeText(process.env.DELIVERY_QUOTE_SECRET);
-  const isRunningOnVercel = String(process.env.VERCEL || "") === "1" || Boolean(process.env.VERCEL_ENV);
 
   if (configuredSecret) {
     return configuredSecret;
   }
 
-  if (isRunningOnVercel) {
-    throw createError(
-      "missing_secret",
-      "A validacao de entrega nao foi configurada corretamente no servidor.",
-      500
-    );
-  }
-
-  return DEFAULT_DEV_SECRET;
+  throw createError(
+    "missing_secret",
+    "A validacao de entrega nao foi configurada corretamente neste ambiente.",
+    500
+  );
 }
 
 function signValue(value) {

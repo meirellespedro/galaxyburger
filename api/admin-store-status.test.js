@@ -106,6 +106,7 @@ function buildBaseOrderPayload(overrides = {}) {
 test.afterEach(() => {
   delete process.env.ADMIN_PANEL_PASSWORD;
   delete process.env.ADMIN_PANEL_SECRET;
+  delete process.env.ORDER_TICKET_SECRET;
   delete process.env.STORE_STATUS_FILE_PATH;
   delete process.env.STORE_STATUS_STORAGE_MODE;
   delete process.env.STORE_STATUS_BLOB_PATHNAME;
@@ -130,6 +131,7 @@ test("painel exige login antes de consultar o status operacional", async () => {
 
 test("painel atualiza o modo manual e o endpoint publico reflete a mudanca", async () => {
   process.env.ADMIN_PANEL_PASSWORD = "painel-seguro";
+  process.env.ADMIN_PANEL_SECRET = "painel-secret";
   configureStoreStatusFile();
   const cookie = await loginAdmin();
 
@@ -171,6 +173,7 @@ test("painel atualiza o modo manual e o endpoint publico reflete a mudanca", asy
 });
 
 test("pedido online e bloqueado quando a loja esta fechada manualmente", async () => {
+  process.env.ORDER_TICKET_SECRET = "order-secret";
   configureStoreStatusFile("force_closed");
 
   const response = await invokeHandler(orderTicketHandler, {

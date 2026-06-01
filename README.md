@@ -38,8 +38,8 @@ Este projeto nao precisa de build step.
 
 ## Variaveis de ambiente
 
-- `DELIVERY_QUOTE_SECRET`: obrigatoria em qualquer deploy publicado da Vercel para assinar e verificar as cotacoes de entrega.
-- `ORDER_TICKET_SECRET`: opcional. Se nao for definida, a API de comanda segura reutiliza `DELIVERY_QUOTE_SECRET`.
+- `DELIVERY_QUOTE_SECRET`: obrigatoria em qualquer ambiente que use a validacao de entrega ou a comanda segura do pedido.
+- `ORDER_TICKET_SECRET`: opcional, mas recomendada. Se nao for definida, a API de comanda segura reutiliza `DELIVERY_QUOTE_SECRET`.
 - `ADMIN_PANEL_PASSWORD`: obrigatoria para liberar o login do painel administrativo.
 - `ADMIN_PANEL_SECRET`: recomendada para assinar a sessao do painel administrativo.
 - `BLOB_READ_WRITE_TOKEN`: obrigatoria na Vercel se voce quiser persistir o estoque do painel em producao sem depender do filesystem local.
@@ -66,6 +66,7 @@ As regras ficam centralizadas em `delivery-config.js`, com bairros e ruas cadast
 - O site principal passa a obedecer esse status operacional em poucos segundos e tambem durante o preparo do pedido.
 - Em desenvolvimento local, o estoque fica salvo em `data/inventory-status.json`.
 - Em desenvolvimento local, o status operacional fica salvo em `data/store-status.json`.
+- Em desenvolvimento local, configure `DELIVERY_QUOTE_SECRET` para testar cotacao e preparo do pedido sem depender de fallback embutido no codigo.
 - Em producao na Vercel, use `BLOB_READ_WRITE_TOKEN` para salvar o estoque de forma persistente entre funcoes, reinicios e novos deploys.
 
 ## Fluxo profissional recomendado

@@ -41,7 +41,6 @@ const {
 
 const MAX_CART_ITEM_QUANTITY = 20;
 const ORDER_TICKET_TTL_MS = 48 * 60 * 60 * 1000;
-const DEFAULT_DEV_SECRET = "galaxy-burger-local-order-ticket-dev-secret";
 const ORDER_TICKET_TOKEN_VERSION = "v2";
 const STORE_ADDRESS = Object.freeze(storeConfig.store?.address || {});
 const STORE_TIME_ZONE = normalizeText(storeConfig.checkout?.timeZone) || "America/Sao_Paulo";
@@ -683,17 +682,12 @@ async function assertStoreAcceptingOrders() {
 
 function getOrderSecret() {
   const configuredSecret = normalizeText(process.env.ORDER_TICKET_SECRET || process.env.DELIVERY_QUOTE_SECRET);
-  const isVercelRuntime = String(process.env.VERCEL || "") === "1" || Boolean(process.env.VERCEL_ENV);
 
   if (configuredSecret) {
     return configuredSecret;
   }
 
-  if (isVercelRuntime) {
-    throw createError("missing_order_secret", "A comanda segura do pedido nao foi configurada corretamente no servidor.", 500);
-  }
-
-  return DEFAULT_DEV_SECRET;
+  throw createError("missing_order_secret", "A comanda segura do pedido nao foi configurada corretamente neste ambiente.", 500);
 }
 
 function getOrderCipherKey() {

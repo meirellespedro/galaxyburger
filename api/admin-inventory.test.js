@@ -101,6 +101,7 @@ test("painel exige login antes de listar o estoque", async () => {
 
 test("login valida senha e libera consulta do estoque", async () => {
   process.env.ADMIN_PANEL_PASSWORD = "painel-seguro";
+  process.env.ADMIN_PANEL_SECRET = "painel-secret";
   process.env.INVENTORY_STATUS_FILE_PATH = withTempInventoryFile();
 
   const login = await invokeHandler(adminLoginHandler, {
@@ -128,6 +129,7 @@ test("login valida senha e libera consulta do estoque", async () => {
 
 test("alteracao do painel persiste e o cardapio publico le o novo status", async () => {
   process.env.ADMIN_PANEL_PASSWORD = "painel-seguro";
+  process.env.ADMIN_PANEL_SECRET = "painel-secret";
   process.env.INVENTORY_STATUS_FILE_PATH = withTempInventoryFile();
 
   const login = await invokeHandler(adminLoginHandler, {
@@ -160,6 +162,7 @@ test("alteracao do painel persiste e o cardapio publico le o novo status", async
 
 test("checkout rejeita produto marcado como esgotado no painel", async () => {
   process.env.ADMIN_PANEL_PASSWORD = "painel-seguro";
+  process.env.ADMIN_PANEL_SECRET = "painel-secret";
   process.env.DELIVERY_QUOTE_SECRET = "test-secret";
   process.env.INVENTORY_STATUS_FILE_PATH = withTempInventoryFile();
 
