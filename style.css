@@ -3674,40 +3674,12 @@ body.ticket-view-active .order-ticket-modal-content {
 }
 
 .admin-delivery-zone-legend-card {
-  --accent: rgba(255, 255, 255, 0.25);
   display: grid;
   gap: 8px;
   padding: 14px 15px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
-  position: relative;
-  overflow: visible;
-}
-
-.admin-delivery-zone-legend-card::after {
-  content: "";
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--accent), transparent 80%);
-  opacity: 0.9;
-}
-
-.admin-delivery-zone-legend-card.is-zone-5 {
-  --accent: rgba(125, 255, 198, 0.9);
-}
-
-.admin-delivery-zone-legend-card.is-zone-10 {
-  --accent: rgba(255, 211, 122, 0.9);
-}
-
-.admin-delivery-zone-legend-card.is-pickup {
-  --accent: rgba(166, 205, 255, 0.9);
-}
-
-.admin-delivery-zone-legend-card.is-blocked {
-  --accent: rgba(240, 70, 84, 0.9);
 }
 
 .admin-delivery-zone-legend-head {

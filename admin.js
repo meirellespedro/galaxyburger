@@ -871,7 +871,6 @@
           </div>
           <div class="admin-delivery-meta">
             <span>${escapeHtml(feeLabel)}</span>
-            <span>Atualizado: ${escapeHtml(formatDateTime(area.updatedAt))}</span>
           </div>
           <p>${escapeHtml(note)}</p>
         </div>
