@@ -3550,6 +3550,273 @@ body.ticket-view-active .order-ticket-modal-content {
   background: rgba(4, 7, 11, 0.72);
 }
 
+.admin-delivery-builder-card {
+  position: relative;
+  overflow: hidden;
+  gap: 20px;
+  padding: 24px;
+  border-color: rgba(125, 255, 198, 0.14);
+  background:
+    radial-gradient(circle at 12% 12%, rgba(125, 255, 198, 0.09), transparent 24%),
+    radial-gradient(circle at 88% 8%, rgba(255, 211, 122, 0.08), transparent 22%),
+    linear-gradient(180deg, rgba(7, 11, 16, 0.96), rgba(4, 7, 12, 0.9));
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.28);
+}
+
+.admin-delivery-builder-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(125, 255, 198, 0.08), transparent 34%, rgba(240, 70, 84, 0.05) 72%, transparent 100%);
+  pointer-events: none;
+}
+
+.admin-delivery-builder-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.admin-delivery-builder-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-delivery-builder-heading {
+  display: grid;
+  gap: 8px;
+  max-width: 620px;
+}
+
+.admin-delivery-builder-heading h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 2.4vw, 2.7rem);
+  letter-spacing: 0.05em;
+  line-height: 0.92;
+}
+
+.admin-delivery-builder-lead {
+  margin: 0;
+  max-width: 58ch;
+  color: var(--muted);
+  line-height: 1.6;
+  font-size: 0.96rem;
+}
+
+.admin-delivery-builder-badge {
+  display: grid;
+  gap: 6px;
+  min-width: 176px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(125, 255, 198, 0.15);
+  background: rgba(4, 8, 12, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.admin-delivery-builder-badge span {
+  font-size: 0.74rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.admin-delivery-builder-badge strong {
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.admin-delivery-builder-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(290px, 0.9fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.admin-delivery-form-panel {
+  gap: 18px;
+  padding: 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(7, 11, 16, 0.95), rgba(4, 7, 12, 0.88));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.admin-delivery-form-panel .admin-field span {
+  color: rgba(245, 248, 251, 0.82);
+}
+
+.admin-delivery-zone-callout {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(125, 255, 198, 0.14);
+  background: linear-gradient(180deg, rgba(125, 255, 198, 0.08), rgba(4, 8, 12, 0.88));
+}
+
+.admin-delivery-zone-callout-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-delivery-zone-callout-head span {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(125, 255, 198, 0.82);
+}
+
+.admin-delivery-zone-callout-head strong {
+  color: var(--text);
+  font-size: 0.96rem;
+  line-height: 1.45;
+  max-width: 22ch;
+  text-align: right;
+}
+
+.admin-delivery-zone-callout .admin-field-helper {
+  margin: 0;
+  color: #d8fff0;
+}
+
+.admin-delivery-note-field textarea {
+  min-height: 156px;
+}
+
+.admin-delivery-actions-row {
+  margin-top: 2px;
+}
+
+.admin-delivery-guide {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(9, 12, 18, 0.96), rgba(4, 7, 12, 0.9));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.admin-delivery-guide-head {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-delivery-guide-head h5 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 2vw, 2rem);
+  letter-spacing: 0.05em;
+  line-height: 0.95;
+}
+
+.admin-delivery-guide-head p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.admin-delivery-zone-legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-delivery-zone-legend-card {
+  --accent: rgba(255, 255, 255, 0.25);
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-delivery-zone-legend-card::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), transparent 80%);
+  opacity: 0.9;
+}
+
+.admin-delivery-zone-legend-card.is-zone-5 {
+  --accent: rgba(125, 255, 198, 0.9);
+}
+
+.admin-delivery-zone-legend-card.is-zone-10 {
+  --accent: rgba(255, 211, 122, 0.9);
+}
+
+.admin-delivery-zone-legend-card.is-pickup {
+  --accent: rgba(166, 205, 255, 0.9);
+}
+
+.admin-delivery-zone-legend-card.is-blocked {
+  --accent: rgba(240, 70, 84, 0.9);
+}
+
+.admin-delivery-zone-legend-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-delivery-zone-legend-head strong {
+  font-size: 0.98rem;
+  line-height: 1.3;
+}
+
+.admin-delivery-zone-legend-head span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(6, 10, 16, 0.72);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.admin-delivery-zone-legend-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 0.93rem;
+}
+
+.admin-delivery-guide-foot {
+  padding: 16px 16px 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-delivery-guide-foot strong {
+  display: block;
+  margin-bottom: 6px;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  letter-spacing: 0.05em;
+}
+
+.admin-delivery-guide-foot p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .admin-field-grid {
   display: grid;
   gap: 12px;
@@ -3860,6 +4127,21 @@ body.ticket-view-active .order-ticket-modal-content {
   text-align: center;
 }
 
+@media (max-width: 1080px) {
+  .admin-delivery-builder-head {
+    flex-direction: column;
+  }
+
+  .admin-delivery-builder-badge {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .admin-delivery-builder-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 780px) {
   .admin-shell {
     width: calc(100% - 24px);
@@ -3875,6 +4157,8 @@ body.ticket-view-active .order-ticket-modal-content {
   .admin-section-head,
   .admin-card-head,
   .admin-delivery-card,
+  .admin-delivery-zone-callout-head,
+  .admin-delivery-zone-legend-head,
   .admin-product-card,
   .admin-category-head {
     flex-direction: column;
@@ -3903,5 +4187,20 @@ body.ticket-view-active .order-ticket-modal-content {
   .admin-filter-row-dual,
   .admin-split-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-delivery-builder-card,
+  .admin-delivery-form-panel,
+  .admin-delivery-guide {
+    padding: 18px;
+  }
+
+  .admin-delivery-zone-legend {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-delivery-zone-callout-head strong {
+    max-width: none;
+    text-align: left;
   }
 }

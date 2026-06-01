@@ -10,9 +10,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260525-1">
+  <link rel="stylesheet" href="style.css?v=20260601-1">
   <script src="store-config.js?v=20260522-1" defer></script>
-  <script src="admin.js?v=20260601-2" defer></script>
+  <script src="admin.js?v=20260601-3" defer></script>
 </head>
 <body class="admin-body">
   <div class="space-dust" aria-hidden="true"></div>
@@ -23,7 +23,7 @@
     <section class="admin-panel admin-login-panel" id="admin-login-panel">
       <span class="section-kicker">Painel administrativo</span>
       <h1 id="admin-brand-title">Controle operacional da Galaxy Burger</h1>
-      <p>Entre com a senha do painel para atualizar bairros de entrega, taxas e estoque sem mexer no c&oacute;digo.</p>
+      <p>Entre com a senha do painel para atualizar regioes de entrega, taxas e estoque sem mexer no c&oacute;digo.</p>
 
       <form id="admin-login-form" class="admin-form" autocomplete="off">
         <label class="admin-field">
@@ -87,12 +87,13 @@
           <div>
             <span class="section-kicker">Entrega</span>
             <h3>Gerencie as regioes atendidas</h3>
+            <p>Cadastre regioes de entrega com uma leitura mais limpa, rapida e consistente.</p>
           </div>
         </div>
 
         <div class="admin-stats-grid admin-stats-grid-4">
           <article class="admin-stat-card">
-            <span>Total de bairros</span>
+            <span>Total de regioes</span>
             <strong id="admin-delivery-stat-total">0</strong>
           </article>
           <article class="admin-stat-card">
@@ -110,46 +111,107 @@
         </div>
 
         <div class="admin-split-grid">
-          <article class="admin-section-card">
-            <div class="admin-card-head">
-              <div>
+          <article class="admin-section-card admin-delivery-builder-card">
+            <div class="admin-delivery-builder-head">
+              <div class="admin-delivery-builder-heading">
                 <span class="section-kicker">Cadastro</span>
-                <h4 id="admin-delivery-form-title">Novo bairro</h4>
+                <h4 id="admin-delivery-form-title">Nova regiao</h4>
+                <p class="admin-delivery-builder-lead">Cadastre regioes de entrega com um fluxo guiado, visual e mais facil de ler em poucos segundos.</p>
+              </div>
+
+              <div class="admin-delivery-builder-badge" aria-hidden="true">
+                <span>Fluxo guiado</span>
+                <strong>Cadastro rapido</strong>
               </div>
             </div>
 
-            <form id="admin-delivery-form" class="admin-form admin-delivery-form" autocomplete="off">
-              <input id="admin-delivery-id" type="hidden" value="">
+            <div class="admin-delivery-builder-layout">
+              <form id="admin-delivery-form" class="admin-form admin-delivery-form admin-delivery-form-panel" autocomplete="off">
+                <input id="admin-delivery-id" type="hidden" value="">
 
-              <label class="admin-field">
-                <span>Nome do bairro ou regiao</span>
-                <input id="admin-delivery-name" name="name" type="text" placeholder="Ex.: Campo Grande centro" required>
-              </label>
-
-              <div class="admin-field-grid admin-field-grid-compact">
                 <label class="admin-field">
-                  <span>Zona de entrega</span>
-                  <select id="admin-delivery-zone" name="zoneId" required>
-                    <option value="zone_5">Ate 2,9 km - R$ 5,00</option>
-                    <option value="zone_10">De 3 km ate 5 km - R$ 10,00</option>
-                    <option value="pickup_only">A partir de 5,1 km - somente retirada</option>
-                    <option value="blocked">Bloqueado</option>
-                  </select>
+                  <span>Nome da regiao</span>
+                  <input id="admin-delivery-name" name="name" type="text" placeholder="Ex.: Campo Grande centro" required>
                 </label>
-              </div>
 
-              <p class="field-helper admin-field-helper" id="admin-delivery-zone-helper">Use R$ 5,00 para areas proximas, R$ 10,00 para a faixa de 3 km a 5 km e retirada para tudo acima disso.</p>
+                <div class="admin-field-grid admin-field-grid-compact">
+                  <label class="admin-field">
+                    <span>Zona de entrega</span>
+                    <select id="admin-delivery-zone" name="zoneId" required>
+                      <option value="zone_5">Ate 2,9 km - R$ 5,00</option>
+                      <option value="zone_10">De 3 km ate 5 km - R$ 10,00</option>
+                      <option value="pickup_only">A partir de 5,1 km - somente retirada</option>
+                      <option value="blocked">Bloqueado</option>
+                    </select>
+                  </label>
+                </div>
 
-              <label class="admin-field">
-                <span>Observa&ccedil;&atilde;o</span>
-                <textarea id="admin-delivery-note" name="note" rows="4" placeholder="Opcional. Ex.: atendimento mais r&aacute;pido nesta regi&atilde;o."></textarea>
-              </label>
+                <div class="admin-delivery-zone-callout">
+                  <div class="admin-delivery-zone-callout-head">
+                    <span>Faixa de entrega</span>
+                    <strong>Escolha a zona certa para o raio correto</strong>
+                  </div>
+                  <p class="field-helper admin-field-helper" id="admin-delivery-zone-helper">Use R$ 5,00 para areas proximas, R$ 10,00 para a faixa de 3 km a 5 km e retirada para tudo acima disso.</p>
+                </div>
 
-              <div class="admin-inline-actions">
-                <button id="admin-delivery-save-button" class="btn-primary admin-toolbar-btn" type="submit">Salvar bairro</button>
-                <button id="admin-delivery-cancel-button" class="btn-secondary admin-toolbar-btn" type="button">Limpar</button>
-              </div>
-            </form>
+                <label class="admin-field">
+                  <span>Observa&ccedil;&atilde;o</span>
+                  <textarea id="admin-delivery-note" name="note" rows="4" placeholder="Opcional. Ex.: atendimento mais r&aacute;pido nesta regi&atilde;o."></textarea>
+                </label>
+
+                <div class="admin-inline-actions admin-delivery-actions-row">
+                  <button id="admin-delivery-save-button" class="btn-primary admin-toolbar-btn" type="submit">Salvar regiao</button>
+                  <button id="admin-delivery-cancel-button" class="btn-secondary admin-toolbar-btn" type="button">Limpar</button>
+                </div>
+              </form>
+
+              <aside class="admin-delivery-guide" aria-label="Guia visual das zonas">
+                <div class="admin-delivery-guide-head">
+                  <span class="section-kicker">Mapa rapido</span>
+                  <h5>Leitura visual das faixas</h5>
+                  <p>Referencia rapida para cadastrar sem depender de memoria durante a operacao.</p>
+                </div>
+
+                <div class="admin-delivery-zone-legend">
+                  <article class="admin-delivery-zone-legend-card is-zone-5">
+                    <div class="admin-delivery-zone-legend-head">
+                      <strong>Ate 2,9 km</strong>
+                      <span>R$ 5,00</span>
+                    </div>
+                    <p>Entrega ativa para areas proximas e de acesso rapido.</p>
+                  </article>
+
+                  <article class="admin-delivery-zone-legend-card is-zone-10">
+                    <div class="admin-delivery-zone-legend-head">
+                      <strong>De 3 km ate 5 km</strong>
+                      <span>R$ 10,00</span>
+                    </div>
+                    <p>Entrega ativa para areas intermediarias, com rota um pouco mais longa.</p>
+                  </article>
+
+                  <article class="admin-delivery-zone-legend-card is-pickup">
+                    <div class="admin-delivery-zone-legend-head">
+                      <strong>Somente retirada</strong>
+                      <span>Sem taxa</span>
+                    </div>
+                    <p>Use quando a regiao nao recebe entrega, mas ainda atende retirada no local.</p>
+                  </article>
+
+                  <article class="admin-delivery-zone-legend-card is-blocked">
+                    <div class="admin-delivery-zone-legend-head">
+                      <strong>Bloqueado</strong>
+                      <span>Pausado</span>
+                    </div>
+                    <p>Bloqueia novos pedidos ate a regiao voltar ao fluxo normal.</p>
+                  </article>
+                </div>
+
+                <div class="admin-delivery-guide-foot">
+                  <strong>Fluxo ideal</strong>
+                  <p>Nome curto, zona certa e uma observacao objetiva deixam o atendimento mais rapido e reduzem retrabalho.</p>
+                </div>
+              </aside>
+            </div>
           </article>
 
           <article class="admin-section-card">

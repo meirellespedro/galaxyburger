@@ -509,17 +509,17 @@
       }
 
       if (!response.ok || !payload?.ok || !payload.deliveryAreas) {
-        throw new Error(payload?.message || "Nao foi possivel carregar os bairros agora.");
+        throw new Error(payload?.message || "Nao foi possivel carregar as regioes agora.");
       }
 
       applyDeliveryAreasPayload(payload.deliveryAreas);
       if (showMessage) {
-        setDeliveryMessage("Bairros atualizados com sucesso.");
+        setDeliveryMessage("Regioes atualizadas com sucesso.");
       }
       return true;
     } catch (error) {
       if (!background) {
-        setDeliveryMessage(error.message || "Nao foi possivel carregar os bairros agora.", true);
+        setDeliveryMessage(error.message || "Nao foi possivel carregar as regioes agora.", true);
       }
       throw error;
     }
@@ -633,7 +633,7 @@
 
     if (deliveryNote) {
       deliveryNote.textContent = buildStorageNote(
-        "bairros",
+        "regioes",
         dashboardState.deliveryAreas.storageLabel,
         dashboardState.deliveryAreas.persistenceConfigured
       );
@@ -687,7 +687,8 @@
     }
 
     if (copy) {
-      copy.textContent = meta.description;
+      copy.hidden = !meta.description;
+      copy.textContent = meta.description || "";
     }
 
     if (updated) {
@@ -965,7 +966,7 @@
     const areaId = normalizeText(fields.id?.value || dashboardState.editingDeliveryAreaId);
 
     if (!name) {
-      setDeliveryMessage("Informe o nome do bairro ou regiao.", true);
+      setDeliveryMessage("Informe o nome da regiao.", true);
       fields.name?.focus();
       return;
     }
@@ -1002,7 +1003,7 @@
       }
 
       if (!response.ok || !payload?.ok || !payload.deliveryAreas) {
-        throw new Error(payload?.message || "Nao foi possivel salvar o bairro agora.");
+        throw new Error(payload?.message || "Nao foi possivel salvar a regiao agora.");
       }
 
       applyDeliveryAreasPayload(payload.deliveryAreas);
@@ -1083,7 +1084,7 @@
       }
 
       if (!response.ok || !payload?.ok || !payload.deliveryAreas) {
-        throw new Error(payload?.message || "Nao foi possivel atualizar o status do bairro.");
+        throw new Error(payload?.message || "Nao foi possivel atualizar o status da regiao.");
       }
 
       applyDeliveryAreasPayload(payload.deliveryAreas);
