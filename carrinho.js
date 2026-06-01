@@ -72,6 +72,7 @@ const DELIVERY_QUOTE_API_URL = "/api/delivery-quote";
 const DELIVERY_AREAS_API_URL = "/api/delivery-areas";
 const ORDER_TICKET_API_URL = "/api/order-ticket";
 const INVENTORY_STATUS_API_URL = "/api/inventory-status";
+const STORE_STATUS_API_URL = "/api/store-status";
 const DELIVERY_FEE_LOCAL = 5;
 const DELIVERY_FEE_EXTENDED = 10;
 const MIN_ORDER_AMOUNT = normalizeMoneyValue(SHARED_STORE_CONFIG.checkout?.minimumOrderAmount, 20);
@@ -82,13 +83,16 @@ const DELIVERY_QUOTE_EXPIRY_BUFFER_MS = 30 * 1000;
 const DELIVERY_REQUEST_TIMEOUT_MS = 12000;
 const DELIVERY_AREAS_REQUEST_TIMEOUT_MS = 8000;
 const INVENTORY_REQUEST_TIMEOUT_MS = 8000;
+const STORE_STATUS_REQUEST_TIMEOUT_MS = 8000;
 const INVENTORY_REFRESH_INTERVAL_MS = 5000;
 const DELIVERY_AREAS_REFRESH_INTERVAL_MS = 60000;
+const STORE_STATUS_REFRESH_INTERVAL_MS = 30000;
 const VIA_CEP_REQUEST_TIMEOUT_MS = 8000;
 const DELIVERY_AUTO_CALCULATE_DEBOUNCE_MS = 700;
 const DELIVERY_IDLE_MESSAGE = "Preencha o endereco completo para calcular a entrega.";
 const CHECKOUT_LOG_PREFIX = "[Galaxy Burger checkout]";
 const DELIVERY_STATUS_VALUES = new Set(["idle", "loading", "ready", "out_of_range", "blocked", "pickup_only", "error", "pickup"]);
+const STORE_STATUS_OVERRIDE_VALUES = new Set(["auto", "force_open", "force_closed"]);
 const INVALID_HOUSE_NUMBER_VALUES = new Set(["s/n", "s n", "sn", "sem numero", "sem numero.", "sem numero,"]);
 const BR_PHONE_MIN_LENGTH = 10;
 const BR_PHONE_MAX_LENGTH = 11;
@@ -100,6 +104,7 @@ const DELIVERY_STORAGE_KEY = "galaxy_burguer_delivery_v16";
 const ORDER_PREPARATION_STORAGE_KEY = "galaxy_burguer_pending_order_v1";
 const DELIVERY_AREAS_BROADCAST_STORAGE_KEY = "galaxy_burguer_delivery_areas_broadcast_v1";
 const INVENTORY_BROADCAST_STORAGE_KEY = "galaxy_burguer_inventory_broadcast_v1";
+const STORE_STATUS_BROADCAST_STORAGE_KEY = "galaxy_burguer_store_status_broadcast_v1";
 const INVENTORY_SYNC_CHANNEL_NAME = "galaxy_burguer_inventory_sync_v1";
 const LEGACY_DELIVERY_STORAGE_KEYS = [
   "galaxy_burguer_delivery",
@@ -160,11 +165,13 @@ let activeWhatsAppAttempt = null;
 let activeDeliveryQuoteRequest = null;
 let activeDeliveryAreasRequest = null;
 let activeInventoryStatusRequest = null;
+let activeStoreStatusRequest = null;
 let activeViaCepLookup = null;
 let deliveryAutoQuoteTimer = 0;
 let pendingCustomerOrder = loadPendingCustomerOrder();
 let inventoryRealtimeChannel = null;
 let deliveryAreasState = createDeliveryAreasState();
+let storeStatusState = createStoreStatusState();
 
 function formatCurrency(value) {
   return normalizeMoneyValue(value).toLocaleString("pt-BR", {
@@ -533,6 +540,22 @@ function createDeliveryAreasState(overrides = {}) {
     error: normalizeText(overrides.error),
     zones: Array.isArray(overrides.zones) ? overrides.zones.slice() : [],
     areas: Array.isArray(overrides.areas) ? overrides.areas.slice() : []
+  };
+}
+
+function normalizeStoreStatusOverrideMode(value) {
+  const overrideMode = normalizeCompareText(value).replace(/[\s-]+/g, "_");
+  return STORE_STATUS_OVERRIDE_VALUES.has(overrideMode) ? overrideMode : "auto";
+}
+
+function createStoreStatusState(overrides = {}) {
+  return {
+    loaded: Boolean(overrides.loaded),
+    loading: Boolean(overrides.loading),
+    updatedAt: normalizeText(overrides.updatedAt),
+    error: normalizeText(overrides.error),
+    overrideMode: normalizeStoreStatusOverrideMode(overrides.overrideMode),
+    persistenceConfigured: overrides.persistenceConfigured !== false
   };
 }
 
@@ -994,7 +1017,34 @@ function getStoreAvailability(now = new Date()) {
   const isScheduledOpen = Boolean(todaySchedule)
     && clock.currentMinutes >= todaySchedule.openMinutes
     && clock.currentMinutes <= todaySchedule.closeMinutes;
+  const overrideMode = normalizeStoreStatusOverrideMode(storeStatusState.overrideMode);
   const temporaryClosure = getActiveStoreTemporaryClosure(now);
+
+  if (overrideMode === "force_open") {
+    return {
+      ...clock,
+      todaySchedule,
+      scheduleEnforced,
+      isScheduledOpen,
+      isOpen: true,
+      nextOpen: null,
+      manualOverrideMode: overrideMode,
+      manualOverrideActive: true
+    };
+  }
+
+  if (overrideMode === "force_closed") {
+    return {
+      ...clock,
+      todaySchedule,
+      scheduleEnforced,
+      isScheduledOpen,
+      isOpen: false,
+      nextOpen: null,
+      manualOverrideMode: overrideMode,
+      manualOverrideActive: true
+    };
+  }
 
   if (temporaryClosure) {
     return {
@@ -1003,6 +1053,8 @@ function getStoreAvailability(now = new Date()) {
       scheduleEnforced,
       isScheduledOpen,
       isOpen: false,
+      manualOverrideMode: overrideMode,
+      manualOverrideActive: false,
       nextOpen: {
         type: "temporary_closure",
         date: temporaryClosure.reopenAt,
@@ -1021,6 +1073,8 @@ function getStoreAvailability(now = new Date()) {
     todaySchedule,
     scheduleEnforced,
     isScheduledOpen,
+    manualOverrideMode: overrideMode,
+    manualOverrideActive: false,
     isOpen,
     nextOpen: getNextStoreOpening(clock.dayIndex, clock.currentMinutes)
   };
@@ -1059,7 +1113,59 @@ function formatNextOpeningMessage(nextOpen) {
   return `A pr\u00f3xima abertura \u00e9 ${STORE_WEEKDAY_LABELS[nextOpen.dayIndex]}, \u00e0s ${timeLabel}.`;
 }
 
+function isStoreManuallyForcedOpen(availability = getStoreAvailability()) {
+  return availability.manualOverrideMode === "force_open";
+}
+
+function isStoreManuallyForcedClosed(availability = getStoreAvailability()) {
+  return availability.manualOverrideMode === "force_closed";
+}
+
+function getStoreHeroStatusCopy(availability = getStoreAvailability()) {
+  if (isStoreManuallyForcedOpen(availability)) {
+    return {
+      pill: "Pedidos abertos manualmente",
+      title: "A Galaxy Burger esta aceitando pedidos agora",
+      message: "A loja liberou os pedidos manualmente pelo painel administrativo."
+    };
+  }
+
+  if (isStoreManuallyForcedClosed(availability)) {
+    return {
+      pill: "Fechada no momento",
+      title: "A Galaxy Burger esta fechada agora",
+      message: "A loja esta fechada no momento."
+    };
+  }
+
+  if (!availability.scheduleEnforced) {
+    return {
+      pill: "Teste liberado",
+      title: "A Galaxy Burger esta liberada para testes",
+      message: "Bloqueio por horario desativado temporariamente para validacao do checkout e apresentacao ao cliente."
+    };
+  }
+
+  if (availability.isOpen) {
+    return {
+      pill: "Aberta no momento",
+      title: "A Galaxy Burger esta aberta agora",
+      message: `Recebendo pedidos ate ${formatStoreTimeLabel(availability.todaySchedule?.closeMinutes || 0)}.`
+    };
+  }
+
+  return {
+    pill: "Fechada no momento",
+    title: "A Galaxy Burger esta fechada agora",
+    message: formatNextOpeningMessage(availability.nextOpen)
+  };
+}
+
 function getStoreClosedOrderMessage(availability = getStoreAvailability()) {
+  if (isStoreManuallyForcedClosed(availability)) {
+    return "A Galaxy Burger esta fechada no momento.";
+  }
+
   return `A Galaxy Burger est\u00e1 fechada agora. ${formatNextOpeningMessage(availability.nextOpen)}`;
 }
 
@@ -2110,6 +2216,110 @@ async function fetchDeliveryAreas({ signal } = {}) {
   }
 
   return payload;
+}
+
+async function fetchStoreStatus({ signal } = {}) {
+  const timedRequest = signal ? null : createTimedRequest(STORE_STATUS_REQUEST_TIMEOUT_MS);
+  let response;
+
+  try {
+    response = await fetch(STORE_STATUS_API_URL, {
+      signal: signal || timedRequest?.controller.signal,
+      headers: {
+        Accept: "application/json"
+      }
+    });
+  } catch (error) {
+    if (timedRequest?.didTimeout && isAbortError(error)) {
+      throw createDeliveryRequestError(
+        "O status da loja demorou mais do que o esperado para carregar.",
+        "store_status_timeout",
+        504
+      );
+    }
+
+    throw error;
+  } finally {
+    timedRequest?.cleanup();
+  }
+
+  let payload = null;
+
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok || !payload?.ok) {
+    const error = new Error(payload?.message || "Nao foi possivel carregar o status da loja agora.");
+    error.code = payload?.code || "store_status_failed";
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
+  }
+
+  return payload;
+}
+
+async function refreshStoreStatus({ quiet = true, reason = "manual" } = {}) {
+  if (activeStoreStatusRequest?.promise) {
+    return activeStoreStatusRequest.promise;
+  }
+
+  const request = {};
+  activeStoreStatusRequest = request;
+  request.promise = (async () => {
+    try {
+      const payload = await fetchStoreStatus({});
+
+      storeStatusState = createStoreStatusState({
+        loaded: true,
+        loading: false,
+        updatedAt: payload.updatedAt,
+        error: "",
+        overrideMode: payload.overrideMode,
+        persistenceConfigured: payload.persistenceConfigured !== false
+      });
+
+      updateStoreStatusUI();
+      return storeStatusState;
+    } catch (error) {
+      storeStatusState = createStoreStatusState({
+        loaded: true,
+        loading: false,
+        updatedAt: storeStatusState.updatedAt,
+        error: error.message,
+        overrideMode: storeStatusState.overrideMode,
+        persistenceConfigured: storeStatusState.persistenceConfigured
+      });
+
+      if (!quiet) {
+        showToast(error.message || "Nao foi possivel carregar o status da loja agora.");
+      }
+
+      logCheckoutWarn("Falha ao carregar o status operacional da loja.", {
+        reason,
+        error
+      });
+      return null;
+    } finally {
+      if (activeStoreStatusRequest === request) {
+        activeStoreStatusRequest = null;
+      }
+    }
+  })();
+
+  return request.promise;
+}
+
+function handleStoreStatusRealtimeRefresh(reason = "store_status_sync") {
+  refreshStoreStatus({
+    quiet: true,
+    reason
+  }).catch(error => {
+    logCheckoutWarn("Falha ao sincronizar o status da loja em segundo plano.", error);
+  });
 }
 
 async function refreshDeliveryAreas({ quiet = true, reason = "manual" } = {}) {
@@ -3516,6 +3726,53 @@ function syncStoreConfigUI() {
   });
 }
 
+function getOrderAvailabilityCopy(availability = getStoreAvailability()) {
+  const minimumOrderCopy = `Pedido minimo: ${formatCurrency(MIN_ORDER_AMOUNT)} em produtos.`;
+
+  if (isStoreManuallyForcedOpen(availability)) {
+    return {
+      cartLabel: "Pedidos liberados manualmente",
+      cartMessage: "A loja liberou os pedidos manualmente pelo painel. Valide o endereco, revise o pedido e abra o WhatsApp oficial da Galaxy Burger para concluir.",
+      checkoutHelper: `Pedidos liberados manualmente pelo painel administrativo. Revise o pedido, abra o WhatsApp oficial da Galaxy Burger e confirme o envio no site para limpar o carrinho. ${minimumOrderCopy}`,
+      footerStatus: "Status atual: pedidos abertos manualmente pelo painel."
+    };
+  }
+
+  if (isStoreManuallyForcedClosed(availability)) {
+    return {
+      cartLabel: "Loja fechada no momento",
+      cartMessage: `${getStoreClosedOrderMessage(availability)} Voce pode montar o carrinho normalmente, mas o envio fica bloqueado ate a reabertura da loja.`,
+      checkoutHelper: `${getStoreClosedOrderMessage(availability)} Monte seu carrinho normalmente; o envio pelo WhatsApp fica bloqueado ate a reabertura. ${minimumOrderCopy}`,
+      footerStatus: "Status atual: fechada."
+    };
+  }
+
+  if (!availability.scheduleEnforced) {
+    return {
+      cartLabel: "Pedidos liberados para teste",
+      cartMessage: "Modo de validacao ativo. O bloqueio por horario foi desativado temporariamente para voce testar o checkout, inclusive o envio do pedido para a hamburgueria.",
+      checkoutHelper: `Modo de testes ativo: o envio para a hamburgueria esta liberado temporariamente para validar o fluxo completo do pedido. ${minimumOrderCopy}`,
+      footerStatus: "Status atual: modo de testes ativo, com pedidos liberados temporariamente."
+    };
+  }
+
+  if (availability.isOpen) {
+    return {
+      cartLabel: "Loja aberta no momento",
+      cartMessage: "Valide o endereco, revise o pedido e abra o WhatsApp oficial da Galaxy Burger para concluir.",
+      checkoutHelper: `Revise o pedido, abra o WhatsApp oficial da Galaxy Burger e confirme o envio no site para limpar o carrinho. ${minimumOrderCopy}`,
+      footerStatus: `Status atual: aberta ate ${formatStoreTimeLabel(availability.todaySchedule?.closeMinutes || 0)}.`
+    };
+  }
+
+  return {
+    cartLabel: "Loja fechada no momento",
+    cartMessage: `${getStoreClosedOrderMessage(availability)} Voce pode montar o carrinho normalmente, mas o envio do pedido fica liberado apenas no horario de funcionamento.`,
+    checkoutHelper: `${getStoreClosedOrderMessage(availability)} Monte seu carrinho normalmente; o envio pelo WhatsApp fica bloqueado ate a reabertura. ${minimumOrderCopy}`,
+    footerStatus: `Status atual: fechada. ${formatNextOpeningMessage(availability.nextOpen)}`
+  };
+}
+
 function updateOrderAvailabilityUI(availability = getStoreAvailability()) {
   const footerStatus = document.getElementById("footer-store-status");
   const cartStatusStrip = document.getElementById("cart-order-status-strip");
@@ -3523,7 +3780,7 @@ function updateOrderAvailabilityUI(availability = getStoreAvailability()) {
   const cartStatusMessage = document.getElementById("cart-order-status-message");
   const checkoutHelper = document.getElementById("checkout-helper");
   const subtotal = getCartTotal();
-  const minimumOrderCopy = `Pedido m\u00ednimo: ${formatCurrency(MIN_ORDER_AMOUNT)} em produtos.`;
+  const copy = getOrderAvailabilityCopy(availability);
   const orderLinks = document.querySelectorAll('a[onclick*="openIfoodStore"]');
 
   orderLinks.forEach(link => {
@@ -3545,27 +3802,15 @@ function updateOrderAvailabilityUI(availability = getStoreAvailability()) {
   }
 
   if (cartStatusLabel) {
-    cartStatusLabel.textContent = !availability.scheduleEnforced
-      ? "Pedidos liberados para teste"
-      : availability.isOpen
-      ? "Loja aberta no momento"
-      : "Loja fechada no momento";
+    cartStatusLabel.textContent = copy.cartLabel;
   }
 
   if (cartStatusMessage) {
-    cartStatusMessage.textContent = !availability.scheduleEnforced
-      ? "Modo de valida\u00e7\u00e3o ativo. O bloqueio por hor\u00e1rio foi desativado temporariamente para voc\u00ea testar o checkout, inclusive o envio do pedido para a hamburgueria."
-      : availability.isOpen
-      ? "Valide o endere\u00e7o, revise o pedido e abra o WhatsApp oficial da Galaxy Burger para concluir."
-      : `${getStoreClosedOrderMessage(availability)} Voc\u00ea pode montar o carrinho normalmente, mas o envio do pedido fica liberado apenas no hor\u00e1rio de funcionamento.`;
+    cartStatusMessage.textContent = copy.cartMessage;
   }
 
   if (checkoutHelper) {
-    checkoutHelper.textContent = !availability.scheduleEnforced
-      ? `Modo de testes ativo: o envio para a hamburgueria est\u00e1 liberado temporariamente para validar o fluxo completo do pedido. ${minimumOrderCopy}`
-      : availability.isOpen
-      ? `Revise o pedido, abra o WhatsApp oficial da Galaxy Burger e confirme o envio no site para limpar o carrinho. ${minimumOrderCopy}`
-      : `${getStoreClosedOrderMessage(availability)} Monte seu carrinho normalmente; o envio pelo WhatsApp fica bloqueado at\u00e9 a reabertura. ${minimumOrderCopy}`;
+    checkoutHelper.textContent = copy.checkoutHelper;
   }
 
   if (availability.isOpen && cart.length && cartStatusLabel && cartStatusMessage && !hasReachedMinimumOrder(subtotal)) {
@@ -3574,11 +3819,7 @@ function updateOrderAvailabilityUI(availability = getStoreAvailability()) {
   }
 
   if (footerStatus) {
-    footerStatus.textContent = !availability.scheduleEnforced
-      ? "Status atual: modo de testes ativo, com pedidos liberados temporariamente."
-      : availability.isOpen
-      ? `Status atual: aberta at\u00e9 ${formatStoreTimeLabel(availability.todaySchedule?.closeMinutes || 0)}.`
-      : `Status atual: fechada. ${formatNextOpeningMessage(availability.nextOpen)}`;
+    footerStatus.textContent = copy.footerStatus;
   }
 }
 
@@ -5317,29 +5558,17 @@ function updateStoreStatusUI(availability = getStoreAvailability()) {
   const statusPill = document.getElementById("store-status-pill");
   const statusTitle = document.getElementById("store-status-title");
   const statusMessage = document.getElementById("store-status-message");
-  const closeTimeLabel = formatStoreTimeLabel(availability.todaySchedule?.closeMinutes || 0);
+  const copy = getStoreHeroStatusCopy(availability);
 
   if (statusCard) statusCard.dataset.open = String(availability.isOpen);
   if (statusPill) {
-    statusPill.textContent = !availability.scheduleEnforced
-      ? "Teste liberado"
-      : availability.isOpen
-        ? "Aberta no momento"
-        : "Fechada no momento";
+    statusPill.textContent = copy.pill;
   }
   if (statusTitle) {
-    statusTitle.textContent = !availability.scheduleEnforced
-      ? "A Galaxy Burger est\u00e1 liberada para testes"
-      : availability.isOpen
-        ? "A Galaxy Burger est\u00e1 aberta agora"
-        : "A Galaxy Burger est\u00e1 fechada agora";
+    statusTitle.textContent = copy.title;
   }
   if (statusMessage) {
-    statusMessage.textContent = !availability.scheduleEnforced
-      ? "Bloqueio por hor\u00e1rio desativado temporariamente para valida\u00e7\u00e3o do checkout e apresenta\u00e7\u00e3o ao cliente."
-      : availability.isOpen
-        ? `Recebendo pedidos at\u00e9 ${closeTimeLabel}.`
-        : formatNextOpeningMessage(availability.nextOpen);
+    statusMessage.textContent = copy.message;
   }
 
   updateOrderAvailabilityUI(availability);
@@ -5470,6 +5699,7 @@ document.addEventListener("DOMContentLoaded", () => {
   updatePendingOrderBanner();
   loadDeliveryData();
   bindDeliveryEvents();
+  handleStoreStatusRealtimeRefresh("initial_load");
   handleDeliveryAreasRealtimeRefresh("initial_load");
   updateCashChangeUI();
   updateOrderTicketModalMode();
@@ -5486,6 +5716,9 @@ document.addEventListener("DOMContentLoaded", () => {
   setupExpandableCardDescriptions();
   window.setInterval(() => updateStoreStatusUI(), 60000);
   window.setInterval(() => {
+    handleStoreStatusRealtimeRefresh("scheduled_refresh");
+  }, STORE_STATUS_REFRESH_INTERVAL_MS);
+  window.setInterval(() => {
     refreshCatalogAvailability({
       notify: true,
       quiet: true,
@@ -5497,6 +5730,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }, DELIVERY_AREAS_REFRESH_INTERVAL_MS);
   window.addEventListener("resize", requestExpandableCardDescriptionsSync);
   window.addEventListener("focus", () => {
+    handleStoreStatusRealtimeRefresh("window_focus");
     refreshCatalogAvailability({
       notify: true,
       quiet: true,
@@ -5509,6 +5743,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    handleStoreStatusRealtimeRefresh("tab_visible");
     refreshCatalogAvailability({
       notify: true,
       quiet: true,
@@ -5516,6 +5751,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     handleDeliveryAreasRealtimeRefresh("tab_visible");
   });
+  window.addEventListener("storage", event => {
+    if (event.key !== STORE_STATUS_BROADCAST_STORAGE_KEY || !event.newValue) {
+      return;
+    }
+
+    handleStoreStatusRealtimeRefresh("admin_store_status_broadcast");
+  });
+
   window.addEventListener("storage", event => {
     if (event.key !== DELIVERY_AREAS_BROADCAST_STORAGE_KEY || !event.newValue) {
       return;

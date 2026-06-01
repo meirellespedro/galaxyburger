@@ -17,6 +17,9 @@ const {
   ACTIVE_DELIVERY_FEE_VALUES
 } = require("./_delivery-areas-store");
 const {
+  getStoreStatusSnapshot
+} = require("./_store-status-store");
+const {
   canPersistSharedOrderTicket,
   createPersistedOrderTicketRef,
   isPersistedOrderTicketRef,
@@ -568,6 +571,7 @@ async function prepareOrder(payload = {}, req) {
   const paymentMethod = normalizeCompareText(payload.payment?.method || payload.paymentMethod);
   const cashChangeText = normalizeText(payload.payment?.cashChangeText || payload.cashChangeText);
   const rawCart = Array.isArray(payload.cart) ? payload.cart : [];
+  await assertStoreAcceptingOrders();
   const catalogContext = await createCatalogContext();
 
   if (!customerName) {
@@ -663,6 +667,18 @@ async function prepareOrder(payload = {}, req) {
     sharedTicketUrl,
     whatsAppMessage
   };
+}
+
+async function assertStoreAcceptingOrders() {
+  const storeStatus = await getStoreStatusSnapshot();
+
+  if (normalizeCompareText(storeStatus.overrideMode) === "force_closed") {
+    throw createError(
+      "store_orders_closed",
+      "A Galaxy Burger esta com os pedidos fechados no painel administrativo no momento.",
+      409
+    );
+  }
 }
 
 function getOrderSecret() {

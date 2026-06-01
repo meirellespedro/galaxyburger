@@ -10,9 +10,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260522-1">
+  <link rel="stylesheet" href="style.css?v=20260525-1">
   <script src="store-config.js?v=20260522-1" defer></script>
-  <script src="admin.js?v=20260521-2" defer></script>
+  <script src="admin.js?v=20260525-1" defer></script>
 </head>
 <body class="admin-body">
   <div class="space-dust" aria-hidden="true"></div>
@@ -51,6 +51,36 @@
       </div>
 
       <p id="admin-dashboard-message" class="admin-inline-message" aria-live="polite"></p>
+
+      <section class="admin-section">
+        <div class="admin-section-head">
+          <div>
+            <span class="section-kicker">Operacao</span>
+            <h3>Abra ou feche os pedidos com um clique</h3>
+          </div>
+        </div>
+
+        <article class="admin-section-card admin-store-status-card">
+          <div class="admin-store-status-copy">
+            <div class="admin-delivery-status-row">
+              <strong id="admin-store-status-title">Carregando status operacional...</strong>
+              <span id="admin-store-status-badge" class="admin-status-badge is-auto">Horario automatico</span>
+            </div>
+            <p id="admin-store-status-copy">O painel vai mostrar aqui se o site esta seguindo o horario normal, aberto manualmente ou fechado manualmente.</p>
+            <div class="admin-delivery-meta">
+              <span id="admin-store-status-updated">Sem atualizacao registrada.</span>
+            </div>
+          </div>
+
+          <div id="admin-store-status-actions" class="admin-store-status-actions">
+            <button type="button" class="admin-delivery-chip is-active" data-store-status-mode="force_open">Abrir pedidos</button>
+            <button type="button" class="admin-delivery-chip is-blocked" data-store-status-mode="force_closed">Fechar pedidos</button>
+            <button type="button" class="admin-delivery-chip" data-store-status-mode="auto">Seguir horario</button>
+          </div>
+
+          <p id="admin-store-status-message" class="admin-inline-message" aria-live="polite"></p>
+        </article>
+      </section>
 
       <section class="admin-section">
         <div class="admin-section-head">

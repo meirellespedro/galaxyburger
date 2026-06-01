@@ -3633,6 +3633,12 @@ body.ticket-view-active .order-ticket-modal-content {
   color: #d8fff0;
 }
 
+.admin-status-badge.is-auto {
+  border-color: rgba(166, 205, 255, 0.28);
+  background: rgba(166, 205, 255, 0.12);
+  color: #deebff;
+}
+
 .admin-status-badge.is-pickup {
   border-color: rgba(255, 215, 141, 0.28);
   background: rgba(255, 215, 141, 0.12);
@@ -3649,6 +3655,28 @@ body.ticket-view-active .order-ticket-modal-content {
   display: inline-flex;
   flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-store-status-card {
+  gap: 16px;
+}
+
+.admin-store-status-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-store-status-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.admin-store-status-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
 }
@@ -3855,6 +3883,7 @@ body.ticket-view-active .order-ticket-modal-content {
 
   .admin-dashboard-actions,
   .admin-inline-actions,
+  .admin-store-status-actions,
   .admin-delivery-actions,
   .admin-stock-actions {
     width: 100%;

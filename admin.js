@@ -4,10 +4,12 @@
   const ADMIN_LOGIN_API_URL = "/api/admin-login";
   const ADMIN_INVENTORY_API_URL = "/api/admin-inventory";
   const ADMIN_DELIVERY_AREAS_API_URL = "/api/admin-delivery-areas";
+  const ADMIN_STORE_STATUS_API_URL = "/api/admin-store-status";
   const ADMIN_REFRESH_INTERVAL_MS = 15000;
   const INVENTORY_BROADCAST_STORAGE_KEY = "galaxy_burguer_inventory_broadcast_v1";
   const INVENTORY_SYNC_CHANNEL_NAME = "galaxy_burguer_inventory_sync_v1";
   const DELIVERY_AREAS_BROADCAST_STORAGE_KEY = "galaxy_burguer_delivery_areas_broadcast_v1";
+  const STORE_STATUS_BROADCAST_STORAGE_KEY = "galaxy_burguer_store_status_broadcast_v1";
   const CATEGORY_LABELS = Object.freeze({
     burger: "Burgers",
     combo: "Combos",
@@ -66,6 +68,23 @@
       badgeClass: "is-blocked"
     }
   });
+  const STORE_STATUS_MODE_META = Object.freeze({
+    auto: {
+      label: "Horario automatico",
+      description: "O site segue o horario padrao configurado para liberar ou bloquear pedidos.",
+      badgeClass: "is-auto"
+    },
+    force_open: {
+      label: "Pedidos abertos manualmente",
+      description: "Os pedidos foram liberados manualmente pelo painel, mesmo fora do horario automatico.",
+      badgeClass: "is-active"
+    },
+    force_closed: {
+      label: "Pedidos fechados manualmente",
+      description: "Novos pedidos ficam bloqueados ate alguem reabrir a loja pelo painel.",
+      badgeClass: "is-blocked"
+    }
+  });
 
   let dashboardState = createDashboardState();
   let inventoryRealtimeChannel = null;
@@ -117,6 +136,12 @@
         storageLabel: "",
         persistenceConfigured: true
       },
+      storeStatus: {
+        overrideMode: "auto",
+        updatedAt: "",
+        storageLabel: "",
+        persistenceConfigured: true
+      },
       filters: {
         inventorySearch: "",
         deliverySearch: "",
@@ -142,6 +167,10 @@
       style: "currency",
       currency: "BRL"
     });
+  }
+
+  function getStoreStatusModeMeta(overrideMode) {
+    return STORE_STATUS_MODE_META[normalizeText(overrideMode)] || STORE_STATUS_MODE_META.auto;
   }
 
   function getDeliveryZoneMeta(zoneId) {
@@ -192,6 +221,7 @@
     const deliveryFilter = document.getElementById("admin-delivery-filter");
     const inventoryGroups = document.getElementById("admin-inventory-groups");
     const deliveryAreaList = document.getElementById("admin-delivery-areas-list");
+    const storeStatusActions = document.getElementById("admin-store-status-actions");
     const deliveryForm = document.getElementById("admin-delivery-form");
     const deliveryCancelButton = document.getElementById("admin-delivery-cancel-button");
 
@@ -212,6 +242,7 @@
     });
     inventoryGroups?.addEventListener("click", handleInventoryActionClick);
     deliveryAreaList?.addEventListener("click", handleDeliveryAreaActionClick);
+    storeStatusActions?.addEventListener("click", handleStoreStatusActionClick);
     deliveryForm?.addEventListener("submit", handleDeliveryAreaSubmit);
     deliveryCancelButton?.addEventListener("click", resetDeliveryAreaForm);
     getDeliveryAreaFormFields().zone?.addEventListener("change", syncDeliveryAreaZoneField);
@@ -233,6 +264,14 @@
 
       if (event.key === DELIVERY_AREAS_BROADCAST_STORAGE_KEY) {
         loadDeliveryAreas({
+          background: true,
+          showMessage: false
+        }).catch(() => null);
+        return;
+      }
+
+      if (event.key === STORE_STATUS_BROADCAST_STORAGE_KEY) {
+        loadStoreStatus({
           background: true,
           showMessage: false
         }).catch(() => null);
@@ -360,7 +399,11 @@
     }
 
     try {
-      const [deliveryLoaded, inventoryLoaded] = await Promise.all([
+      const [storeStatusLoaded, deliveryLoaded, inventoryLoaded] = await Promise.all([
+        loadStoreStatus({
+          showMessage: false,
+          background: true
+        }),
         loadDeliveryAreas({
           showMessage: false,
           background: true
@@ -371,7 +414,7 @@
         })
       ]);
 
-      if (showMessage && deliveryLoaded && inventoryLoaded) {
+      if (showMessage && storeStatusLoaded && deliveryLoaded && inventoryLoaded) {
         setDashboardMessage("Painel atualizado com sucesso.");
       }
     } catch (error) {
@@ -411,6 +454,39 @@
     } catch (error) {
       if (!background) {
         setInventoryMessage(error.message || "Nao foi possivel carregar o estoque agora.", true);
+      }
+      throw error;
+    }
+  }
+
+  async function loadStoreStatus({ showMessage = false, background = false } = {}) {
+    try {
+      const response = await fetch(ADMIN_STORE_STATUS_API_URL, {
+        method: "GET",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json"
+        }
+      });
+      const payload = await safeReadJson(response);
+
+      if (response.status === 401) {
+        handleSessionExpired();
+        return false;
+      }
+
+      if (!response.ok || !payload?.ok || !payload.storeStatus) {
+        throw new Error(payload?.message || "Nao foi possivel carregar o status da loja agora.");
+      }
+
+      applyStoreStatusPayload(payload.storeStatus);
+      if (showMessage) {
+        setStoreStatusMessage("Status da loja atualizado com sucesso.");
+      }
+      return true;
+    } catch (error) {
+      if (!background) {
+        setStoreStatusMessage(error.message || "Nao foi possivel carregar o status da loja agora.", true);
       }
       throw error;
     }
@@ -470,6 +546,16 @@
     renderDashboard();
   }
 
+  function applyStoreStatusPayload(storeStatus) {
+    dashboardState.storeStatus = {
+      overrideMode: normalizeText(storeStatus.overrideMode) || "auto",
+      updatedAt: normalizeText(storeStatus.updatedAt),
+      storageLabel: normalizeText(storeStatus.storageLabel),
+      persistenceConfigured: storeStatus.persistenceConfigured !== false
+    };
+    renderDashboard();
+  }
+
   function applyDeliveryAreasPayload(deliveryAreas) {
     dashboardState.deliveryAreas = {
       zones: Array.isArray(deliveryAreas.zones) ? deliveryAreas.zones.slice() : [],
@@ -503,6 +589,7 @@
   function renderDashboard() {
     renderLastUpdated();
     renderStorageNotes();
+    renderStoreStatusSection();
     renderInventoryStats();
     renderDeliveryAreaStats();
     renderInventoryGroups();
@@ -517,6 +604,9 @@
       return;
     }
 
+    const storeStatusUpdatedAt = dashboardState.storeStatus.updatedAt
+      ? `Pedidos: ${formatDateTime(dashboardState.storeStatus.updatedAt)}`
+      : "Pedidos sem atualizacao";
     const deliveryUpdatedAt = dashboardState.deliveryAreas.updatedAt
       ? `Bairros: ${formatDateTime(dashboardState.deliveryAreas.updatedAt)}`
       : "Bairros sem atualizacao";
@@ -524,12 +614,22 @@
       ? `Estoque: ${formatDateTime(dashboardState.inventory.updatedAt)}`
       : "Estoque sem atualizacao";
 
-    lastUpdated.textContent = `${deliveryUpdatedAt} | ${inventoryUpdatedAt}.`;
+    lastUpdated.textContent = `${storeStatusUpdatedAt} | ${deliveryUpdatedAt} | ${inventoryUpdatedAt}.`;
   }
 
   function renderStorageNotes() {
+    const storeStatusNote = document.getElementById("admin-store-status-storage-note");
     const deliveryNote = document.getElementById("admin-delivery-storage-note");
     const inventoryNote = document.getElementById("admin-inventory-storage-note");
+
+    if (storeStatusNote) {
+      storeStatusNote.textContent = buildStorageNote(
+        "pedidos",
+        dashboardState.storeStatus.storageLabel,
+        dashboardState.storeStatus.persistenceConfigured
+      );
+      storeStatusNote.classList.toggle("is-warning", dashboardState.storeStatus.persistenceConfigured === false);
+    }
 
     if (deliveryNote) {
       deliveryNote.textContent = buildStorageNote(
@@ -567,6 +667,39 @@
     if (total) total.textContent = String(dashboardState.inventory.counts.total || 0);
     if (available) available.textContent = String(dashboardState.inventory.counts.available || 0);
     if (unavailable) unavailable.textContent = String(dashboardState.inventory.counts.unavailable || 0);
+  }
+
+  function renderStoreStatusSection() {
+    const meta = getStoreStatusModeMeta(dashboardState.storeStatus.overrideMode);
+    const badge = document.getElementById("admin-store-status-badge");
+    const title = document.getElementById("admin-store-status-title");
+    const copy = document.getElementById("admin-store-status-copy");
+    const updated = document.getElementById("admin-store-status-updated");
+    const buttons = document.querySelectorAll("[data-store-status-mode]");
+
+    if (badge) {
+      badge.textContent = meta.label;
+      badge.className = `admin-status-badge ${meta.badgeClass}`;
+    }
+
+    if (title) {
+      title.textContent = meta.label;
+    }
+
+    if (copy) {
+      copy.textContent = meta.description;
+    }
+
+    if (updated) {
+      updated.textContent = dashboardState.storeStatus.updatedAt
+        ? `Ultima alteracao: ${formatDateTime(dashboardState.storeStatus.updatedAt)}`
+        : "Sem atualizacao registrada.";
+    }
+
+    buttons.forEach(button => {
+      const buttonMode = normalizeText(button.dataset.storeStatusMode);
+      button.classList.toggle("is-selected", buttonMode === dashboardState.storeStatus.overrideMode);
+    });
   }
 
   function renderDeliveryAreaStats() {
@@ -1012,6 +1145,61 @@
     }
   }
 
+  async function handleStoreStatusActionClick(event) {
+    const button = event.target.closest("[data-store-status-mode]");
+    if (!button) {
+      return;
+    }
+
+    const overrideMode = normalizeText(button.dataset.storeStatusMode);
+    if (!overrideMode || overrideMode === dashboardState.storeStatus.overrideMode) {
+      return;
+    }
+
+    setStoreStatusActionsBusy(true, overrideMode);
+    setStoreStatusMessage("");
+
+    try {
+      const response = await fetch(ADMIN_STORE_STATUS_API_URL, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json"
+        },
+        body: JSON.stringify({
+          overrideMode
+        })
+      });
+      const payload = await safeReadJson(response);
+
+      if (response.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+
+      if (!response.ok || !payload?.ok || !payload.storeStatus) {
+        throw new Error(payload?.message || "Nao foi possivel atualizar o status da loja.");
+      }
+
+      applyStoreStatusPayload(payload.storeStatus);
+      broadcastStoreStatusUpdate({
+        overrideMode,
+        updatedAt: payload.storeStatus.updatedAt || new Date().toISOString()
+      });
+
+      if (payload.storeStatus.persistenceConfigured === false) {
+        setStoreStatusMessage("O status visual foi atualizado, mas a hospedagem ainda precisa de armazenamento persistente para salvar isso em producao.");
+      } else {
+        setStoreStatusMessage(`Status da loja atualizado para ${getStoreStatusModeMeta(overrideMode).label.toLowerCase()}.`);
+      }
+    } catch (error) {
+      setStoreStatusMessage(error.message || "Nao foi possivel atualizar o status da loja agora.", true);
+    } finally {
+      setStoreStatusActionsBusy(false);
+    }
+  }
+
   async function handleInventoryActionClick(event) {
     const button = event.target.closest("[data-admin-product-id][data-admin-available]");
     if (!button) {
@@ -1096,6 +1284,21 @@
     button.textContent = isBusy ? label : button.dataset.defaultLabel;
   }
 
+  function setStoreStatusActionsBusy(isBusy, overrideMode = "") {
+    document.querySelectorAll("[data-store-status-mode]").forEach(button => {
+      if (!button.dataset.defaultLabel) {
+        button.dataset.defaultLabel = button.textContent.trim();
+      }
+
+      button.disabled = Boolean(isBusy);
+      if (isBusy && normalizeText(button.dataset.storeStatusMode) === normalizeText(overrideMode)) {
+        button.textContent = "Salvando...";
+      } else {
+        button.textContent = button.dataset.defaultLabel;
+      }
+    });
+  }
+
   function setDeliveryAreaFormBusy(isBusy, label = "") {
     const fields = getDeliveryAreaFormFields();
     const saveButton = fields.saveButton;
@@ -1147,6 +1350,10 @@
 
   function setDashboardMessage(message, isError = false) {
     applyInlineMessage("admin-dashboard-message", message, isError);
+  }
+
+  function setStoreStatusMessage(message, isError = false) {
+    applyInlineMessage("admin-store-status-message", message, isError);
   }
 
   function setInventoryMessage(message, isError = false) {
@@ -1207,6 +1414,18 @@
       });
     } catch {
       // O painel continua funcionando mesmo sem BroadcastChannel.
+    }
+  }
+
+  function broadcastStoreStatusUpdate(payload) {
+    try {
+      localStorage.setItem(STORE_STATUS_BROADCAST_STORAGE_KEY, JSON.stringify({
+        overrideMode: normalizeText(payload?.overrideMode) || "auto",
+        updatedAt: normalizeText(payload?.updatedAt) || new Date().toISOString(),
+        ts: Date.now()
+      }));
+    } catch {
+      // O painel continua funcionando mesmo sem localStorage.
     }
   }
 

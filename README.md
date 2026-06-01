@@ -8,7 +8,7 @@ Site em HTML, CSS e JavaScript para a Galaxy Burger, com checkout via WhatsApp, 
 - CSS
 - JavaScript vanilla
 - Deploy: Vercel
-- APIs serverless: `api/delivery-quote.js`, `api/order-ticket.js`, `api/admin-login.js`, `api/admin-inventory.js` e `api/inventory-status.js`
+- APIs serverless: `api/delivery-quote.js`, `api/order-ticket.js`, `api/admin-login.js`, `api/admin-inventory.js`, `api/admin-store-status.js`, `api/inventory-status.js` e `api/store-status.js`
 
 ## Estrutura
 
@@ -22,6 +22,7 @@ Site em HTML, CSS e JavaScript para a Galaxy Burger, com checkout via WhatsApp, 
 - `api/order-ticket.js`: validacao serverless do pedido, estoque, totais e comanda segura
 - `admin.html`: painel simples para login e troca de status de estoque
 - `admin.js`: interface do painel administrativo
+- `api/_store-status-store.js`: persistencia compartilhada do status operacional da loja
 - `api/_inventory-store.js`: persistencia compartilhada do estoque
 - `img/`: assets visuais do projeto
 - `vercel.json`: configuracao de deploy e headers
@@ -57,11 +58,14 @@ As regras ficam centralizadas em `delivery-config.js`, com bairros e ruas cadast
 - A comanda do pedido e preparada por `api/order-ticket.js`, que recalcula subtotal, taxa e total antes de abrir o WhatsApp.
 - O link compartilhado da comanda nao expoe dados sensiveis em JSON aberto na URL.
 
-## Painel de estoque
+## Painel administrativo
 
 - O acesso administrativo fica em `/admin.html`.
+- O painel permite abrir ou fechar os pedidos manualmente sem editar codigo.
 - O painel atualiza o status do produto e o cardapio principal reage automaticamente.
+- O site principal passa a obedecer esse status operacional em poucos segundos e tambem durante o preparo do pedido.
 - Em desenvolvimento local, o estoque fica salvo em `data/inventory-status.json`.
+- Em desenvolvimento local, o status operacional fica salvo em `data/store-status.json`.
 - Em producao na Vercel, use `BLOB_READ_WRITE_TOKEN` para salvar o estoque de forma persistente entre funcoes, reinicios e novos deploys.
 
 ## Fluxo profissional recomendado
