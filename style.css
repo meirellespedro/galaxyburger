@@ -3614,8 +3614,8 @@ body.ticket-view-active .order-ticket-modal-content {
 
 .admin-delivery-builder-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.12fr) minmax(270px, 0.88fr);
-  gap: 16px;
+  grid-template-columns: 1fr;
+  gap: 18px;
   align-items: start;
 }
 
@@ -3669,7 +3669,7 @@ body.ticket-view-active .order-ticket-modal-content {
 
 .admin-delivery-zone-legend {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -4120,5 +4120,9 @@ body.ticket-view-active .order-ticket-modal-content {
 
   .admin-delivery-builder-meta {
     justify-items: start;
+  }
+
+  .admin-delivery-zone-legend {
+    grid-template-columns: 1fr;
   }
 }
