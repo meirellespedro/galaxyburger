@@ -3669,7 +3669,7 @@ body.ticket-view-active .order-ticket-modal-content {
 
 .admin-delivery-zone-legend {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 
@@ -3682,7 +3682,7 @@ body.ticket-view-active .order-ticket-modal-content {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .admin-delivery-zone-legend-card::after {
@@ -3711,10 +3711,9 @@ body.ticket-view-active .order-ticket-modal-content {
 }
 
 .admin-delivery-zone-legend-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  display: grid;
+  gap: 6px;
+  justify-items: start;
 }
 
 .admin-delivery-zone-legend-head strong {
@@ -3733,7 +3732,7 @@ body.ticket-view-active .order-ticket-modal-content {
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--text);
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .admin-delivery-zone-legend-card p {
