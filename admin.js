@@ -393,7 +393,7 @@
     updateAdminPanels();
     renderDashboard();
     resetDeliveryAreaForm();
-    setLoginMessage("Sessão encerrada.");
+    setLoginMessage("");
   }
 
   async function loadDashboardData({ showMessage = false, background = false } = {}) {
