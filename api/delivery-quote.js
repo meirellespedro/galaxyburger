@@ -30,24 +30,24 @@ const DELIVERY_NORMALIZATION_ABBREVIATIONS = Object.freeze(
 );
 const ADDRESS_GEOCODE_CACHE = new Map();
 const DELIVERY_MESSAGES = Object.freeze({
-  active: "Entrega disponivel para sua regiao. Taxa: {fee}.",
-  blocked: "No momento nao entregamos nessa regiao. Voce pode escolher retirada no local.",
-  pickupOnly: "Para essa regiao, no momento trabalhamos apenas com retirada no local.",
-  outOfRange: "No momento nao entregamos nessa regiao. Voce pode escolher retirada no local.",
-  incomplete: "Preencha o endereco completo para calcular a entrega."
+  active: "Entrega disponível para sua região. Taxa: {fee}.",
+  blocked: "No momento não entregamos nessa região. Você pode escolher retirada no local.",
+  pickupOnly: "Para essa região, no momento trabalhamos apenas com retirada no local.",
+  outOfRange: "No momento não entregamos nessa região. Você pode escolher retirada no local.",
+  incomplete: "Preencha o endereço completo para calcular a entrega."
 });
 const DISTANCE_RULE_ZONE_META = Object.freeze({
   zone_5: Object.freeze({
     zoneId: "zone_5",
     fee: 5,
     status: "active",
-    zoneLabel: "Ate 2,9 km da base - R$ 5,00"
+    zoneLabel: "Até 2,9 km da base - R$ 5,00"
   }),
   zone_10: Object.freeze({
     zoneId: "zone_10",
     fee: 10,
     status: "active",
-    zoneLabel: "De 3 km ate 5 km da base - R$ 10,00"
+    zoneLabel: "De 3 km até 5 km da base - R$ 10,00"
   }),
   pickup_only: Object.freeze({
     zoneId: "pickup_only",
@@ -56,6 +56,32 @@ const DISTANCE_RULE_ZONE_META = Object.freeze({
     zoneLabel: "A partir de 5,1 km - somente retirada"
   })
 });
+const DELIVERY_DISPLAY_TEXT_REPLACEMENTS = Object.freeze([
+  ["Ate 2,9 km", "Até 2,9 km"],
+  ["Ate 2,9 km - R$ 5,00", "Até 2,9 km - R$ 5,00"],
+  ["Ate 2,9 km da base - R$ 5,00", "Até 2,9 km da base - R$ 5,00"],
+  ["De 3 km ate 5 km", "De 3 km até 5 km"],
+  ["De 3 km ate 5 km - R$ 10,00", "De 3 km até 5 km - R$ 10,00"],
+  ["De 3 km ate 5 km da base - R$ 10,00", "De 3 km até 5 km da base - R$ 10,00"],
+  ["Entrega disponivel para sua regiao. Taxa: {fee}.", "Entrega disponível para sua região. Taxa: {fee}."],
+  ["No momento nao entregamos nessa regiao. Voce pode escolher retirada no local.", "No momento não entregamos nessa região. Você pode escolher retirada no local."],
+  ["Para essa regiao, no momento trabalhamos apenas com retirada no local.", "Para essa região, no momento trabalhamos apenas com retirada no local."],
+  ["Endereco validado", "Endereço validado"],
+  ["Taxa automatica para enderecos ate 2,9 km da base.", "Taxa automática para endereços até 2,9 km da base."],
+  ["Taxa automatica para enderecos ate 5 km da base.", "Taxa automática para endereços até 5 km da base."],
+  ["Atendimento apenas com retirada no local para distancias acima da faixa de entrega.", "Atendimento apenas com retirada no local para distâncias acima da faixa de entrega."],
+  ["Entrega bloqueada para esta regiao", "Entrega bloqueada para esta região"]
+]);
+
+function formatDeliveryDisplayText(value) {
+  const text = normalizeText(value);
+  if (!text) {
+    return "";
+  }
+
+  const replacement = DELIVERY_DISPLAY_TEXT_REPLACEMENTS.find(([source]) => source === text);
+  return replacement ? replacement[1] : text;
+}
 const ADDRESS_TYPE_PREFIX_PATTERN = /^(rua|avenida|alameda|travessa|estrada|rodovia|praca|praia)\s+/;
 const cepLookupCache = new Map();
 const ADDRESS_GEOCODE_PROVIDERS = Object.freeze([
@@ -225,7 +251,7 @@ const deliveryQuoteHandler = async function handler(req, res) {
       }
 
       if (addressKey && quote.addressKey !== addressKey) {
-        throw createError("address_mismatch", "O endereco desta comanda nao bate com a cotacao validada.", 409);
+        throw createError("address_mismatch", "O endereço desta comanda não bate com a cotação validada.", 409);
       }
 
       const area = await assertCurrentDeliveryQuote(quote, {
@@ -261,14 +287,14 @@ const deliveryQuoteHandler = async function handler(req, res) {
       ok: false,
       status: "error",
       code: "method_not_allowed",
-      message: "Metodo nao suportado."
+      message: "Método não suportado."
     });
   } catch (error) {
     res.status(Number(error.statusCode || 500)).json({
       ok: false,
       status: error.status || "error",
       code: error.code || "delivery_quote_failed",
-      message: error.message || "Nao foi possivel validar a entrega agora.",
+      message: error.message || "Não foi possível validar a entrega agora.",
       ...(error.officialAddress ? { officialAddress: error.officialAddress } : {})
     });
   }
@@ -469,13 +495,13 @@ function classifyDistanceZone(distanceKm) {
 function createDynamicDeliveryArea(address, zone) {
   return {
     id: "",
-    name: normalizeText(address.street || address.neighborhood || "Endereco validado"),
+    name: normalizeText(address.street || address.neighborhood || "Endereço validado"),
     status: zone.status,
     zoneId: zone.zoneId,
-    zoneLabel: zone.zoneLabel,
+    zoneLabel: formatDeliveryDisplayText(zone.zoneLabel),
     note: zone.status === "active"
-      ? `Taxa automatica para enderecos ate ${zone.zoneId === "zone_5" ? "2,9 km" : "5 km"} da base.`
-      : "Atendimento apenas com retirada no local para distancias acima da faixa de entrega.",
+      ? `Taxa automática para endereços até ${zone.zoneId === "zone_5" ? "2,9 km" : "5 km"} da base.`
+      : "Atendimento apenas com retirada no local para distâncias acima da faixa de entrega.",
     updatedAt: ""
   };
 }
@@ -486,8 +512,8 @@ function buildAreaResponse(area) {
     name: normalizeText(area?.name),
     status: normalizeText(area?.status || "active"),
     zoneId: normalizeText(area?.zoneId),
-    zoneLabel: normalizeText(area?.zoneLabel),
-    note: normalizeText(area?.note || ""),
+    zoneLabel: formatDeliveryDisplayText(area?.zoneLabel),
+    note: formatDeliveryDisplayText(area?.note || ""),
     updatedAt: normalizeText(area?.updatedAt)
   };
 }
@@ -572,7 +598,7 @@ function getQuoteSecret() {
 
   throw createError(
     "missing_secret",
-    "A validacao de entrega nao foi configurada corretamente neste ambiente.",
+    "A validação de entrega não foi configurada corretamente neste ambiente.",
     500
   );
 }
@@ -655,7 +681,7 @@ function buildZoneLabelForArea(area) {
   }
 
   if (normalizeText(area.zoneLabel)) {
-    return normalizeText(area.zoneLabel);
+    return formatDeliveryDisplayText(area.zoneLabel);
   }
 
   if (area.status === "pickup_only") {
@@ -663,7 +689,7 @@ function buildZoneLabelForArea(area) {
   }
 
   if (area.status === "blocked") {
-    return "Entrega bloqueada para esta regiao";
+    return "Entrega bloqueada para esta região";
   }
 
   return `Taxa cadastrada para ${area.name}`;
@@ -708,7 +734,7 @@ async function resolveAddressCoordinates(address) {
   if (typeof globalThis.fetch !== "function") {
     throw createError(
       "delivery_distance_lookup_unavailable",
-      "Nao foi possivel calcular a distancia desta entrega no servidor agora. Tente novamente em instantes.",
+      "Não foi possível calcular a distância desta entrega no servidor agora. Tente novamente em instantes.",
       503
     );
   }
@@ -765,7 +791,7 @@ async function resolveAddressCoordinates(address) {
   if (hadNetworkFailure) {
     throw createError(
       "delivery_distance_lookup_failed",
-      "Nao foi possivel calcular a distancia desta entrega agora. Tente novamente em instantes.",
+      "Não foi possível calcular a distância desta entrega agora. Tente novamente em instantes.",
       503
     );
   }
@@ -832,7 +858,7 @@ async function resolveDeliveryRuleForAddress(officialAddress) {
         status: zone.status,
         zoneId: zone.zoneId,
         zoneLabel: zone.zoneLabel,
-        note: normalizeText(area?.note) || "Zona prioritaria de ate 2,9 km."
+        note: normalizeText(area?.note) || "Zona prioritária de até 2,9 km."
       }),
       validationMode: "priority_zone"
     };
@@ -856,7 +882,7 @@ async function resolveDeliveryRuleForAddress(officialAddress) {
         status: zone.status,
         zoneId: zone.zoneId,
         zoneLabel: zone.zoneLabel,
-        note: normalizeText(area?.note) || "Zona prioritaria de 3 km ate 5 km."
+        note: normalizeText(area?.note) || "Zona prioritária de 3 km até 5 km."
       }),
       validationMode: "priority_zone"
     };
@@ -900,7 +926,7 @@ async function resolveDeliveryRuleForAddress(officialAddress) {
 
   throw createError(
     "delivery_distance_required",
-    "Nao foi possivel confirmar a distancia dessa entrega agora. Tente novamente em instantes ou escolha retirada no local.",
+      "Não foi possível confirmar a distância dessa entrega agora. Tente novamente em instantes ou escolha retirada no local.",
     503
   );
 }
@@ -926,7 +952,7 @@ async function fetchCepAddress(cep) {
   if (typeof globalThis.fetch !== "function") {
     throw createError(
       "delivery_cep_lookup_unavailable",
-      "Nao foi possivel validar o CEP no servidor agora. Tente novamente em instantes.",
+      "Não foi possível validar o CEP no servidor agora. Tente novamente em instantes.",
       503
     );
   }
@@ -972,12 +998,12 @@ async function fetchCepAddress(cep) {
   if (hadNetworkFailure) {
     throw createError(
       "delivery_cep_lookup_failed",
-      "Nao foi possivel consultar o CEP agora. Tente novamente em instantes.",
+      "Não foi possível consultar o CEP agora. Tente novamente em instantes.",
       503
     );
   }
 
-  throw createError("cep_not_found", "CEP nao encontrado. Confira os numeros e tente novamente.", 422);
+  throw createError("cep_not_found", "CEP não encontrado. Confira os números e tente novamente.", 422);
 }
 
 async function resolveOfficialAddressFromCep(submittedAddress) {
@@ -994,7 +1020,7 @@ async function resolveOfficialAddressFromCep(submittedAddress) {
   if (!officialAddress.neighborhood || !officialAddress.city || !officialAddress.state) {
     throw createError(
       "delivery_neighborhood_unresolved",
-      "Nao foi possivel identificar o bairro por este CEP. Confira o endereco ou escolha retirada no local.",
+      "Não foi possível identificar o bairro por este CEP. Confira o endereço ou escolha retirada no local.",
       422,
       {
         officialAddress
@@ -1054,7 +1080,7 @@ async function assertCurrentDeliveryQuote(quote, submittedAddress = {}) {
     ) {
       throw createError(
         "delivery_area_changed",
-        "A taxa de entrega desta regiao mudou. Calcule a entrega novamente antes de finalizar.",
+        "A taxa de entrega desta região mudou. Calcule a entrega novamente antes de finalizar.",
         409
       );
     }
@@ -1069,7 +1095,7 @@ async function assertCurrentDeliveryQuote(quote, submittedAddress = {}) {
   if (!currentArea) {
     throw createError(
       "delivery_area_missing",
-      "A regiao selecionada nao esta mais cadastrada. Escolha outra regiao ou retirada no local.",
+      "A região selecionada não está mais cadastrada. Escolha outra região ou retirada no local.",
       409
     );
   }
@@ -1089,7 +1115,7 @@ async function assertCurrentDeliveryQuote(quote, submittedAddress = {}) {
   ) {
     throw createError(
       "delivery_area_changed",
-      "A taxa de entrega desta regiao mudou. Calcule a entrega novamente antes de finalizar.",
+      "A taxa de entrega desta região mudou. Calcule a entrega novamente antes de finalizar.",
       409
     );
   }
@@ -1160,7 +1186,7 @@ async function buildDeliveryQuote(payload) {
   if (!ACTIVE_DELIVERY_FEE_VALUES.includes(activeFee)) {
     throw createError(
       "delivery_area_invalid_policy",
-      "Esta regiao ainda nao esta configurada corretamente para entrega. Escolha retirada no local ou fale com a loja.",
+      "Esta região ainda não está configurada corretamente para entrega. Escolha retirada no local ou fale com a loja.",
       409
     );
   }

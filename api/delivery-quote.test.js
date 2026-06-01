@@ -208,7 +208,7 @@ test("calcula taxa de R$ 5,00 para regiao da zona proxima", async () => {
   assert.equal(response.body.zone, "zone_5");
   assert.equal(response.body.fee, 5);
   assert.ok(response.body.deliveryArea.id);
-  assert.equal(response.body.message, "Entrega disponivel para sua regiao. Taxa: R$ 5,00.");
+  assert.equal(response.body.message, "Entrega disponível para sua região. Taxa: R$ 5,00.");
   assert.ok(response.body.quote?.token);
 });
 
@@ -229,7 +229,7 @@ test("calcula taxa de R$ 10,00 para regiao da zona intermediaria", async () => {
   assert.equal(response.body.zone, "zone_10");
   assert.equal(response.body.fee, 10);
   assert.equal(response.body.deliveryArea.id, area.id);
-  assert.equal(response.body.message, "Entrega disponivel para sua regiao. Taxa: R$ 10,00.");
+  assert.equal(response.body.message, "Entrega disponível para sua região. Taxa: R$ 10,00.");
 });
 
 test("usa a taxa cadastrada na rua mesmo com numero diferente quando a distancia seria menor", async () => {
@@ -551,7 +551,7 @@ test("retorna bloqueado quando a regiao esta sem entrega", async () => {
   assert.equal(response.body.status, "blocked");
   assert.equal(response.body.fee, 0);
   assert.equal(response.body.deliveryArea.id, area.id);
-  assert.equal(response.body.message, "No momento nao entregamos nessa regiao. Voce pode escolher retirada no local.");
+  assert.equal(response.body.message, "No momento não entregamos nessa região. Você pode escolher retirada no local.");
 });
 
 test("retorna somente retirada quando a regiao esta nessa zona", async () => {
@@ -574,7 +574,7 @@ test("retorna somente retirada quando a regiao esta nessa zona", async () => {
   assert.equal(response.body.status, "pickup_only");
   assert.equal(response.body.fee, 0);
   assert.equal(response.body.deliveryArea.id, area.id);
-  assert.equal(response.body.message, "Para essa regiao, no momento trabalhamos apenas com retirada no local.");
+  assert.equal(response.body.message, "Para essa região, no momento trabalhamos apenas com retirada no local.");
 });
 
 test("libera apenas retirada para endereco acima de 5 km pela distancia", async () => {
@@ -628,7 +628,7 @@ test("bloqueia endereco incompleto antes de gerar a taxa", async () => {
   assert.equal(response.statusCode, 422);
   assert.equal(response.body.ok, false);
   assert.equal(response.body.code, "missing_address_field");
-  assert.equal(response.body.message, "Preencha o endereco completo para calcular a entrega.");
+  assert.equal(response.body.message, "Preencha o endereço completo para calcular a entrega.");
 });
 
 test("invalida uma cotacao salva quando a rua validada fica bloqueada depois", async () => {

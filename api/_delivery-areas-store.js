@@ -10,8 +10,8 @@ const DEFAULT_BLOB_PATHNAME = "config/galaxy-burger/delivery-areas.json";
 const DELIVERY_AREAS_STATE_VERSION = 3;
 const DELIVERY_AREA_STATUS_VALUES = new Set(["active", "blocked", "pickup_only"]);
 const ACTIVE_DELIVERY_FEE_VALUES = Object.freeze([5, 10]);
-const DEFAULT_ACTIVE_NOTE = "Entrega liberada para esta regiao.";
-const DEFAULT_BLOCKED_NOTE = "Regiao bloqueada para entrega.";
+const DEFAULT_ACTIVE_NOTE = "Entrega liberada para esta região.";
+const DEFAULT_BLOCKED_NOTE = "Região bloqueada para entrega.";
 const DEFAULT_PICKUP_ONLY_NOTE = "Atendimento apenas com retirada no local.";
 const DELIVERY_NORMALIZATION_ABBREVIATIONS = Object.freeze(
   Object.entries(deliveryConfig.normalization?.abbreviations || {})
@@ -25,21 +25,21 @@ const DELIVERY_ZONE_IDS = Object.freeze({
 const FIXED_DELIVERY_ZONES = Object.freeze([
   Object.freeze({
     id: DELIVERY_ZONE_IDS.zone5,
-    name: "Ate 2,9 km",
+    name: "Até 2,9 km",
     fee: 5,
     status: "active",
     minDistanceKm: 0,
     maxDistanceKm: 2.9,
-    label: "Ate 2,9 km - R$ 5,00"
+    label: "Até 2,9 km - R$ 5,00"
   }),
   Object.freeze({
     id: DELIVERY_ZONE_IDS.zone10,
-    name: "De 3 km ate 5 km",
+    name: "De 3 km até 5 km",
     fee: 10,
     status: "active",
     minDistanceKm: 3,
     maxDistanceKm: 5,
-    label: "De 3 km ate 5 km - R$ 10,00"
+    label: "De 3 km até 5 km - R$ 10,00"
   }),
   Object.freeze({
     id: DELIVERY_ZONE_IDS.pickupOnly,
@@ -57,7 +57,7 @@ const FIXED_DELIVERY_ZONES = Object.freeze([
     status: "blocked",
     minDistanceKm: 0,
     maxDistanceKm: 0,
-    label: "Entrega bloqueada para esta regiao"
+    label: "Entrega bloqueada para esta região"
   })
 ]);
 const DELIVERY_ZONE_ALIAS_MAP = Object.freeze({
@@ -104,6 +104,29 @@ function normalizeDeliveryAreaName(value) {
     .trim();
 }
 
+const DELIVERY_DISPLAY_TEXT_REPLACEMENTS = Object.freeze([
+  ["Ate 2,9 km", "Até 2,9 km"],
+  ["Ate 2,9 km - R$ 5,00", "Até 2,9 km - R$ 5,00"],
+  ["Ate 2,9 km da base - R$ 5,00", "Até 2,9 km da base - R$ 5,00"],
+  ["De 3 km ate 5 km", "De 3 km até 5 km"],
+  ["De 3 km ate 5 km - R$ 10,00", "De 3 km até 5 km - R$ 10,00"],
+  ["De 3 km ate 5 km da base - R$ 10,00", "De 3 km até 5 km da base - R$ 10,00"],
+  ["Regiao fora da area", "Região fora da área"],
+  ["Regiao bloqueada para entrega.", "Região bloqueada para entrega."],
+  ["Entrega bloqueada para esta regiao", "Entrega bloqueada para esta região"],
+  ["Entrega liberada para esta regiao.", "Entrega liberada para esta região."]
+]);
+
+function formatDeliveryDisplayText(value) {
+  const text = normalizeText(value);
+  if (!text) {
+    return "";
+  }
+
+  const replacement = DELIVERY_DISPLAY_TEXT_REPLACEMENTS.find(([source]) => source === text);
+  return replacement ? replacement[1] : text;
+}
+
 function normalizeDeliveryAreaStatus(value) {
   const normalizedStatus = normalizeCompareText(value).replace(/[\s-]+/g, "_");
   return DELIVERY_AREA_STATUS_VALUES.has(normalizedStatus) ? normalizedStatus : "active";
@@ -136,7 +159,7 @@ function createDeliveryAreaStorageError(code, message, statusCode = 503) {
 function createInvalidActiveFeePolicyError() {
   return createDeliveryAreaStorageError(
     "delivery_area_invalid_fee_policy",
-    "Regioes com entrega ativa devem usar taxa de R$ 5,00 ou R$ 10,00.",
+    "Regiões com entrega ativa devem usar taxa de R$ 5,00 ou R$ 10,00.",
     422
   );
 }
@@ -379,7 +402,7 @@ function sanitizeDeliveryAreaRecord(area, existingAreas = [], options = {}) {
   const updatedAt = normalizeText(area?.updatedAt || options.updatedAt || "");
 
   if (!normalizedName) {
-    throw createDeliveryAreaStorageError("delivery_area_name_required", "Informe o nome do bairro ou regiao.", 422);
+    throw createDeliveryAreaStorageError("delivery_area_name_required", "Informe o nome do bairro ou região.", 422);
   }
 
   const duplicatedArea = existingAreas.find(candidate =>
@@ -390,7 +413,7 @@ function sanitizeDeliveryAreaRecord(area, existingAreas = [], options = {}) {
   if (duplicatedArea) {
     throw createDeliveryAreaStorageError(
       "delivery_area_duplicate_name",
-      "Ja existe um bairro ou regiao cadastrado com esse nome.",
+      "Já existe um bairro ou região cadastrado com esse nome.",
       409
     );
   }
@@ -424,13 +447,13 @@ function resolvePublicDeliveryArea(area, zones = []) {
     name: normalizeText(area?.name),
     normalizedName: normalizeDeliveryAreaName(area?.normalizedName || area?.name),
     zoneId: zone.id,
-    zoneName: zone.name,
-    zoneLabel: zone.label,
+    zoneName: formatDeliveryDisplayText(zone.name),
+    zoneLabel: formatDeliveryDisplayText(zone.label),
     minDistanceKm: Number(zone.minDistanceKm || 0),
     maxDistanceKm: Number(zone.maxDistanceKm || 0),
     fee: Number(zone.fee || 0),
     status: zone.status,
-    note: normalizeText(area?.note) || buildDefaultNoteForZone(zone.id),
+    note: formatDeliveryDisplayText(normalizeText(area?.note) || buildDefaultNoteForZone(zone.id)),
     supportsDelivery: zone.status === "active",
     pickupOnly: zone.status === "pickup_only",
     blocked: zone.status === "blocked",
@@ -522,7 +545,7 @@ async function getBlobSdk() {
   } catch {
     throw createDeliveryAreaStorageError(
       "delivery_area_blob_sdk_missing",
-      "A persistencia das regioes ainda nao foi concluida no projeto. Instale a dependencia do Vercel Blob e publique novamente.",
+      "A persistência das regiões ainda não foi concluída no projeto. Instale a dependência do Vercel Blob e publique novamente.",
       500
     );
   }
@@ -649,7 +672,7 @@ async function persistDeliveryAreasState(state, storageMode = resolvePreferredDe
   if (storageMode === "readonly") {
     throw createDeliveryAreaStorageError(
       "delivery_areas_storage_not_configured",
-      "As areas de entrega ainda nao foram configuradas com armazenamento persistente em producao.",
+      "As áreas de entrega ainda não foram configuradas com armazenamento persistente em produção.",
       503
     );
   }
@@ -724,7 +747,7 @@ async function createDeliveryArea(input) {
   if (!storageResult.persistenceConfigured) {
     throw createDeliveryAreaStorageError(
       "delivery_areas_storage_not_configured",
-      "As areas de entrega ainda nao foram configuradas com armazenamento persistente em producao.",
+      "As áreas de entrega ainda não foram configuradas com armazenamento persistente em produção.",
       503
     );
   }
@@ -750,21 +773,21 @@ async function createDeliveryArea(input) {
 async function updateDeliveryArea(areaId, input) {
   const normalizedId = normalizeText(areaId);
   if (!normalizedId) {
-    throw createDeliveryAreaStorageError("delivery_area_not_found", "Regiao nao encontrada para atualizacao.", 404);
+    throw createDeliveryAreaStorageError("delivery_area_not_found", "Região não encontrada para atualização.", 404);
   }
 
   const storageResult = await readDeliveryAreasState();
   if (!storageResult.persistenceConfigured) {
     throw createDeliveryAreaStorageError(
       "delivery_areas_storage_not_configured",
-      "As areas de entrega ainda nao foram configuradas com armazenamento persistente em producao.",
+      "As áreas de entrega ainda não foram configuradas com armazenamento persistente em produção.",
       503
     );
   }
 
   const areaIndex = storageResult.state.areas.findIndex(area => normalizeText(area.id) === normalizedId);
   if (areaIndex < 0) {
-    throw createDeliveryAreaStorageError("delivery_area_not_found", "Regiao nao encontrada para atualizacao.", 404);
+    throw createDeliveryAreaStorageError("delivery_area_not_found", "Região não encontrada para atualização.", 404);
   }
 
   const currentArea = storageResult.state.areas[areaIndex];
@@ -797,21 +820,21 @@ async function updateDeliveryArea(areaId, input) {
 async function deleteDeliveryArea(areaId) {
   const normalizedId = normalizeText(areaId);
   if (!normalizedId) {
-    throw createDeliveryAreaStorageError("delivery_area_not_found", "Regiao nao encontrada para exclusao.", 404);
+    throw createDeliveryAreaStorageError("delivery_area_not_found", "Região não encontrada para exclusão.", 404);
   }
 
   const storageResult = await readDeliveryAreasState();
   if (!storageResult.persistenceConfigured) {
     throw createDeliveryAreaStorageError(
       "delivery_areas_storage_not_configured",
-      "As areas de entrega ainda nao foram configuradas com armazenamento persistente em producao.",
+      "As áreas de entrega ainda não foram configuradas com armazenamento persistente em produção.",
       503
     );
   }
 
   const nextAreas = storageResult.state.areas.filter(area => normalizeText(area.id) !== normalizedId);
   if (nextAreas.length === storageResult.state.areas.length) {
-    throw createDeliveryAreaStorageError("delivery_area_not_found", "Regiao nao encontrada para exclusao.", 404);
+    throw createDeliveryAreaStorageError("delivery_area_not_found", "Região não encontrada para exclusão.", 404);
   }
 
   const nextState = {

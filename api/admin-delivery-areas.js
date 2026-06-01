@@ -40,7 +40,7 @@ module.exports = async function adminDeliveryAreasHandler(req, res) {
       const areaId = String(payload.id || payload.areaId || "").trim();
 
       if (!areaId) {
-        throw createAdminError("missing_delivery_area_id", "Informe qual regiao sera atualizada.", 422);
+        throw createAdminError("missing_delivery_area_id", "Informe qual região será atualizada.", 422);
       }
 
       const area = await updateDeliveryArea(areaId, payload);
@@ -59,7 +59,7 @@ module.exports = async function adminDeliveryAreasHandler(req, res) {
       const areaId = String(payload.id || payload.areaId || "").trim();
 
       if (!areaId) {
-        throw createAdminError("missing_delivery_area_id", "Informe qual regiao sera removida.", 422);
+        throw createAdminError("missing_delivery_area_id", "Informe qual região será removida.", 422);
       }
 
       await deleteDeliveryArea(areaId);
@@ -75,13 +75,13 @@ module.exports = async function adminDeliveryAreasHandler(req, res) {
     res.status(405).json({
       ok: false,
       code: "method_not_allowed",
-      message: "Metodo nao suportado."
+      message: "Método não suportado."
     });
   } catch (error) {
     res.status(Number(error.statusCode || 500)).json({
       ok: false,
       code: error.code || "admin_delivery_areas_failed",
-      message: error.message || "Nao foi possivel salvar as regioes agora."
+      message: error.message || "Não foi possível salvar as regiões agora."
     });
   }
 };

@@ -111,14 +111,14 @@ module.exports = async function orderTicketHandler(req, res) {
       ok: false,
       status: "error",
       code: "method_not_allowed",
-      message: "Metodo nao suportado."
+      message: "Método não suportado."
     });
   } catch (error) {
     res.status(Number(error.statusCode || 500)).json({
       ok: false,
       status: error.status || "error",
       code: error.code || "order_ticket_failed",
-      message: error.message || "Nao foi possivel preparar o pedido agora."
+      message: error.message || "Não foi possível preparar o pedido agora."
     });
   }
 };
@@ -362,14 +362,14 @@ async function resolveDeliveryOrderContext(payload = {}) {
   }
 
   if (typeof verifyQuoteToken !== "function") {
-    throw createError("delivery_validation_unavailable", "A validacao da entrega nao esta disponivel no servidor.", 500);
+    throw createError("delivery_validation_unavailable", "A validação da entrega não está disponível no servidor.", 500);
   }
 
   const rawDeliveryValues = sanitizeSubmittedAddress(payload.delivery?.values || {});
   assertSubmittedAddress(rawDeliveryValues);
 
   if (!isSupportedServiceArea(rawDeliveryValues)) {
-    throw createError("out_of_range", "No momento nao entregamos nessa regiao. Voce pode escolher retirada no local.", 409);
+    throw createError("out_of_range", "No momento não entregamos nessa região. Você pode escolher retirada no local.", 409);
   }
 
   const quoteToken = normalizeText(payload.delivery?.quoteToken);
@@ -388,7 +388,7 @@ async function resolveDeliveryOrderContext(payload = {}) {
 
   const addressKey = buildDeliveryAddressKey(rawDeliveryValues);
   if (quote.addressKey !== addressKey) {
-    throw createError("delivery_address_mismatch", "O endereco alterou depois da taxa. Calcule a entrega novamente.", 409);
+    throw createError("delivery_address_mismatch", "O endereço alterou depois da taxa. Calcule a entrega novamente.", 409);
   }
 
   let currentArea = null;
@@ -465,7 +465,7 @@ function buildDeliveryAddressData(deliveryValues = {}, isPickup = false) {
 
   return {
     compactAddressLine: [streetLine, deliveryValues.complement, deliveryValues.neighborhood, cityState].filter(Boolean).join(" - "),
-    referenceText: normalizeText(deliveryValues.reference) || "Nao informado",
+    referenceText: normalizeText(deliveryValues.reference) || "Não informado",
     ticketAddressLines,
     mapsQueryAddress: [streetLine, deliveryValues.neighborhood, deliveryValues.city, deliveryValues.state, formatCep(deliveryValues.cep), "Brasil"].filter(Boolean).join(", ")
   };
@@ -593,7 +593,7 @@ async function prepareOrder(payload = {}, req) {
   const subtotalValue = items.reduce((sum, item) => sum + item.lineTotal, 0);
 
   if (subtotalValue < MIN_ORDER_AMOUNT) {
-    throw createError("minimum_order_not_reached", "O pedido minimo ainda nao foi atingido.", 422);
+    throw createError("minimum_order_not_reached", "O pedido mínimo ainda não foi atingido.", 422);
   }
 
   const deliveryContext = await resolveDeliveryOrderContext(payload);
@@ -687,7 +687,7 @@ function getOrderSecret() {
     return configuredSecret;
   }
 
-  throw createError("missing_order_secret", "A comanda segura do pedido nao foi configurada corretamente neste ambiente.", 500);
+  throw createError("missing_order_secret", "A comanda segura do pedido não foi configurada corretamente neste ambiente.", 500);
 }
 
 function getOrderCipherKey() {

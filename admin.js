@@ -608,17 +608,8 @@
       return;
     }
 
-    const storeStatusUpdatedAt = dashboardState.storeStatus.updatedAt
-      ? `Pedidos: ${formatDateTime(dashboardState.storeStatus.updatedAt)}`
-      : "Pedidos sem atualização";
-    const deliveryUpdatedAt = dashboardState.deliveryAreas.updatedAt
-      ? `Regiões: ${formatDateTime(dashboardState.deliveryAreas.updatedAt)}`
-      : "Regiões sem atualização";
-    const inventoryUpdatedAt = dashboardState.inventory.updatedAt
-      ? `Estoque: ${formatDateTime(dashboardState.inventory.updatedAt)}`
-      : "Estoque sem atualização";
-
-    lastUpdated.textContent = `${storeStatusUpdatedAt} | ${deliveryUpdatedAt} | ${inventoryUpdatedAt}.`;
+    lastUpdated.hidden = true;
+    lastUpdated.textContent = "";
   }
 
   function renderStorageNotes() {

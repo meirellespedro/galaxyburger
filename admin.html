@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20260601-6">
   <script src="store-config.js?v=20260522-1" defer></script>
-  <script src="admin.js?v=20260601-8" defer></script>
+  <script src="admin.js?v=20260601-9" defer></script>
 </head>
 <body class="admin-body">
   <div class="space-dust" aria-hidden="true"></div>
@@ -41,7 +41,7 @@
         <div>
           <span class="section-kicker">Gest&atilde;o segura</span>
           <h2>Painel do dono</h2>
-          <p id="admin-last-updated">Carregando informações do painel...</p>
+          <p id="admin-last-updated" hidden></p>
         </div>
 
         <div class="admin-dashboard-actions">
@@ -146,7 +146,7 @@
 
                 <label class="admin-field">
                   <span>Observa&ccedil;&atilde;o</span>
-                  <textarea id="admin-delivery-note" name="note" rows="4" placeholder="Opcional. Ex.: atendimento mais rápido nesta região."></textarea>
+                  <textarea id="admin-delivery-note" name="note" rows="4" placeholder="Ex.: atendimento mais rápido nesta região."></textarea>
                 </label>
 
                 <div class="admin-inline-actions admin-delivery-actions-row">

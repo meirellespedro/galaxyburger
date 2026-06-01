@@ -47,9 +47,9 @@
       })
     }),
     messages: Object.freeze({
-      local: "Entrega dispon\u00edvel para sua regi\u00e3o. Taxa: R$ 5,00.",
-      extended: "Entrega dispon\u00edvel para sua regi\u00e3o. Taxa: R$ 10,00.",
-      outOfRange: "No momento n\u00e3o entregamos nessa regi\u00e3o. Voc\u00ea pode escolher retirada no local."
+      local: "Entrega disponível para sua região. Taxa: R$ 5,00.",
+      extended: "Entrega disponível para sua região. Taxa: R$ 10,00.",
+      outOfRange: "No momento não entregamos nessa região. Você pode escolher retirada no local."
     }),
     metadata: Object.freeze({
       locationPrecision: "manual_zone",
@@ -74,7 +74,7 @@
     }),
     blockedRules: Object.freeze([
       Object.freeze({
-        name: "Regiao fora da area",
+        name: "Região fora da área",
         neighborhoods: Object.freeze([
           "santa cruz",
           "paciencia",
@@ -102,10 +102,10 @@
       Object.freeze({
         id: "zone_5",
         value: "zone_5",
-        name: "Ate 2,9 km",
+        name: "Até 2,9 km",
         fee: 5,
         maxDistanceKm: 2.9,
-        label: "Ate 2,9 km da base - R$ 5,00",
+        label: "Até 2,9 km da base - R$ 5,00",
         neighborhoods: Object.freeze([
           "centro de campo grande",
           "campo grande centro",
@@ -156,11 +156,11 @@
       Object.freeze({
         id: "zone_10",
         value: "zone_10",
-        name: "De 3 km ate 5 km",
+        name: "De 3 km até 5 km",
         fee: 10,
         minDistanceKm: 3,
         maxDistanceKm: 5,
-        label: "De 3 km ate 5 km da base - R$ 10,00",
+        label: "De 3 km até 5 km da base - R$ 10,00",
         neighborhoods: Object.freeze([
           "campo grande",
           "inhoaiba",
