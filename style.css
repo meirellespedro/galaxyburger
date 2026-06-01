@@ -3345,7 +3345,9 @@ body.ticket-view-active .order-ticket-modal-content {
 
 .admin-field textarea {
   min-height: 132px;
-  resize: vertical;
+  height: 132px;
+  resize: none;
+  overflow: auto;
 }
 
 .admin-field select {

@@ -856,10 +856,6 @@
   function renderDeliveryAreaCard(area) {
     const status = normalizeText(area?.status) || "active";
     const statusMeta = DELIVERY_STATUS_META[status] || DELIVERY_STATUS_META.active;
-    const zoneMeta = getDeliveryZoneMeta(area?.zoneId);
-    const feeLabel = status === "active"
-      ? normalizeText(area?.zoneLabel || zoneMeta.label)
-      : normalizeText(area?.zoneLabel || zoneMeta.label || "Taxa: retirada no local");
     const note = normalizeText(area?.note) || statusMeta.description;
 
     return `
@@ -868,9 +864,6 @@
           <div class="admin-delivery-status-row">
             <strong>${escapeHtml(area.name)}</strong>
             <span class="admin-status-badge ${statusMeta.badgeClass}">${escapeHtml(statusMeta.label)}</span>
-          </div>
-          <div class="admin-delivery-meta">
-            <span>${escapeHtml(feeLabel)}</span>
           </div>
           <p>${escapeHtml(note)}</p>
         </div>
