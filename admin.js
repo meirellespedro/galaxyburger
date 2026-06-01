@@ -81,7 +81,7 @@
     },
     force_closed: {
       label: "Pedidos fechados manualmente",
-      description: "Novos pedidos ficam bloqueados ate alguem reabrir a loja pelo painel.",
+      description: "",
       badgeClass: "is-blocked"
     }
   });
