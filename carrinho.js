@@ -2107,9 +2107,6 @@ async function refreshCatalogAvailability({ notify = true, quiet = true, reason 
     return payload;
   } catch (error) {
     logCheckoutWarn("Falha ao sincronizar estoque do cardápio.", error);
-    if (!quiet) {
-      showToast("Não foi possível atualizar o estoque agora.");
-    }
     return null;
   }
 }
@@ -3097,7 +3094,7 @@ function updatePixPanelSummary({ subtotal = getCartTotal(), total = subtotal } =
 
 function getFinalizeButtonLabel() {
   return getCurrentFulfillmentMode() === "pickup"
-    ? "Revisar retirada no WhatsApp"
+    ? "Revisar pedido no WhatsApp"
     : "Revisar pedido no WhatsApp";
 }
 
@@ -3219,7 +3216,7 @@ function updateCartTotals() {
         : hasItems && !meetsMinimumOrder
           ? `Faltam ${formatCurrency(getMinimumOrderShortfall(subtotal))} para o m\u00ednimo`
           : !hasItems
-            ? getFinalizeButtonLabel()
+            ? "Monte seu pedido para enviar"
             : deliveryUnavailable
               ? "Escolha retirada para continuar"
             : !isPickup && !hasValidatedDelivery
@@ -3728,7 +3725,7 @@ function syncStoreConfigUI() {
 
 function getOrderAvailabilityCopy(availability = getStoreAvailability()) {
   const minimumOrderCopy = `Pedido minimo: ${formatCurrency(MIN_ORDER_AMOUNT)} em produtos.`;
-
+  const minimumOrderText = MIN_ORDER_AMOUNT > 0 ? ` ${minimumOrderCopy}` : "";
   if (isStoreManuallyForcedOpen(availability)) {
     return {
       cartLabel: "Pedidos liberados manualmente",
@@ -3741,8 +3738,8 @@ function getOrderAvailabilityCopy(availability = getStoreAvailability()) {
   if (isStoreManuallyForcedClosed(availability)) {
     return {
       cartLabel: "Loja fechada no momento",
-      cartMessage: `${getStoreClosedOrderMessage(availability)} Voce pode montar o carrinho normalmente, mas o envio fica bloqueado ate a reabertura da loja.`,
-      checkoutHelper: `${getStoreClosedOrderMessage(availability)} Monte seu carrinho normalmente; o envio pelo WhatsApp fica bloqueado ate a reabertura. ${minimumOrderCopy}`,
+      cartMessage: `${getStoreClosedOrderMessage(availability)} Você pode montar o carrinho normalmente, mas o envio fica bloqueado até a reabertura da loja.`,
+      checkoutHelper: `${getStoreClosedOrderMessage(availability)} Monte seu carrinho normalmente; o envio pelo WhatsApp fica bloqueado até a reabertura.${minimumOrderText}`,
       footerStatus: "Status atual: fechada."
     };
   }
@@ -3750,17 +3747,17 @@ function getOrderAvailabilityCopy(availability = getStoreAvailability()) {
   if (!availability.scheduleEnforced) {
     return {
       cartLabel: "Pedidos liberados para teste",
-      cartMessage: "Modo de validacao ativo. O bloqueio por horario foi desativado temporariamente para voce testar o checkout, inclusive o envio do pedido para a hamburgueria.",
-      checkoutHelper: `Modo de testes ativo: o envio para a hamburgueria esta liberado temporariamente para validar o fluxo completo do pedido. ${minimumOrderCopy}`,
+      cartMessage: "Modo de validação ativo. O bloqueio por horário foi desativado temporariamente para você testar o checkout, inclusive o envio do pedido para a hamburgueria.",
+      checkoutHelper: `Modo de testes ativo: o envio para a hamburgueria está liberado temporariamente para validar o fluxo completo do pedido.${minimumOrderText}`,
       footerStatus: "Status atual: modo de testes ativo, com pedidos liberados temporariamente."
     };
   }
 
   if (availability.isOpen) {
     return {
-      cartLabel: "Loja aberta no momento",
+      cartLabel: `Loja aberta até ${formatStoreTimeLabel(availability.todaySchedule?.closeMinutes || 0)}`,
       cartMessage: "Valide o endereco, revise o pedido e abra o WhatsApp oficial da Galaxy Burger para concluir.",
-      checkoutHelper: `Revise o pedido, abra o WhatsApp oficial da Galaxy Burger e confirme o envio no site para limpar o carrinho. ${minimumOrderCopy}`,
+      checkoutHelper: `Revise o pedido, abra o WhatsApp oficial da Galaxy Burger e confirme o envio no site para limpar o carrinho.${minimumOrderText}`,
       footerStatus: `Status atual: aberta ate ${formatStoreTimeLabel(availability.todaySchedule?.closeMinutes || 0)}.`
     };
   }
@@ -3768,7 +3765,7 @@ function getOrderAvailabilityCopy(availability = getStoreAvailability()) {
   return {
     cartLabel: "Loja fechada no momento",
     cartMessage: `${getStoreClosedOrderMessage(availability)} Voce pode montar o carrinho normalmente, mas o envio do pedido fica liberado apenas no horario de funcionamento.`,
-    checkoutHelper: `${getStoreClosedOrderMessage(availability)} Monte seu carrinho normalmente; o envio pelo WhatsApp fica bloqueado ate a reabertura. ${minimumOrderCopy}`,
+    checkoutHelper: `${getStoreClosedOrderMessage(availability)} Monte seu carrinho normalmente; o envio pelo WhatsApp fica bloqueado até a reabertura.${minimumOrderText}`,
     footerStatus: `Status atual: fechada. ${formatNextOpeningMessage(availability.nextOpen)}`
   };
 }
@@ -3813,7 +3810,7 @@ function updateOrderAvailabilityUI(availability = getStoreAvailability()) {
     checkoutHelper.textContent = copy.checkoutHelper;
   }
 
-  if (availability.isOpen && cart.length && cartStatusLabel && cartStatusMessage && !hasReachedMinimumOrder(subtotal)) {
+  if (availability.isOpen && cart.length && cartStatusLabel && cartStatusMessage && !hasReachedMinimumOrder(subtotal) && MIN_ORDER_AMOUNT > 0) {
     cartStatusLabel.textContent = "Pedido m\u00ednimo n\u00e3o atingido";
     cartStatusMessage.textContent = `Adicione mais ${formatCurrency(getMinimumOrderShortfall(subtotal))} em produtos para liberar o envio do pedido para a hamburgueria.`;
   }
@@ -5282,7 +5279,7 @@ function validateCheckout() {
 
   if (!hasReachedMinimumOrder(subtotal)) {
     logCheckoutWarn("Checkout bloqueado: pedido m\u00ednimo n\u00e3o atingido.", { subtotal });
-    showToast(`O pedido m\u00ednimo da Galaxy Burger \u00e9 ${formatCurrency(MIN_ORDER_AMOUNT)} em produtos. Faltam ${formatCurrency(getMinimumOrderShortfall(subtotal))} para continuar.`);
+    showToast(`O pedido mínimo da Galaxy Burger é ${formatCurrency(MIN_ORDER_AMOUNT)} em produtos. Faltam ${formatCurrency(getMinimumOrderShortfall(subtotal))} para continuar.`);
     return false;
   }
 
@@ -5828,7 +5825,3 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
-
-
-
-

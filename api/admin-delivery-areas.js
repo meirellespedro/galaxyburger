@@ -4,11 +4,11 @@ const {
   getDeliveryAreaCounts,
   getDeliveryAreasSnapshot,
   updateDeliveryArea
-} = require("./_delivery-areas-store");
+} = require("../lib/_delivery-areas-store");
 const {
   createAdminError,
   requireAdminSession
-} = require("./_admin-auth");
+} = require("../lib/_admin-auth");
 
 module.exports = async function adminDeliveryAreasHandler(req, res) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");

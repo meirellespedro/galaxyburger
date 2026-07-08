@@ -5,7 +5,7 @@ const {
   getDeliveryAreaById,
   getDeliveryAreaByName,
   normalizeDeliveryAreaName
-} = require("./_delivery-areas-store");
+} = require("../lib/_delivery-areas-store");
 
 const QUOTE_TTL_MS = 15 * 60 * 1000;
 const VIACEP_BASE_URL = "https://viacep.com.br/ws";

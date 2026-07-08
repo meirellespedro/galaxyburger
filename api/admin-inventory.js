@@ -2,11 +2,11 @@ const {
   getInventoryCounts,
   getInventorySnapshot,
   setBulkInventoryStatus
-} = require("./_inventory-store");
+} = require("../lib/_inventory-store");
 const {
   createAdminError,
   requireAdminSession
-} = require("./_admin-auth");
+} = require("../lib/_admin-auth");
 
 module.exports = async function adminInventoryHandler(req, res) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");

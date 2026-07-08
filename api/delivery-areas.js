@@ -1,7 +1,7 @@
 const {
   getDeliveryAreaCounts,
   getDeliveryAreasSnapshot
-} = require("./_delivery-areas-store");
+} = require("../lib/_delivery-areas-store");
 
 module.exports = function deliveryAreasHandler(req, res) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");

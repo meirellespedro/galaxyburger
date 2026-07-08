@@ -90,6 +90,7 @@
   let inventoryRealtimeChannel = null;
 
   document.addEventListener("DOMContentLoaded", () => {
+    injectPersistenceWarningStyles();
     inventoryRealtimeChannel = createInventoryRealtimeChannel();
     syncBrandCopy();
     bindAdminEvents();
@@ -121,7 +122,9 @@
         },
         updatedAt: "",
         storageLabel: "",
-        persistenceConfigured: true
+        persistenceConfigured: true,
+        loadErrorMessage: "",
+        loadErrorCode: ""
       },
       deliveryAreas: {
         zones: [],
@@ -140,7 +143,9 @@
         overrideMode: "auto",
         updatedAt: "",
         storageLabel: "",
-        persistenceConfigured: true
+        persistenceConfigured: true,
+        loadErrorMessage: "",
+        loadErrorCode: ""
       },
       filters: {
         inventorySearch: "",
@@ -149,6 +154,73 @@
       },
       editingDeliveryAreaId: ""
     };
+  }
+
+  function isPersistenceGloballyConfigured() {
+    return dashboardState.inventory.persistenceConfigured &&
+           dashboardState.deliveryAreas.persistenceConfigured &&
+           dashboardState.storeStatus.persistenceConfigured;
+  }
+
+  function injectPersistenceWarningStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+        .admin-persistence-warning {
+            background-color: #ffc107;
+            color: #000;
+            padding: 1rem;
+            text-align: center;
+            font-size: 0.9rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        body.has-persistence-warning .admin-toolbar {
+            top: 50px;
+        }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function renderPersistenceWarning() {
+    let warningBanner = document.getElementById("admin-persistence-warning");
+    if (!isPersistenceGloballyConfigured()) {
+        if (!warningBanner) {
+            warningBanner = document.createElement("div");
+            warningBanner.id = "admin-persistence-warning";
+            warningBanner.className = "admin-persistence-warning";
+            document.body.prepend(warningBanner);
+        }
+        warningBanner.innerHTML = `
+            <strong>Atenção:</strong> A persistência de dados não está configurada corretamente.
+            As alterações feitas neste painel não serão salvas. Verifique as variáveis de ambiente no seu projeto Vercel.
+        `;
+        warningBanner.hidden = false;
+        document.body.classList.add("has-persistence-warning");
+
+    } else if (warningBanner) {
+        warningBanner.hidden = true;
+        document.body.classList.remove("has-persistence-warning");
+    }
+  }
+
+  function updateFormsForPersistence() {
+    const isReadOnly = !isPersistenceGloballyConfigured();
+
+    const actionButtons = document.querySelectorAll(
+        '[data-admin-product-id], [data-store-status-mode], [data-delivery-action], #admin-delivery-save-button'
+    );
+
+    actionButtons.forEach(button => {
+        button.disabled = isReadOnly;
+    });
+
+    const deliveryFormInputs = document.querySelectorAll(
+        '#admin-delivery-name, #admin-delivery-zone, #admin-delivery-note'
+    );
+    deliveryFormInputs.forEach(input => {
+        input.disabled = isReadOnly;
+    });
   }
 
   function normalizeText(value) {
@@ -456,8 +528,10 @@
       }
       return true;
     } catch (error) {
+      applyInventoryLoadError(error);
+      logAdminApiError("inventory_load_failed", error);
       if (!background) {
-        setInventoryMessage(error.message || "Não foi possível carregar o estoque agora.", true);
+        setInventoryMessage("Não foi possível sincronizar o estoque.", true);
       }
       throw error;
     }
@@ -480,7 +554,7 @@
       }
 
       if (!response.ok || !payload?.ok || !payload.storeStatus) {
-        throw new Error(payload?.message || "Não foi possível carregar o status da loja agora.");
+        throw createApiResponseError(response, payload, "Nao foi possivel carregar o status da loja agora.");
       }
 
       applyStoreStatusPayload(payload.storeStatus);
@@ -489,10 +563,11 @@
       }
       return true;
     } catch (error) {
-      if (!background) {
-        setStoreStatusMessage(error.message || "Não foi possível carregar o status da loja agora.", true);
+      applyStoreStatusLoadError(error);
+      logAdminApiError("store_status_load_failed", error);
+      if (!background || !dashboardState.storeStatus.updatedAt) {
+        setStoreStatusMessage(error.message || "Nao foi possivel carregar o status da loja agora.", true);
       }
-      throw error;
     }
   }
 
@@ -545,7 +620,20 @@
       },
       updatedAt: normalizeText(inventory.updatedAt),
       storageLabel: normalizeText(inventory.storageLabel),
-      persistenceConfigured: inventory.persistenceConfigured !== false
+      persistenceConfigured: inventory.persistenceConfigured !== false,
+      loadErrorMessage: "",
+      loadErrorCode: ""
+    };
+    renderDashboard();
+  }
+
+  function applyInventoryLoadError(error) {
+    dashboardState.inventory = {
+      ...dashboardState.inventory,
+      storageLabel: dashboardState.inventory.storageLabel || "Vercel Blob",
+      loadErrorMessage: normalizeText(error?.message) || "Não foi possível carregar o estoque agora.",
+      loadErrorCode: normalizeText(error?.code),
+      persistenceConfigured: false
     };
     renderDashboard();
   }
@@ -555,7 +643,19 @@
       overrideMode: normalizeText(storeStatus.overrideMode) || "auto",
       updatedAt: normalizeText(storeStatus.updatedAt),
       storageLabel: normalizeText(storeStatus.storageLabel),
-      persistenceConfigured: storeStatus.persistenceConfigured !== false
+      persistenceConfigured: storeStatus.persistenceConfigured !== false,
+      loadErrorMessage: "",
+      loadErrorCode: ""
+    };
+    renderDashboard();
+  }
+
+  function applyStoreStatusLoadError(error) {
+    dashboardState.storeStatus = {
+      ...dashboardState.storeStatus,
+      storageLabel: dashboardState.storeStatus.storageLabel || "Vercel Blob",
+      loadErrorMessage: normalizeText(error?.message) || "Nao foi possivel carregar o status da loja agora.",
+      loadErrorCode: normalizeText(error?.code)
     };
     renderDashboard();
   }
@@ -591,6 +691,8 @@
   }
 
   function renderDashboard() {
+    renderPersistenceWarning();
+    updateFormsForPersistence();
     renderLastUpdated();
     renderStorageNotes();
     renderStoreStatusSection();
@@ -618,12 +720,17 @@
     const inventoryNote = document.getElementById("admin-inventory-storage-note");
 
     if (storeStatusNote) {
-      storeStatusNote.textContent = buildStorageNote(
-        "pedidos",
-        dashboardState.storeStatus.storageLabel,
-        dashboardState.storeStatus.persistenceConfigured
-      );
-      storeStatusNote.classList.toggle("is-warning", dashboardState.storeStatus.persistenceConfigured === false);
+      if (dashboardState.storeStatus.loadErrorMessage) {
+        storeStatusNote.textContent = `Falha no armazenamento dos pedidos: ${dashboardState.storeStatus.loadErrorMessage}`;
+        storeStatusNote.classList.add("is-warning");
+      } else {
+        storeStatusNote.textContent = buildStorageNote(
+          "pedidos",
+          dashboardState.storeStatus.storageLabel,
+          dashboardState.storeStatus.persistenceConfigured
+        );
+        storeStatusNote.classList.toggle("is-warning", dashboardState.storeStatus.persistenceConfigured === false);
+      }
     }
 
     if (deliveryNote) {
@@ -659,6 +766,13 @@
     const available = document.getElementById("admin-stat-available");
     const unavailable = document.getElementById("admin-stat-unavailable");
 
+    if (dashboardState.inventory.loadErrorMessage) {
+        if (total) total.textContent = "N/A";
+        if (available) available.textContent = "N/A";
+        if (unavailable) unavailable.textContent = "N/A";
+        return;
+    }
+
     if (total) total.textContent = String(dashboardState.inventory.counts.total || 0);
     if (available) available.textContent = String(dashboardState.inventory.counts.available || 0);
     if (unavailable) unavailable.textContent = String(dashboardState.inventory.counts.unavailable || 0);
@@ -671,6 +785,35 @@
     const copy = document.getElementById("admin-store-status-copy");
     const updated = document.getElementById("admin-store-status-updated");
     const buttons = document.querySelectorAll("[data-store-status-mode]");
+    const loadErrorMessage = normalizeText(dashboardState.storeStatus.loadErrorMessage);
+
+    if (loadErrorMessage) {
+      if (badge) {
+        badge.textContent = "Sincronização Indisponível";
+        badge.className = "admin-status-badge is-warning";
+      }
+
+      if (title) {
+        title.textContent = "Não foi possível sincronizar";
+      }
+
+      if (copy) {
+        copy.hidden = false;
+        copy.textContent = `${loadErrorMessage} O sistema continuará tentando reconectar automaticamente.`;
+      }
+
+      if (updated) {
+        updated.textContent = dashboardState.storeStatus.loadErrorCode
+          ? `Falha na consulta: ${dashboardState.storeStatus.loadErrorCode}`
+          : "Falha na ultima consulta.";
+      }
+
+      buttons.forEach(button => {
+        button.classList.remove("is-selected");
+        button.disabled = false;
+      });
+      return;
+    }
 
     if (badge) {
       badge.textContent = meta.label;
@@ -695,6 +838,7 @@
     buttons.forEach(button => {
       const buttonMode = normalizeText(button.dataset.storeStatusMode);
       button.classList.toggle("is-selected", buttonMode === dashboardState.storeStatus.overrideMode);
+      button.disabled = false;
     });
   }
 
@@ -714,6 +858,16 @@
   function renderInventoryGroups() {
     const container = document.getElementById("admin-inventory-groups");
     if (!container) {
+      return;
+    }
+
+    if (dashboardState.inventory.loadErrorMessage) {
+        container.innerHTML = `
+        <div class="admin-empty-state">
+          <strong>Não foi possível carregar o estoque</strong>
+          <p>${escapeHtml(dashboardState.inventory.loadErrorMessage)}</p>
+        </div>
+      `;
       return;
     }
 
@@ -1166,7 +1320,7 @@
       }
 
       if (!response.ok || !payload?.ok || !payload.storeStatus) {
-        throw new Error(payload?.message || "Não foi possível atualizar o status da loja.");
+        throw createApiResponseError(response, payload, "Nao foi possivel atualizar o status da loja.");
       }
 
       applyStoreStatusPayload(payload.storeStatus);
@@ -1181,7 +1335,11 @@
         setStoreStatusMessage(`Status da loja atualizado para ${getStoreStatusModeMeta(overrideMode).label.toLowerCase()}.`);
       }
     } catch (error) {
-      setStoreStatusMessage(error.message || "Não foi possível atualizar o status da loja agora.", true);
+      logAdminApiError("store_status_save_failed", error);
+      if (normalizeText(error?.code).includes("blob")) {
+        applyStoreStatusLoadError(error);
+      }
+      setStoreStatusMessage(error.message || "Nao foi possivel atualizar o status da loja agora.", true);
     } finally {
       setStoreStatusActionsBusy(false);
     }
@@ -1272,12 +1430,13 @@
   }
 
   function setStoreStatusActionsBusy(isBusy, overrideMode = "") {
+    const hasLoadError = Boolean(normalizeText(dashboardState.storeStatus.loadErrorMessage));
     document.querySelectorAll("[data-store-status-mode]").forEach(button => {
       if (!button.dataset.defaultLabel) {
         button.dataset.defaultLabel = button.textContent.trim();
       }
 
-      button.disabled = Boolean(isBusy);
+      button.disabled = Boolean(isBusy || hasLoadError);
       if (isBusy && normalizeText(button.dataset.storeStatusMode) === normalizeText(overrideMode)) {
         button.textContent = "Salvando...";
       } else {
@@ -1368,6 +1527,21 @@
     } catch {
       return null;
     }
+  }
+
+  function createApiResponseError(response, payload, fallbackMessage) {
+    const error = new Error(normalizeText(payload?.message) || fallbackMessage);
+    error.code = normalizeText(payload?.code);
+    error.statusCode = Number(response?.status || 0);
+    return error;
+  }
+
+  function logAdminApiError(eventName, error) {
+    console.warn(`[admin] ${eventName}`, {
+      code: normalizeText(error?.code),
+      statusCode: Number(error?.statusCode || 0) || undefined,
+      message: normalizeText(error?.message)
+    });
   }
 
   function escapeHtml(value) {

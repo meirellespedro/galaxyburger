@@ -12,20 +12,20 @@ const {
 } = require("zlib");
 const storeConfig = require("../store-config");
 const deliveryQuoteApi = require("./delivery-quote.js");
-const { getInventorySnapshot } = require("./_inventory-store");
+const { getInventorySnapshot } = require("../lib/_inventory-store");
 const {
   ACTIVE_DELIVERY_FEE_VALUES
-} = require("./_delivery-areas-store");
+} = require("../lib/_delivery-areas-store");
 const {
   getStoreStatusSnapshot
-} = require("./_store-status-store");
+} = require("../lib/_store-status-store");
 const {
   canPersistSharedOrderTicket,
   createPersistedOrderTicketRef,
   isPersistedOrderTicketRef,
   persistSharedOrderTicket,
   readSharedOrderTicket
-} = require("./_order-ticket-store");
+} = require("../lib/_order-ticket-store");
 
 const deliveryInternals = deliveryQuoteApi._internals || {};
 const {

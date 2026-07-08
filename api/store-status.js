@@ -1,4 +1,4 @@
-const { getStoreStatusSnapshot } = require("./_store-status-store");
+const { getStoreStatusSnapshot } = require("../lib/_store-status-store");
 
 module.exports = function storeStatusHandler(req, res) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");

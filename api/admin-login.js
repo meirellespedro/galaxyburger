@@ -4,7 +4,7 @@ const {
   getAdminSession,
   setAdminSessionCookie,
   validateAdminPassword
-} = require("./_admin-auth");
+} = require("../lib/_admin-auth");
 
 module.exports = async function adminLoginHandler(req, res) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");

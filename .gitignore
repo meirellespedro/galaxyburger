@@ -30,3 +30,5 @@ desktop.ini
 .vercel
 .env*.local
 data/order-tickets/
+
+.env*

@@ -1,11 +1,11 @@
 const {
   getStoreStatusSnapshot,
   updateStoreStatusOverride
-} = require("./_store-status-store");
+} = require("../lib/_store-status-store");
 const {
   createAdminError,
   requireAdminSession
-} = require("./_admin-auth");
+} = require("../lib/_admin-auth");
 
 module.exports = async function adminStoreStatusHandler(req, res) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");

@@ -1,7 +1,7 @@
 const {
   getInventoryCounts,
   getInventorySnapshot
-} = require("./_inventory-store");
+} = require("../lib/_inventory-store");
 
 module.exports = function inventoryStatusHandler(req, res) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
