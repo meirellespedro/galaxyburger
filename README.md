@@ -42,6 +42,7 @@ Este projeto nao precisa de build step.
 - `ORDER_TICKET_SECRET`: opcional, mas recomendada. Se nao for definida, a API de comanda segura reutiliza `DELIVERY_QUOTE_SECRET`.
 - `ADMIN_PANEL_PASSWORD`: obrigatoria para liberar o login do painel administrativo.
 - `ADMIN_PANEL_SECRET`: recomendada para assinar a sessao do painel administrativo.
+- `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`: necessarias em producao (Vercel) para o painel administrativo salvar de verdade (estoque, areas de entrega, status da loja). Veja a secao "Painel administrativo" abaixo.
 
 ## Taxa de entrega
 
@@ -66,7 +67,19 @@ As regras ficam centralizadas em `delivery-config.js`, com bairros e ruas cadast
 - Em desenvolvimento local, o estoque fica salvo em `data/inventory-status.json`.
 - Em desenvolvimento local, o status operacional fica salvo em `data/store-status.json`.
 - Em desenvolvimento local, configure `DELIVERY_QUOTE_SECRET` para testar cotacao e preparo do pedido sem depender de fallback embutido no codigo.
-- Em producao na Vercel nao ha volume persistente entre execucoes das funcoes, entao o painel opera em modo somente leitura: o site publico serve os dados de `delivery-config.js` / `catalog-config.js`, e edicoes feitas no painel nao sao salvas. Isso e proposital, para nao depender de nenhum servico de armazenamento pago.
+- Em producao na Vercel nao ha volume persistente entre execucoes das funcoes (o disco local nao serve para isso). Por isso o painel usa o [Upstash Redis](https://upstash.com) como armazenamento — plano gratuito para sempre, sem cartao de credito, mais que suficiente para este site.
+
+### Configurar o Upstash Redis (uma vez, necessario para o painel salvar em producao)
+
+1. Crie uma conta gratuita em https://console.upstash.com.
+2. Crie um banco Redis (escolha uma regiao proxima da regiao de deploy da Vercel).
+3. Na pagina do banco, copie os valores de **REST URL** e **REST TOKEN**.
+4. No projeto da Vercel, va em **Settings > Environment Variables** e adicione:
+   - `UPSTASH_REDIS_REST_URL`
+   - `UPSTASH_REDIS_REST_TOKEN`
+5. Faca um redeploy do projeto na Vercel.
+
+Sem essas duas variaveis configuradas, o painel continua funcionando em modo somente leitura em producao (com um aviso visivel no topo da tela), para nunca quebrar ou gerar erro de storage — mas as edicoes so passam a ser salvas de verdade depois desse passo.
 
 ## Fluxo profissional recomendado
 

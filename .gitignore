@@ -32,3 +32,4 @@ desktop.ini
 data/order-tickets/
 
 .env*
+!.env.example

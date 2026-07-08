@@ -3992,22 +3992,35 @@ body.ticket-view-active .order-ticket-modal-content {
   border-color: rgba(125, 255, 198, 0.28);
 }
 
-.admin-stock-chip.is-active {
-  background: linear-gradient(180deg, rgba(125, 255, 198, 0.22), rgba(125, 255, 198, 0.12));
-  border-color: rgba(125, 255, 198, 0.32);
-  color: #d8fff0;
-  box-shadow: 0 14px 24px rgba(70, 168, 124, 0.18);
+.admin-stock-chip.is-selected-available {
+  background: linear-gradient(180deg, #34d178, #1f9d55);
+  border-color: #34d178;
+  color: #f2fff8;
+  box-shadow: 0 14px 24px rgba(31, 157, 85, 0.32);
 }
 
-.admin-stock-chip.is-danger {
-  border-color: rgba(240, 70, 84, 0.22);
+.admin-stock-chip.is-selected-unavailable {
+  background: linear-gradient(180deg, #f0525f, #d92d3f);
+  border-color: #f0525f;
+  color: #fff2f3;
+  box-shadow: 0 14px 24px rgba(217, 45, 63, 0.32);
 }
 
-.admin-stock-chip.is-danger.is-active {
-  background: linear-gradient(180deg, rgba(240, 70, 84, 0.22), rgba(240, 70, 84, 0.1));
-  border-color: rgba(240, 70, 84, 0.28);
-  color: #ffe3e6;
-  box-shadow: 0 14px 24px rgba(157, 38, 51, 0.18);
+.admin-stock-chip.is-dimmed {
+  opacity: 0.5;
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  box-shadow: none;
+  filter: saturate(0.7);
+}
+
+.admin-stock-chip.is-dimmed:hover,
+.admin-stock-chip.is-dimmed:focus-visible {
+  opacity: 0.8;
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: none;
+  box-shadow: none;
 }
 
 .admin-toolbar-btn:disabled,

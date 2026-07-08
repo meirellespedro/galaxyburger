@@ -90,6 +90,7 @@
   let inventoryRealtimeChannel = null;
 
   document.addEventListener("DOMContentLoaded", () => {
+    injectPersistenceWarningStyles();
     inventoryRealtimeChannel = createInventoryRealtimeChannel();
     syncBrandCopy();
     bindAdminEvents();
@@ -159,6 +160,47 @@
     return dashboardState.inventory.persistenceConfigured &&
            dashboardState.deliveryAreas.persistenceConfigured &&
            dashboardState.storeStatus.persistenceConfigured;
+  }
+
+  function injectPersistenceWarningStyles() {
+    const style = document.createElement("style");
+    style.textContent = `
+        .admin-persistence-warning {
+            background-color: #ffc107;
+            color: #000;
+            padding: 1rem;
+            text-align: center;
+            font-size: 0.9rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        body.has-persistence-warning .admin-toolbar {
+            top: 50px;
+        }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function renderPersistenceWarning() {
+    let warningBanner = document.getElementById("admin-persistence-warning");
+    if (!isPersistenceGloballyConfigured()) {
+      if (!warningBanner) {
+        warningBanner = document.createElement("div");
+        warningBanner.id = "admin-persistence-warning";
+        warningBanner.className = "admin-persistence-warning";
+        document.body.prepend(warningBanner);
+      }
+      warningBanner.innerHTML = `
+            <strong>Modo somente leitura:</strong> este ambiente ainda não tem armazenamento configurado.
+            As alterações feitas neste painel não serão salvas até isso ser resolvido.
+        `;
+      warningBanner.hidden = false;
+      document.body.classList.add("has-persistence-warning");
+    } else if (warningBanner) {
+      warningBanner.hidden = true;
+      document.body.classList.remove("has-persistence-warning");
+    }
   }
 
   function updateFormsForPersistence() {
@@ -648,6 +690,7 @@
   }
 
   function renderDashboard() {
+    renderPersistenceWarning();
     updateFormsForPersistence();
     renderLastUpdated();
     renderStorageNotes();
@@ -880,6 +923,8 @@
   function renderProductCard(product) {
     const isAvailable = Boolean(product.available);
     const statusLabel = isAvailable ? "Disponível" : "Esgotado";
+    const availableChipClass = isAvailable ? "is-selected-available" : "is-dimmed";
+    const unavailableChipClass = !isAvailable ? "is-selected-unavailable" : "is-dimmed";
 
     return `
       <article class="admin-product-card" data-admin-product-row="${escapeHtml(product.id)}">
@@ -892,7 +937,7 @@
         <div class="admin-stock-actions">
           <button
             type="button"
-            class="admin-stock-chip ${isAvailable ? "is-active" : ""}"
+            class="admin-stock-chip ${availableChipClass}"
             data-admin-product-id="${escapeHtml(product.id)}"
             data-admin-available="true"
           >
@@ -900,7 +945,7 @@
           </button>
           <button
             type="button"
-            class="admin-stock-chip ${!isAvailable ? "is-active is-danger" : "is-danger"}"
+            class="admin-stock-chip ${unavailableChipClass}"
             data-admin-product-id="${escapeHtml(product.id)}"
             data-admin-available="false"
           >
