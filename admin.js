@@ -90,7 +90,6 @@
   let inventoryRealtimeChannel = null;
 
   document.addEventListener("DOMContentLoaded", () => {
-    injectPersistenceWarningStyles();
     inventoryRealtimeChannel = createInventoryRealtimeChannel();
     syncBrandCopy();
     bindAdminEvents();
@@ -160,48 +159,6 @@
     return dashboardState.inventory.persistenceConfigured &&
            dashboardState.deliveryAreas.persistenceConfigured &&
            dashboardState.storeStatus.persistenceConfigured;
-  }
-
-  function injectPersistenceWarningStyles() {
-    const style = document.createElement('style');
-    style.textContent = `
-        .admin-persistence-warning {
-            background-color: #ffc107;
-            color: #000;
-            padding: 1rem;
-            text-align: center;
-            font-size: 0.9rem;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-        }
-        body.has-persistence-warning .admin-toolbar {
-            top: 50px;
-        }
-    `;
-    document.head.appendChild(style);
-  }
-
-  function renderPersistenceWarning() {
-    let warningBanner = document.getElementById("admin-persistence-warning");
-    if (!isPersistenceGloballyConfigured()) {
-        if (!warningBanner) {
-            warningBanner = document.createElement("div");
-            warningBanner.id = "admin-persistence-warning";
-            warningBanner.className = "admin-persistence-warning";
-            document.body.prepend(warningBanner);
-        }
-        warningBanner.innerHTML = `
-            <strong>Modo somente leitura:</strong> este ambiente não tem armazenamento persistente configurado.
-            As alterações feitas neste painel não serão salvas.
-        `;
-        warningBanner.hidden = false;
-        document.body.classList.add("has-persistence-warning");
-
-    } else if (warningBanner) {
-        warningBanner.hidden = true;
-        document.body.classList.remove("has-persistence-warning");
-    }
   }
 
   function updateFormsForPersistence() {
@@ -691,7 +648,6 @@
   }
 
   function renderDashboard() {
-    renderPersistenceWarning();
     updateFormsForPersistence();
     renderLastUpdated();
     renderStorageNotes();
