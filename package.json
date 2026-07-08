@@ -1,7 +1,7 @@
 {
   "name": "hamburgeria",
   "version": "1.0.0",
-  "description": "Sistema de gerenciamento de hamburgueria com Vercel Blob",
+  "description": "Sistema de gerenciamento de hamburgueria",
   "private": true,
   "scripts": {
     "deploy": "vercel"
@@ -9,13 +9,7 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "dependencies": {
-    "@vercel/blob": "^2.6.1",
-    "@vercel/oidc": "^3.8.0"
-  },
   "keywords": [
-    "vercel",
-    "blob",
     "hamburgueria",
     "delivery"
   ]

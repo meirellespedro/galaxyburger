@@ -42,8 +42,6 @@ Este projeto nao precisa de build step.
 - `ORDER_TICKET_SECRET`: opcional, mas recomendada. Se nao for definida, a API de comanda segura reutiliza `DELIVERY_QUOTE_SECRET`.
 - `ADMIN_PANEL_PASSWORD`: obrigatoria para liberar o login do painel administrativo.
 - `ADMIN_PANEL_SECRET`: recomendada para assinar a sessao do painel administrativo.
-- `BLOB_STORE_ID` + `VERCEL_OIDC_TOKEN`: preferenciais na Vercel. Ao conectar o Blob Store ao projeto, a Vercel injeta esses valores e o SDK autentica leituras/escritas automaticamente.
-- `BLOB_READ_WRITE_TOKEN`: alternativa para desenvolvimento local ou execucao fora da Vercel. Use um token do mesmo Blob Store usado pelo projeto.
 
 ## Taxa de entrega
 
@@ -68,8 +66,7 @@ As regras ficam centralizadas em `delivery-config.js`, com bairros e ruas cadast
 - Em desenvolvimento local, o estoque fica salvo em `data/inventory-status.json`.
 - Em desenvolvimento local, o status operacional fica salvo em `data/store-status.json`.
 - Em desenvolvimento local, configure `DELIVERY_QUOTE_SECRET` para testar cotacao e preparo do pedido sem depender de fallback embutido no codigo.
-- Em producao na Vercel, conecte um Blob Store privado ao projeto para salvar status operacional, estoque, regioes e comandas entre funcoes, reinicios e novos deploys. O caminho recomendado e OIDC (`BLOB_STORE_ID` + `VERCEL_OIDC_TOKEN`); `BLOB_READ_WRITE_TOKEN` funciona como fallback quando OIDC nao estiver disponivel.
-- Nao configure `VERCEL_OIDC_TOKEN` manualmente no painel da Vercel. Ele e curto, rotativo e deve ser injetado pela plataforma; um valor estatico ou expirado causa 401/403 ao buscar blobs privados.
+- Em producao na Vercel nao ha volume persistente entre execucoes das funcoes, entao o painel opera em modo somente leitura: o site publico serve os dados de `delivery-config.js` / `catalog-config.js`, e edicoes feitas no painel nao sao salvas. Isso e proposital, para nao depender de nenhum servico de armazenamento pago.
 
 ## Fluxo profissional recomendado
 

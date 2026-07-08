@@ -192,8 +192,8 @@
             document.body.prepend(warningBanner);
         }
         warningBanner.innerHTML = `
-            <strong>Atenção:</strong> A persistência de dados não está configurada corretamente.
-            As alterações feitas neste painel não serão salvas. Verifique as variáveis de ambiente no seu projeto Vercel.
+            <strong>Modo somente leitura:</strong> este ambiente não tem armazenamento persistente configurado.
+            As alterações feitas neste painel não serão salvas.
         `;
         warningBanner.hidden = false;
         document.body.classList.add("has-persistence-warning");
@@ -630,7 +630,7 @@
   function applyInventoryLoadError(error) {
     dashboardState.inventory = {
       ...dashboardState.inventory,
-      storageLabel: dashboardState.inventory.storageLabel || "Vercel Blob",
+      storageLabel: dashboardState.inventory.storageLabel || "armazenamento persistente",
       loadErrorMessage: normalizeText(error?.message) || "Não foi possível carregar o estoque agora.",
       loadErrorCode: normalizeText(error?.code),
       persistenceConfigured: false
@@ -653,7 +653,7 @@
   function applyStoreStatusLoadError(error) {
     dashboardState.storeStatus = {
       ...dashboardState.storeStatus,
-      storageLabel: dashboardState.storeStatus.storageLabel || "Vercel Blob",
+      storageLabel: dashboardState.storeStatus.storageLabel || "armazenamento persistente",
       loadErrorMessage: normalizeText(error?.message) || "Nao foi possivel carregar o status da loja agora.",
       loadErrorCode: normalizeText(error?.code)
     };

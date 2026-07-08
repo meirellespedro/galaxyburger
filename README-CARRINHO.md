@@ -44,7 +44,7 @@ Site estatico com checkout via WhatsApp, taxa de entrega validada por uma funcao
 - Opcional, mas recomendado: configure `ORDER_TICKET_SECRET`. Se nao existir, a comanda segura reutiliza `DELIVERY_QUOTE_SECRET`.
 - Configure `ADMIN_PANEL_PASSWORD` para liberar o acesso ao painel.
 - Configure `ADMIN_PANEL_SECRET` para assinar a sessao do painel.
-- Conecte um Blob Store privado ao projeto na Vercel para persistir painel e comandas em producao. O caminho recomendado e OIDC (`BLOB_STORE_ID` + `VERCEL_OIDC_TOKEN`, injetados pela Vercel); `BLOB_READ_WRITE_TOKEN` continua valido para desenvolvimento local ou execucao fora da Vercel.
+- Em producao na Vercel o painel administrativo opera em modo somente leitura (sem volume persistente entre execucoes); o site publico continua servindo os dados de `catalog-config.js` / `delivery-config.js` normalmente.
 - Edite `store-config.js` para atualizar telefone, Pix, iFood e horarios.
 - Edite `catalog-config.js` para atualizar precos, combos e itens esgotados.
 - Edite `delivery-config.js` para manter a lista de bairros e ruas atendidas sempre atualizada.
