@@ -33,8 +33,6 @@ const STORE_ADDRESS_LINES = Object.freeze([
   ].filter(Boolean).join(" - "),
   CONFIGURED_STORE_ADDRESS.cep ? `CEP ${formatCep(CONFIGURED_STORE_ADDRESS.cep)}` : ""
 ].filter(Boolean));
-const ORDER_TICKET_WIDTH = 30;
-const ORDER_TICKET_DIVIDER = "-".repeat(ORDER_TICKET_WIDTH);
 const STORE_TIME_ZONE = normalizeText(SHARED_STORE_CONFIG.checkout?.timeZone) || "America/Sao_Paulo";
 // Use "live" para respeitar o horário real da loja. Troque para "preview" apenas em testes.
 const STORE_SCHEDULE_MODE = normalizeText(SHARED_STORE_CONFIG.checkout?.scheduleMode) || "live";
@@ -631,22 +629,6 @@ function findDeliveryAreaByNameLocal(name) {
   return (deliveryAreasState.areas || []).find(area => area.normalizedName === normalizedName) || null;
 }
 
-function buildDeliveryAreaOptionLabel(area) {
-  if (!area) {
-    return "";
-  }
-
-  if (area.status === "active") {
-    return `${area.name} - ${formatCurrency(area.fee)}`;
-  }
-
-  if (area.status === "pickup_only") {
-    return `${area.name} - somente retirada`;
-  }
-
-  return `${area.name} - entrega bloqueada`;
-}
-
 function createTimedRequest(timeoutMs) {
   const controller = new AbortController();
   const request = {
@@ -669,10 +651,6 @@ function createTimedRequest(timeoutMs) {
 
 function isAbortError(error) {
   return error?.name === "AbortError";
-}
-
-function isCampoGrandeNeighborhood(value) {
-  return normalizeCompareText(value) === "campo grande";
 }
 
 function formatDistanceKm(value) {
@@ -729,22 +707,6 @@ function isManualZoneMetadata({ precision = "", source = "" } = {}) {
   const normalizedSource = normalizeDeliveryMetadataValue(source);
 
   return normalizedPrecision === "manual_zone" || normalizedSource === "manual_zone_registry";
-}
-
-function getDeliveryQuoteDistanceCopy(quote = {}) {
-  const normalizedPrecision = normalizeDeliveryMetadataValue(quote?.locationPrecision);
-
-  if (Number(quote?.routeDistanceKm) > 0 && normalizedPrecision === "exact") {
-    return `Dist\u00e2ncia real por rota: ${formatDistanceKm(quote.routeDistanceKm)}.`;
-  }
-
-  if (Number(quote?.distanceKm) > 0) {
-    return normalizedPrecision === "street" || normalizedPrecision === "approximate"
-      ? `Dist\u00e2ncia aproximada da base: ${formatDistanceKm(quote.distanceKm)}.`
-      : `Dist\u00e2ncia calculada: ${formatDistanceKm(quote.distanceKm)}.`;
-  }
-
-  return "";
 }
 
 function buildDeliveryAddressKey(values = {}) {
@@ -1951,6 +1913,17 @@ function normalizeInventoryRealtimePayload(payload) {
   };
 }
 
+function isOlderInventoryTimestamp(candidate, existing) {
+  const candidateTime = Date.parse(candidate);
+  const existingTime = Date.parse(existing);
+
+  if (!Number.isFinite(candidateTime) || !Number.isFinite(existingTime)) {
+    return false;
+  }
+
+  return candidateTime < existingTime;
+}
+
 function applyCatalogInventorySnapshot(payload, { notify = true, reason = "inventory_sync" } = {}) {
   const inventoryProducts = normalizeInventoryProductsPayload(payload);
   if (!inventoryProducts.length) {
@@ -1965,9 +1938,16 @@ function applyCatalogInventorySnapshot(payload, { notify = true, reason = "inven
       return;
     }
 
+    const incomingUpdatedAt = normalizeText(product.stockUpdatedAt || product.updatedAt);
+    const existingEntry = nextInventoryStatusMap.get(productId);
+
+    if (existingEntry && isOlderInventoryTimestamp(incomingUpdatedAt, existingEntry.stockUpdatedAt)) {
+      return;
+    }
+
     nextInventoryStatusMap.set(productId, {
       available: Boolean(product.available),
-      stockUpdatedAt: normalizeText(product.stockUpdatedAt || product.updatedAt)
+      stockUpdatedAt: incomingUpdatedAt
     });
   });
 
@@ -3896,34 +3876,6 @@ function formatPaymentLabel(payment) {
   return labels[payment] || payment;
 }
 
-function formatTicketPaymentLabel(payment) {
-  const labels = {
-    pix: "Pix",
-    dinheiro: "Dinheiro",
-    "cartao de credito": "Cart\u00e3o de cr\u00e9dito",
-    "cartao de debito": "Cart\u00e3o de d\u00e9bito",
-    "Cart\u00E3o de cr\u00E9dito": "Cart\u00e3o de cr\u00e9dito",
-    "Cart\u00E3o de d\u00E9bito": "Cart\u00e3o de d\u00e9bito"
-  };
-
-  return labels[payment] || payment;
-}
-
-const TICKET_EMOJI_PATTERN = (() => {
-  try {
-    return new RegExp("[\\p{Extended_Pictographic}\\p{Regional_Indicator}\\u200D\\uFE0F]", "gu");
-  } catch {
-    return /[\u200D\uFE0F]/g;
-  }
-})();
-
-function sanitizeTicketText(value) {
-  return String(value ?? "")
-    .replace(/[#*`_~]/g, "")
-    .replace(TICKET_EMOJI_PATTERN, "")
-    .trim();
-}
-
 function hideCartModalForOrderTicket() {
   const cartModal = document.getElementById("cart-modal");
   if (!cartModal || cartModal.hidden) {
@@ -3955,87 +3907,6 @@ function restoreCartModalAfterOrderTicket() {
   });
 
   cartModalHiddenForOrderTicket = false;
-}
-
-function chunkTicketWord(word, maxWidth = ORDER_TICKET_WIDTH) {
-  const text = String(word || "");
-  const chunks = [];
-
-  for (let index = 0; index < text.length; index += maxWidth) {
-    chunks.push(text.slice(index, index + maxWidth));
-  }
-
-  return chunks.length ? chunks : [""];
-}
-
-function wrapTicketLine(line, maxWidth = ORDER_TICKET_WIDTH) {
-  const originalText = String(line ?? "");
-  const text = /^https?:\/\//i.test(originalText)
-    ? originalText
-    : sanitizeTicketText(originalText);
-
-  if (!text) {
-    return [""];
-  }
-
-  if (text === ORDER_TICKET_DIVIDER) {
-    return [text];
-  }
-
-  if (/^https?:\/\//i.test(text)) {
-    return [text];
-  }
-
-  const words = text.split(/\s+/).filter(Boolean);
-  if (!words.length) {
-    return [""];
-  }
-
-  const wrapped = [];
-  let currentLine = "";
-
-  words.forEach(word => {
-    const parts = word.length > maxWidth ? chunkTicketWord(word, maxWidth) : [word];
-
-    parts.forEach(part => {
-      if (!currentLine) {
-        currentLine = part;
-        return;
-      }
-
-      const candidate = `${currentLine} ${part}`;
-      if (candidate.length <= maxWidth) {
-        currentLine = candidate;
-        return;
-      }
-
-      wrapped.push(currentLine);
-      currentLine = part;
-    });
-  });
-
-  if (currentLine) {
-    wrapped.push(currentLine);
-  }
-
-  return wrapped;
-}
-
-function formatTicketLines(lines) {
-  const wrappedLines = [];
-
-  lines.forEach(line => {
-    wrapTicketLine(line).forEach(wrappedLine => {
-      wrappedLines.push(wrappedLine);
-    });
-  });
-
-  return wrappedLines.join("\n").trim();
-}
-
-function generateMapsLink(address) {
-  const query = encodeURIComponent(sanitizeTicketText(address));
-  return `https://www.google.com/maps/search/?api=1&query=${query}`;
 }
 
 function buildDeliveryAddressData({ isPickup, deliveryValues = {}, address = "" }) {
@@ -4101,78 +3972,6 @@ function getOrderCreatedAtLabel(date = new Date()) {
   }).format(date).replace(",", "");
 }
 
-function getOrderLineItems() {
-  return cart.map(item => {
-    const lineTotal = item.price * item.quantity;
-
-    return {
-      name: item.name,
-      quantity: item.quantity,
-      variantLabel: normalizeText(item.variantLabel),
-      unitPrice: item.price,
-      lineTotal,
-      unitPriceLabel: formatCurrency(item.price),
-      lineTotalLabel: formatCurrency(lineTotal)
-    };
-  });
-}
-
-function buildTicketItemsLines({ detailed = false } = {}) {
-  const orderItems = getOrderLineItems();
-  const lines = [];
-
-  orderItems.forEach((item, index) => {
-    lines.push(`${item.quantity}x ${item.name}`);
-
-    if (item.variantLabel) {
-      lines.push(`Obs item: ${item.variantLabel}`);
-    }
-
-    if (detailed) {
-      lines.push(`Unit\u00e1rio: ${item.unitPriceLabel}`);
-      lines.push(`Total item: ${item.lineTotalLabel}`);
-    }
-
-    if (index < orderItems.length - 1) {
-      lines.push("");
-    }
-  });
-
-  return lines;
-}
-
-function buildOrderPaymentLines({ paymentMethod, paymentLabel, cashChangeText }) {
-  const normalizedPaymentMethod = String(paymentMethod || "").toLowerCase();
-  const resolvedPaymentLabel = paymentLabel || formatPaymentLabel(paymentMethod);
-  const paymentLines = [];
-
-  if (normalizedPaymentMethod === "pix") {
-    paymentLines.push("Pix - aguardando comprovante");
-  } else {
-    paymentLines.push(resolvedPaymentLabel);
-  }
-
-  if (normalizedPaymentMethod === "dinheiro") {
-    paymentLines.push(`Troco: ${cashChangeText || "N\u00e3o precisa de troco."}`);
-  }
-
-  return paymentLines;
-}
-
-function buildOrderAddressPreviewLines({ isPickup, address, deliveryValues }) {
-  const addressData = buildDeliveryAddressData({ isPickup, deliveryValues, address });
-  const addressLines = [...addressData.ticketAddressLines];
-
-  if (!isPickup) {
-    addressLines.push(`Refer\u00eancia: ${addressData.referenceText}`);
-  }
-
-  return {
-    addressData,
-    addressLines
-  };
-}
-
 function getDeliveryQuoteStatusCopy(quote) {
   const status = quote?.validationStatus || "";
 
@@ -4204,28 +4003,6 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-function encodeBase64UrlText(value) {
-  const text = String(value || "");
-  let binary = "";
-
-  if (typeof TextEncoder === "function") {
-    const bytes = new TextEncoder().encode(text);
-
-    for (let index = 0; index < bytes.length; index += 1) {
-      binary += String.fromCharCode(bytes[index]);
-    }
-  } else {
-    binary = encodeURIComponent(text).replace(/%([0-9A-F]{2})/gi, (_, hex) =>
-      String.fromCharCode(parseInt(hex, 16))
-    );
-  }
-
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
 }
 
 function decodeBase64UrlText(value) {
@@ -4281,65 +4058,6 @@ function resolveOrderTicketBaseUrl() {
   } catch {
     return null;
   }
-}
-
-function buildSharedOrderTicketUrl(orderDetails) {
-  const baseUrl = resolveOrderTicketBaseUrl();
-
-  if (!orderDetails || !baseUrl) {
-    return "";
-  }
-
-  const sharedPayload = {
-    d: orderDetails.createdAt,
-    n: orderDetails.name,
-    c: orderDetails.customerPhone || "",
-    o: orderDetails.notes,
-    p: orderDetails.isPickup ? 1 : 0,
-    m: orderDetails.mapsLink || "",
-    y: Array.isArray(orderDetails.paymentLines) ? orderDetails.paymentLines : [],
-    f: Number(orderDetails.deliveryFeeValue || 0),
-    s: Number(orderDetails.subtotalValue || 0),
-    t: Number(orderDetails.totalValue || 0),
-    v: orderDetails.isPickup ? [] : [
-      orderDetails.deliveryValues?.cep || "",
-      orderDetails.deliveryValues?.street || "",
-      orderDetails.deliveryValues?.number || "",
-      orderDetails.deliveryValues?.neighborhood || "",
-      orderDetails.deliveryValues?.city || "",
-      orderDetails.deliveryValues?.state || "",
-      orderDetails.deliveryValues?.complement || "",
-      orderDetails.deliveryValues?.reference || ""
-    ],
-    q: orderDetails.deliveryQuote
-      ? [
-          orderDetails.deliveryQuote.token || "",
-          orderDetails.deliveryQuote.code || "",
-          orderDetails.deliveryQuote.expiresAt || "",
-          Number(orderDetails.deliveryQuote.distanceKm || 0),
-          Number(orderDetails.deliveryQuote.routeDistanceKm || 0),
-          orderDetails.deliveryQuote.zone || "",
-          orderDetails.deliveryQuote.zoneLabel || "",
-          orderDetails.deliveryQuote.addressKey || "",
-          orderDetails.deliveryQuote.locationPrecision || "",
-          orderDetails.deliveryQuote.geocoderSource || ""
-        ]
-      : [],
-    i: Array.isArray(orderDetails.items)
-      ? orderDetails.items.map(item => [
-          Number(item.quantity || 0),
-          item.name || "",
-          item.variantLabel || "",
-          Number(item.unitPrice || 0)
-        ])
-      : []
-  };
-  const url = new URL(baseUrl.toString());
-
-  url.search = "";
-  url.hash = "";
-  url.searchParams.set("t", encodeBase64UrlText(JSON.stringify(sharedPayload)));
-  return url.toString();
 }
 
 function decodeSharedOrderTicketPayload(encodedTicket) {
@@ -4722,111 +4440,6 @@ function buildOrderTicketPrintDocument(orderDetails) {
 
 function getCartItemsCount() {
   return cart.reduce((sum, item) => sum + item.quantity, 0);
-}
-
-function buildWhatsAppOrderMessage({
-  name,
-  customerPhone,
-  isPickup,
-  address,
-  deliveryValues,
-  deliveryQuote,
-  deliveryFee,
-  subtotal,
-  total,
-  paymentMethod,
-  paymentLabel,
-  cashChangeText,
-  notes,
-  createdAt,
-  ticketUrl
-}) {
-  const addressData = buildDeliveryAddressData({ isPickup, deliveryValues, address });
-  const itemsCount = getCartItemsCount();
-  const paymentLines = buildOrderPaymentLines({
-    paymentMethod,
-    paymentLabel: formatTicketPaymentLabel(paymentMethod || paymentLabel),
-    cashChangeText
-  }).map(line => line === "Pix - aguardando comprovante" ? "Pix - AGUARDANDO COMPROVANTE" : line);
-
-  const lines = [
-    "NOTA - GALAXY BURGER",
-    ORDER_TICKET_DIVIDER,
-    "NOVO PEDIDO",
-    `Data: ${createdAt || getOrderCreatedAtLabel()}`,
-    ""
-  ];
-
-  if (isPickup) {
-    lines.push(
-      "RETIRADA:",
-      addressData.compactAddressLine || STORE_ADDRESS
-    );
-  } else {
-    lines.push(
-      "ENTREGA:",
-      addressData.compactAddressLine || address,
-      `Refer\u00eancia: ${addressData.referenceText}`
-    );
-  }
-
-  lines.push(
-    "",
-    `Nome: ${name}`,
-    `Telefone: ${customerPhone || "Nao informado"}`,
-    `Pedido: ${itemsCount}`,
-    "",
-    "Itens:",
-    ...buildTicketItemsLines({ detailed: false })
-  );
-
-  if (notes) {
-    lines.push(
-      "",
-      "Observa\u00e7\u00f5es:",
-      notes
-    );
-  }
-
-  lines.push(
-    "",
-    "Pagamento:",
-    ...paymentLines,
-    "",
-    `Subtotal: ${subtotal}`
-  );
-
-  lines.push(`Entrega: ${deliveryFee}`);
-
-  if (!isPickup && deliveryQuote?.code) {
-    lines.push(
-      "",
-      "Validacao da entrega:",
-      `${deliveryQuote.code}${deliveryQuote.zoneLabel ? ` | ${deliveryQuote.zoneLabel}` : ""}${deliveryQuote.distanceKm ? ` | ${formatDistanceKm(deliveryQuote.distanceKm)}` : ""}`
-    );
-
-    const precisionLine = getDeliveryQuotePrecisionCopy(deliveryQuote, { includeProvider: false });
-    if (precisionLine) {
-      lines.push(precisionLine);
-    }
-  }
-
-  lines.push(
-    `Total: ${total}`,
-    "",
-    ORDER_TICKET_DIVIDER,
-    "Pedido sujeito a confirma\u00e7\u00e3o."
-  );
-
-  if (ticketUrl) {
-    lines.push(
-      "",
-      "Comanda para impress\u00e3o:",
-      ticketUrl
-    );
-  }
-
-  return formatTicketLines(lines);
 }
 
 function encodeWhatsAppMessage(message) {

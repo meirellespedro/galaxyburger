@@ -25,7 +25,7 @@
       <h1 id="admin-brand-title">Controle operacional da Galaxy Burger</h1>
       <p>Entre com a senha do painel para atualizar regiões de entrega, taxas e estoque sem mexer no código.</p>
 
-      <form id="admin-login-form" class="admin-form" autocomplete="off">
+      <form id="admin-login-form" class="admin-form" autocomplete="off" onsubmit="return false">
         <label class="admin-field">
           <span>Senha do painel</span>
           <input id="admin-password" name="password" type="password" inputmode="text" autocomplete="current-password" placeholder="Digite a senha" required>
@@ -124,7 +124,7 @@
             </div>
 
             <div class="admin-delivery-builder-layout">
-              <form id="admin-delivery-form" class="admin-form admin-delivery-form" autocomplete="off">
+              <form id="admin-delivery-form" class="admin-form admin-delivery-form" autocomplete="off" onsubmit="return false">
                 <input id="admin-delivery-id" type="hidden" value="">
 
                 <label class="admin-field">

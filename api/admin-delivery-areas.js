@@ -9,6 +9,7 @@ const {
   createAdminError,
   requireAdminSession
 } = require("../lib/_admin-auth");
+const { parseJsonBody, sendJsonError } = require("../lib/_http-helpers");
 
 module.exports = async function adminDeliveryAreasHandler(req, res) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -78,46 +79,12 @@ module.exports = async function adminDeliveryAreasHandler(req, res) {
       message: "Método não suportado."
     });
   } catch (error) {
-    res.status(Number(error.statusCode || 500)).json({
-      ok: false,
-      code: error.code || "admin_delivery_areas_failed",
-      message: error.message || "Não foi possível salvar as regiões agora."
+    sendJsonError(res, error, {
+      routeName: "admin-delivery-areas",
+      fallbackMessage: "Não foi possível salvar as regiões agora."
     });
   }
 };
-
-function parseJsonBody(req) {
-  if (req.body && typeof req.body === "object") {
-    return Promise.resolve(req.body);
-  }
-
-  if (typeof req.body === "string" && req.body.trim()) {
-    try {
-      return Promise.resolve(JSON.parse(req.body));
-    } catch {
-      throw createAdminError("invalid_json", "JSON invalido no corpo da requisicao.", 400);
-    }
-  }
-
-  return (async () => {
-    const chunks = [];
-
-    for await (const chunk of req) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-
-    const rawBody = Buffer.concat(chunks).toString("utf8").trim();
-    if (!rawBody) {
-      return {};
-    }
-
-    try {
-      return JSON.parse(rawBody);
-    } catch {
-      throw createAdminError("invalid_json", "JSON invalido no corpo da requisicao.", 400);
-    }
-  })();
-}
 
 async function buildAdminDeliveryAreasPayload() {
   const snapshot = await getDeliveryAreasSnapshot();

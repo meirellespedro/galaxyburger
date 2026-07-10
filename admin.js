@@ -90,13 +90,13 @@
   let inventoryRealtimeChannel = null;
 
   document.addEventListener("DOMContentLoaded", () => {
-    injectPersistenceWarningStyles();
-    inventoryRealtimeChannel = createInventoryRealtimeChannel();
-    syncBrandCopy();
-    bindAdminEvents();
-    syncDeliveryAreaZoneField();
-    bindRealtimeSync();
-    restoreAdminSession();
+    runBootStep(injectPersistenceWarningStyles);
+    runBootStep(() => { inventoryRealtimeChannel = createInventoryRealtimeChannel(); });
+    runBootStep(syncBrandCopy);
+    runBootStep(bindAdminEvents);
+    runBootStep(syncDeliveryAreaZoneField);
+    runBootStep(bindRealtimeSync);
+    runBootStep(restoreAdminSession);
 
     window.setInterval(() => {
       if (!dashboardState.authenticated) {
@@ -109,6 +109,14 @@
       });
     }, ADMIN_REFRESH_INTERVAL_MS);
   });
+
+  function runBootStep(step) {
+    try {
+      step();
+    } catch (error) {
+      console.error(`[admin] boot step failed: ${step.name || "anonymous"}`, error);
+    }
+  }
 
   function createDashboardState() {
     return {
@@ -1337,7 +1345,7 @@
       }
     } catch (error) {
       logAdminApiError("store_status_save_failed", error);
-      if (normalizeText(error?.code).includes("blob")) {
+      if (error?.code === "store_status_storage_not_configured" || error?.code === "kv_storage_error") {
         applyStoreStatusLoadError(error);
       }
       setStoreStatusMessage(error.message || "Nao foi possivel atualizar o status da loja agora.", true);

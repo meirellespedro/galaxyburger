@@ -4,10 +4,15 @@ const {
   ACTIVE_DELIVERY_FEE_VALUES,
   getDeliveryAreaById,
   getDeliveryAreaByName,
+  getDeliveryAreasSnapshot,
   normalizeDeliveryAreaName
 } = require("../lib/_delivery-areas-store");
+const { parseJsonBody, sendJsonError } = require("../lib/_http-helpers");
 
 const QUOTE_TTL_MS = 15 * 60 * 1000;
+const EXTERNAL_LOOKUP_TIMEOUT_MS = 4000;
+const GEOCODE_CACHE_MAX_ENTRIES = 500;
+const CEP_CACHE_MAX_ENTRIES = 500;
 const VIACEP_BASE_URL = "https://viacep.com.br/ws";
 const BRASIL_API_CEP_BASE_URL = "https://brasilapi.com.br/api/cep/v1";
 const INVALID_HOUSE_NUMBER_VALUES = new Set([
@@ -28,6 +33,17 @@ const PRIORITY_ADDRESS_ZONES = Object.freeze(deliveryConfig.priorityAddressZones
 const DELIVERY_NORMALIZATION_ABBREVIATIONS = Object.freeze(
   Object.entries(deliveryConfig.normalization?.abbreviations || {})
 );
+function setBoundedCacheEntry(cache, key, value, maxEntries) {
+  if (cache.size >= maxEntries) {
+    const oldestKey = cache.keys().next().value;
+    if (oldestKey !== undefined) {
+      cache.delete(oldestKey);
+    }
+  }
+
+  cache.set(key, value);
+}
+
 const ADDRESS_GEOCODE_CACHE = new Map();
 const DELIVERY_MESSAGES = Object.freeze({
   active: "Entrega disponível para sua região. Taxa: {fee}.",
@@ -290,12 +306,9 @@ const deliveryQuoteHandler = async function handler(req, res) {
       message: "Método não suportado."
     });
   } catch (error) {
-    res.status(Number(error.statusCode || 500)).json({
-      ok: false,
-      status: error.status || "error",
-      code: error.code || "delivery_quote_failed",
-      message: error.message || "Não foi possível validar a entrega agora.",
-      ...(error.officialAddress ? { officialAddress: error.officialAddress } : {})
+    sendJsonError(res, error, {
+      routeName: "delivery-quote",
+      fallbackMessage: "Não foi possível validar a entrega agora."
     });
   }
 };
@@ -308,37 +321,6 @@ function createError(code, message, statusCode = 400, extra = {}) {
   error.statusCode = statusCode;
   Object.assign(error, extra);
   return error;
-}
-
-async function parseJsonBody(req) {
-  if (req.body && typeof req.body === "object") {
-    return req.body;
-  }
-
-  if (typeof req.body === "string" && req.body.trim()) {
-    try {
-      return JSON.parse(req.body);
-    } catch {
-      throw createError("invalid_json", "JSON invalido no corpo da requisicao.", 400);
-    }
-  }
-
-  const chunks = [];
-
-  for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-
-  const rawBody = Buffer.concat(chunks).toString("utf8").trim();
-  if (!rawBody) {
-    return {};
-  }
-
-  try {
-    return JSON.parse(rawBody);
-  } catch {
-    throw createError("invalid_json", "JSON invalido no corpo da requisicao.", 400);
-  }
 }
 
 function normalizeText(value) {
@@ -696,20 +678,22 @@ function buildZoneLabelForArea(area) {
 }
 
 async function findDeliveryAreaMatchesForAddress(address) {
-  const streetArea = address.street
-    ? await getDeliveryAreaByName(address.street)
-    : null;
-  const neighborhoodArea = address.neighborhood
-    ? await getDeliveryAreaByName(address.neighborhood)
-    : null;
-  const explicitArea = !address.deliveryAreaId
-    ? null
-    : await getDeliveryAreaById(address.deliveryAreaId);
+  const snapshot = await getDeliveryAreasSnapshot();
+  const areas = Array.isArray(snapshot?.areas) ? snapshot.areas : [];
+
+  const findAreaByName = name => {
+    const normalizedName = normalizeDeliveryAreaName(name);
+    return normalizedName ? areas.find(area => area.normalizedName === normalizedName) || null : null;
+  };
+  const findAreaById = id => {
+    const normalizedId = normalizeText(id);
+    return normalizedId ? areas.find(area => normalizeText(area.id) === normalizedId) || null : null;
+  };
 
   return {
-    streetArea,
-    neighborhoodArea,
-    explicitArea
+    streetArea: address.street ? findAreaByName(address.street) : null,
+    neighborhoodArea: address.neighborhood ? findAreaByName(address.neighborhood) : null,
+    explicitArea: address.deliveryAreaId ? findAreaById(address.deliveryAreaId) : null
   };
 }
 
@@ -758,7 +742,8 @@ async function resolveAddressCoordinates(address) {
           headers: {
             Accept: "application/json",
             "User-Agent": "GalaxyBurgerDelivery/1.0"
-          }
+          },
+          signal: AbortSignal.timeout(EXTERNAL_LOOKUP_TIMEOUT_MS)
         });
       } catch {
         hadNetworkFailure = true;
@@ -783,7 +768,7 @@ async function resolveAddressCoordinates(address) {
         continue;
       }
 
-      ADDRESS_GEOCODE_CACHE.set(cacheKey, parsedMatch);
+      setBoundedCacheEntry(ADDRESS_GEOCODE_CACHE, cacheKey, parsedMatch, GEOCODE_CACHE_MAX_ENTRIES);
       return parsedMatch;
     }
   }
@@ -966,7 +951,8 @@ async function fetchCepAddress(cep) {
       response = await globalThis.fetch(provider.buildUrl(normalizedCep), {
         headers: {
           Accept: "application/json"
-        }
+        },
+        signal: AbortSignal.timeout(EXTERNAL_LOOKUP_TIMEOUT_MS)
       });
     } catch {
       hadNetworkFailure = true;
@@ -991,7 +977,7 @@ async function fetchCepAddress(cep) {
       continue;
     }
 
-    cepLookupCache.set(normalizedCep, normalizedPayload);
+    setBoundedCacheEntry(cepLookupCache, normalizedCep, normalizedPayload, CEP_CACHE_MAX_ENTRIES);
     return normalizedPayload;
   }
 

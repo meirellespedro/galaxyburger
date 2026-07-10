@@ -26,6 +26,7 @@ const {
   persistSharedOrderTicket,
   readSharedOrderTicket
 } = require("../lib/_order-ticket-store");
+const { parseJsonBody, sendJsonError } = require("../lib/_http-helpers");
 
 const deliveryInternals = deliveryQuoteApi._internals || {};
 const {
@@ -114,47 +115,12 @@ module.exports = async function orderTicketHandler(req, res) {
       message: "Método não suportado."
     });
   } catch (error) {
-    res.status(Number(error.statusCode || 500)).json({
-      ok: false,
-      status: error.status || "error",
-      code: error.code || "order_ticket_failed",
-      message: error.message || "Não foi possível preparar o pedido agora."
+    sendJsonError(res, error, {
+      routeName: "order-ticket",
+      fallbackMessage: "Não foi possível preparar o pedido agora."
     });
   }
 };
-
-function parseJsonBody(req) {
-  if (req.body && typeof req.body === "object") {
-    return Promise.resolve(req.body);
-  }
-
-  if (typeof req.body === "string" && req.body.trim()) {
-    try {
-      return Promise.resolve(JSON.parse(req.body));
-    } catch {
-      throw createError("invalid_json", "JSON invalido no corpo da requisicao.", 400);
-    }
-  }
-
-  return (async () => {
-    const chunks = [];
-
-    for await (const chunk of req) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-
-    const rawBody = Buffer.concat(chunks).toString("utf8").trim();
-    if (!rawBody) {
-      return {};
-    }
-
-    try {
-      return JSON.parse(rawBody);
-    } catch {
-      throw createError("invalid_json", "JSON invalido no corpo da requisicao.", 400);
-    }
-  })();
-}
 
 function normalizeCompareText(value) {
   return normalizeText(value)
