@@ -33,3 +33,6 @@ data/order-tickets/
 
 .env*
 !.env.example
+
+.vercel
+.env*

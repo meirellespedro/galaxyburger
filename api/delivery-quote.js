@@ -8,8 +8,11 @@ const {
   normalizeDeliveryAreaName
 } = require("../lib/_delivery-areas-store");
 const { parseJsonBody, sendJsonError } = require("../lib/_http-helpers");
+const { assertRateLimitNotExceeded } = require("../lib/_rate-limit");
 
 const QUOTE_TTL_MS = 15 * 60 * 1000;
+const QUOTE_RATE_LIMIT_MAX_ATTEMPTS = 40;
+const QUOTE_RATE_LIMIT_WINDOW_SECONDS = 5 * 60;
 const EXTERNAL_LOOKUP_TIMEOUT_MS = 4000;
 const GEOCODE_CACHE_MAX_ENTRIES = 500;
 const CEP_CACHE_MAX_ENTRIES = 500;
@@ -221,6 +224,17 @@ const deliveryQuoteHandler = async function handler(req, res) {
 
   try {
     if (req.method === "POST") {
+      await assertRateLimitNotExceeded(req, {
+        scope: "delivery-quote",
+        maxAttempts: QUOTE_RATE_LIMIT_MAX_ATTEMPTS,
+        windowSeconds: QUOTE_RATE_LIMIT_WINDOW_SECONDS,
+        createError: () => createError(
+          "delivery_quote_rate_limited",
+          "Muitas tentativas de cotação em pouco tempo. Aguarde um instante antes de tentar novamente.",
+          429
+        )
+      });
+
       const payload = await parseJsonBody(req);
       const quote = await buildDeliveryQuote(payload);
       res.status(200).json({

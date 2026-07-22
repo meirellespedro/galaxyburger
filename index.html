@@ -5,12 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Galaxy Burger em Campo Grande: hambúrgueres artesanais com visual cinematográfico, sabor intenso e entrega rápida pelo canal oficial.">
   <meta name="theme-color" content="#05080a">
+  <link rel="canonical" href="https://galaxyburger-meirellespedros-projects.vercel.app/">
   <meta property="og:title" content="Galaxy Burger | Hamburgueria artesanal em Campo Grande RJ">
   <meta property="og:description" content="Hambúrgueres artesanais com atmosfera sci-fi premium, combos autorais e entrega rápida em Campo Grande.">
   <meta property="og:type" content="website">
-  <meta property="og:image" content="img/orion.png">
+  <meta property="og:url" content="https://galaxyburger-meirellespedros-projects.vercel.app/">
+  <meta property="og:image" content="https://galaxyburger-meirellespedros-projects.vercel.app/img/og-image.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Galaxy Burger | Hamburgueria artesanal em Campo Grande RJ">
+  <meta name="twitter:description" content="Hambúrgueres artesanais com atmosfera sci-fi premium, combos autorais e entrega rápida em Campo Grande.">
+  <meta name="twitter:image" content="https://galaxyburger-meirellespedros-projects.vercel.app/img/og-image.jpg">
   <title>Galaxy Burger | Hamburgueria Artesanal em Campo Grande RJ</title>
-  <link rel="icon" href="img/logotipo.png">
+  <link rel="icon" href="img/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="img/favicon-16.png" sizes="16x16" type="image/png">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
@@ -20,7 +31,7 @@
       "@context": "https://schema.org",
       "@type": "Restaurant",
       "name": "Galaxy Burger",
-      "image": "img/orion.png",
+      "image": "img/orion.webp",
       "telephone": "+55 21 99557-8652",
       "servesCuisine": "Hamburgers",
       "hasMenu": "https://www.ifood.com.br/delivery/rio-de-janeiro-rj/galaxy-burger-199-campo-grande/fe3716f9-fab7-4b6b-9e7a-09f0ccff22d1",
@@ -69,7 +80,7 @@
   <header class="site-header">
     <nav class="navbar" aria-label="Principal">
       <a class="brand" href="#inicio" aria-label="Galaxy Burger">
-        <img src="img/logotipo.png" alt="Galaxy Burger">
+        <img src="img/logotipo.webp" alt="Galaxy Burger">
       </a>
 
       <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false" onclick="toggleMobileNav()">
@@ -101,7 +112,7 @@
   <div id="mobile-nav" class="mobile-nav" hidden>
     <div class="mobile-nav-panel">
       <div class="mobile-nav-head">
-        <img src="img/logotipo.png" alt="Galaxy Burger">
+        <img src="img/logotipo.webp" alt="Galaxy Burger">
         <button type="button" class="mobile-nav-close" aria-label="Fechar menu" onclick="closeMobileNav()">X</button>
       </div>
 
@@ -166,7 +177,7 @@
           <div class="hero-orbit orbit-two" aria-hidden="true"></div>
           <div class="hero-glow" aria-hidden="true"></div>
           <div class="hero-logo-stage">
-            <img class="hero-logo-photo" src="img/logotipo.png" alt="Logotipo da Galaxy Burger" fetchpriority="high" decoding="async">
+            <img class="hero-logo-photo" src="img/logotipo.webp" alt="Logotipo da Galaxy Burger" fetchpriority="high" decoding="async">
           </div>
         </div>
       </div>
@@ -204,7 +215,7 @@
       <div class="top-picks-grid">
         <article class="card top-pick-card" data-product-id="burger-poro-cosmico">
           <span class="product-badge danger">Mais pedido</span>
-          <img src="img/porocosmico.png" alt="Poró cósmico ( TOP 1, O MAIS PEDIDO ) da Galaxy Burger" loading="lazy" decoding="async">
+          <img src="img/porocosmico.webp" alt="Poró cósmico ( TOP 1, O MAIS PEDIDO ) da Galaxy Burger" loading="lazy" decoding="async">
           <div class="card-content">
             <h3>Poró cósmico ( TOP 1, O MAIS PEDIDO )</h3>
             <p>Uma &oacute;rbita cremosa com blend de 150g, bacon crocante, mussarela e creme de alho-por&oacute; que domina a primeira mordida.</p>
@@ -214,7 +225,7 @@
         </article>
         <article class="card top-pick-card top-pick-featured" data-product-id="burger-saturno">
           <span class="product-badge warning">Burger colossal</span>
-          <img src="img/saturno.png" alt="Saturno da Galaxy Burger" loading="lazy" decoding="async">
+          <img src="img/saturno.webp" alt="Saturno da Galaxy Burger" loading="lazy" decoding="async">
           <div class="card-content">
             <h3>Saturno</h3>
             <p>Uma nave robusta com dois burgers de 150g, muito queijo, catupiry, farofa de bacon e molho Billy Jack.</p>
@@ -224,7 +235,7 @@
         </article>
         <article class="card top-pick-card" data-product-id="burger-orion">
           <span class="product-badge success">Favorito da base</span>
-          <img src="img/orion.png" alt="ORION da Galaxy Burger" loading="lazy" decoding="async">
+          <img src="img/orion.webp" alt="ORION da Galaxy Burger" loading="lazy" decoding="async">
           <div class="card-content">
             <h3>ORION</h3>
             <p>Um cl&aacute;ssico estelar com blend de 150g, cheddar derretido, bacon e cebola caramelizada com barbecue da casa.</p>
@@ -248,7 +259,7 @@
         <div class="card-grid">
           <article class="card" data-product-id="burger-alfa-tasty">
             <span class="product-badge neutral">Novidade</span>
-            <img src="img/alfatasty.png" alt="Alfa Tasty" loading="lazy" decoding="async">
+            <img src="img/alfatasty.webp" alt="Alfa Tasty" loading="lazy" decoding="async">
             <div class="card-content">
               <h3>Alfa Tasty</h3>
               <p>Um ponto de entrada na gal&aacute;xia com cheddar, bacon, picles e molho tasty para uma mordida direta e marcante.</p>
@@ -259,7 +270,7 @@
 
           <article class="card" data-product-id="burger-et-da-casa">
             <span class="product-badge success">Favorito</span>
-            <img src="img/etdacasa.png" alt="ET da casa" loading="lazy" decoding="async">
+            <img src="img/etdacasa.webp" alt="ET da casa" loading="lazy" decoding="async">
             <div class="card-content">
               <h3>ET da casa</h3>
               <p>O alien favorito da base, com cheddar, catupiry, bacon, picles, salada fresca e molho Billy Jack.</p>
@@ -270,7 +281,7 @@
 
           <article class="card" data-product-id="burger-baconstelacao">
             <span class="product-badge danger">Mais bacon</span>
-            <img src="img/baconstelacao.png" alt="Baconstelação" loading="lazy" decoding="async">
+            <img src="img/baconstelacao.webp" alt="Baconstelação" loading="lazy" decoding="async">
             <div class="card-content">
               <h3>Baconstelação</h3>
               <p>Uma constela&ccedil;&atilde;o de bacon com mussarela, maionese de bacon, farofa crocante e cebola caramelizada com barbecue.</p>
@@ -281,7 +292,7 @@
 
           <article class="card" data-product-id="burger-picles-das-galaxias">
             <span class="product-badge neutral">Picles em destaque</span>
-            <img src="img/piclesdasgalaxias.png" alt="Picles das galáxias" loading="lazy" decoding="async">
+            <img src="img/piclesdasgalaxias.webp" alt="Picles das galáxias" loading="lazy" decoding="async">
             <div class="card-content">
               <h3>Picles das galáxias</h3>
               <p>Para quem gosta de acidez em destaque: cheddar, picles, bacon, cebola roxa e Billy Jack em equil&iacute;brio.</p>
@@ -292,7 +303,7 @@
 
           <article class="card" data-product-id="burger-estrela-classica">
             <span class="product-badge success">Cl&aacute;ssico da casa</span>
-            <img src="img/estrelaclassica.png" alt="Estrela clássica" loading="lazy" decoding="async">
+            <img src="img/estrelaclassica.webp" alt="Estrela clássica" loading="lazy" decoding="async">
             <div class="card-content">
               <h3>Estrela clássica</h3>
               <p>A estrela mais familiar da casa, com mussarela, cebola roxa, picles, tomate e ketchup sem erro.</p>
@@ -303,7 +314,7 @@
 
           <article class="card" data-product-id="burger-venus-salada">
             <span class="product-badge neutral">Mais fresco</span>
-            <img src="img/venussalada.png" alt="Vênus salada" loading="lazy" decoding="async">
+            <img src="img/venussalada.webp" alt="Vênus salada" loading="lazy" decoding="async">
             <div class="card-content">
               <h3>Vênus salada</h3>
               <p>Uma leitura mais fresca da gal&aacute;xia, com mussarela, bacon, tomate, alface, cebola roxa e maionese verde.</p>
@@ -314,7 +325,7 @@
 
           <article class="card" data-product-id="burger-ovini-smash">
             <span class="product-badge warning">Impacto duplo</span>
-            <img src="img/ovnismash.png" alt="Ovini Smash 2.0" loading="lazy" decoding="async">
+            <img src="img/ovnismash.webp" alt="Ovini Smash 2.0" loading="lazy" decoding="async">
             <div class="card-content">
               <h3>Ovini Smash 2.0</h3>
               <p>Dois smash burgers em avistamento confirmado, com cheddar duplo, bacon, picles e molho Billy Jack.</p>
@@ -325,7 +336,7 @@
 
           <article class="card" data-product-id="burger-cheddar-estrelar">
             <span class="product-badge danger">Cremoso</span>
-            <img src="img/cheddarestelar.png" alt="Cheddar Estrelar" loading="lazy" decoding="async">
+            <img src="img/cheddarestelar.webp" alt="Cheddar Estrelar" loading="lazy" decoding="async">
             <div class="card-content">
               <h3>Cheddar Estrelar</h3>
               <p>Uma explos&atilde;o cremosa com blend de 150g, onion rings, cheddar em dobro e creme de cheddar com bacon.</p>
@@ -336,7 +347,7 @@
 
           <article class="card" data-product-id="burger-cometa-de-fogo">
             <span class="product-badge warning">Picante</span>
-            <img src="img/cometadefogo.png" alt="Cometa de fogo" loading="lazy" decoding="async">
+            <img src="img/cometadefogo.webp" alt="Cometa de fogo" loading="lazy" decoding="async">
             <div class="card-content">
               <h3>Cometa de fogo</h3>
               <p>Um rastro picante de cheddar, bacon e geleia de pimenta sobre blend de 150g.</p>
@@ -360,7 +371,7 @@
         <div class="combo-grid">
           <article class="card combo-card" data-product-id="combo-individual-orion" data-combo-drinks="1">
             <span class="combo-tag">Favorito da base</span>
-            <img src="img/comboorion.png" alt="Combo individual Orion" loading="lazy" decoding="async">
+            <img src="img/comboorion.webp" alt="Combo individual Orion" loading="lazy" decoding="async">
             <div class="card-content">
               <h3>Combo individual Orion</h3>
               <p>O combo de lan&ccedil;amento da base: Orion, batata e 1 bebida para uma refei&ccedil;&atilde;o redonda.</p>
@@ -371,7 +382,7 @@
 
           <article class="card combo-card combo-featured" data-product-id="combo-individual-saturno" data-combo-drinks="1">
             <span class="combo-tag">Melhor custo-benef&iacute;cio</span>
-            <img src="img/combosaturno.png" alt="Combo individual Saturno" loading="lazy" decoding="async">
+            <img src="img/combosaturno.webp" alt="Combo individual Saturno" loading="lazy" decoding="async">
             <div class="card-content">
               <h3>Combo individual Saturno</h3>
               <p>Um combo de maior propuls&atilde;o, com Saturno, batata e 1 bebida para fome de outro planeta.</p>
@@ -382,7 +393,7 @@
 
           <article class="card combo-card" data-product-id="combo-venus-casal" data-combo-drinks="2">
             <span class="combo-tag">Para casal</span>
-            <img src="img/combocasalvenus.png" alt="Combo Vênus casal" loading="lazy" decoding="async">
+            <img src="img/combocasalvenus.webp" alt="Combo Vênus casal" loading="lazy" decoding="async">
             <div class="card-content">
               <h3>Combo Vênus casal</h3>
               <p>Miss&atilde;o em dupla com 2 burgers, 2 batatas pequenas e 2 bebidas para dividir sem turbul&ecirc;ncia.</p>
@@ -393,7 +404,7 @@
 
           <article class="card combo-card" data-product-id="combo-classico" data-combo-drinks="1">
             <span class="combo-tag">Escolha r&aacute;pida</span>
-            <img src="img/comboclassico.png" alt="Combo clássico" loading="lazy" decoding="async">
+            <img src="img/comboclassico.webp" alt="Combo clássico" loading="lazy" decoding="async">
             <div class="card-content">
               <h3>Combo clássico</h3>
               <p>Escolha segura da nave: Estrela Cl&aacute;ssica, batata pequena e 1 bebida em um combo f&aacute;cil de decidir.</p>
@@ -404,7 +415,7 @@
 
           <article class="card combo-card" data-product-id="combo-orion-familia" data-combo-drinks="4">
             <span class="combo-tag">Para fam&iacute;lia</span>
-            <img src="img/combofamiliaorion.png" alt="Combo Orion família" loading="lazy" decoding="async">
+            <img src="img/combofamiliaorion.webp" alt="Combo Orion família" loading="lazy" decoding="async">
             <div class="card-content">
               <h3>Combo Orion família</h3>
               <p>Opera&ccedil;&atilde;o fam&iacute;lia com 4 Orions, batata grande e 4 bebidas para todo mundo comer junto.</p>
@@ -415,7 +426,7 @@
 
           <article class="card combo-card" data-product-id="combo-aliens" data-combo-drinks="4">
             <span class="combo-tag">Pedido em grupo</span>
-            <img src="img/comboaliens.png" alt="Combo Aliens" loading="lazy" decoding="async">
+            <img src="img/comboaliens.webp" alt="Combo Aliens" loading="lazy" decoding="async">
             <div class="card-content">
               <h3>Combo Aliens</h3>
               <p>Combo de tripula&ccedil;&atilde;o com 4 burgers, acompanhamento grande e 4 bebidas para pedido em grupo.</p>
@@ -426,7 +437,7 @@
 
           <article class="card combo-card" data-product-id="combo-kids" data-combo-drinks="1" data-combo-drink-options="Guaracamp copo 285ml">
             <span class="combo-tag">Kids</span>
-            <img src="img/comboetzinho.png" alt="Combo Kids" loading="lazy" decoding="async">
+            <img src="img/comboetzinho.webp" alt="Combo Kids" loading="lazy" decoding="async">
             <div class="card-content">
               <h3>Combo Kids</h3>
               <p>Miss&atilde;o infantil resolvida com Etzinho, batata pequena e Guaracamp na medida certa.</p>
@@ -437,7 +448,7 @@
 
           <article class="card combo-card" data-product-id="combo-galaxy" data-combo-drinks="3">
             <span class="combo-tag">Compartilhe</span>
-            <img src="img/combogalaxy.png" alt="Combo Galaxy" loading="lazy" decoding="async">
+            <img src="img/combogalaxy.webp" alt="Combo Galaxy" loading="lazy" decoding="async">
             <div class="card-content">
               <h3>Combo Galaxy</h3>
               <p>Pacote da casa com 3 burgers, batata grande e 3 bebidas para compartilhar sem perder o ritmo.</p>
@@ -467,7 +478,7 @@
 
             <div class="card-grid compact-grid">
               <article class="card" data-product-id="side-onion-crocante">
-                <img src="img/onionrings.png" alt="15 Onions crocante" loading="lazy" decoding="async">
+                <img src="img/onionrings.webp" alt="15 Onions crocante" loading="lazy" decoding="async">
                 <div class="card-content">
                   <h3>15 Onions crocante</h3>
                   <p>An&eacute;is dourados e crocantes com o molho Galaxy para abrir a miss&atilde;o com impacto.</p>
@@ -477,7 +488,7 @@
               </article>
 
               <article class="card" data-product-id="side-batata-grande">
-                <img src="img/batatagrande.png" alt="Batata Grande" loading="lazy" decoding="async">
+                <img src="img/batatagrande.webp" alt="Batata Grande" loading="lazy" decoding="async">
                 <div class="card-content">
                   <h3>Batata Grande</h3>
                   <p>Uma por&ccedil;&atilde;o de apoio para dividir na mesa ou acompanhar qualquer burger da frota.</p>
@@ -487,7 +498,7 @@
               </article>
 
               <article class="card" data-product-id="side-batata-grande-catupiry">
-                <img src="img/catupiryebacon.png" alt="Batata Grande (catupiry)" loading="lazy" decoding="async">
+                <img src="img/catupiryebacon.webp" alt="Batata Grande (catupiry)" loading="lazy" decoding="async">
                 <div class="card-content">
                   <h3>Batata Grande (catupiry)</h3>
                   <p>Batata grande coberta com catupiry e bacon para uma &oacute;rbita cremosa sem desperd&iacute;cio.</p>
@@ -497,7 +508,7 @@
               </article>
 
               <article class="card" data-product-id="side-batata-grande-cheddar">
-                <img src="img/cheddarebacon.png" alt="Batata Grande (cheddar)" loading="lazy" decoding="async">
+                <img src="img/cheddarebacon.webp" alt="Batata Grande (cheddar)" loading="lazy" decoding="async">
                 <div class="card-content">
                   <h3>Batata Grande (cheddar)</h3>
                   <p>Batata grande com cheddar e bacon para refor&ccedil;ar qualquer combo com mais peso.</p>
@@ -507,7 +518,7 @@
               </article>
 
               <article class="card" data-product-id="side-batata-pequena">
-                <img src="img/batatapequena.png" alt="Batata pequena" loading="lazy" decoding="async">
+                <img src="img/batatapequena.webp" alt="Batata pequena" loading="lazy" decoding="async">
                 <div class="card-content">
                   <h3>Batata pequena</h3>
                   <p>Por&ccedil;&atilde;o r&aacute;pida, crocante e no ponto para completar pedidos individuais.</p>
@@ -517,7 +528,7 @@
               </article>
 
               <article class="card" data-product-id="side-nuggets">
-                <img src="img/nuggets.png" alt="Nuggets" loading="lazy" decoding="async">
+                <img src="img/nuggets.webp" alt="Nuggets" loading="lazy" decoding="async">
                 <div class="card-content">
                   <h3>Nuggets</h3>
                   <p>Cinco unidades para refor&ccedil;ar a tripula&ccedil;&atilde;o dos pedidos mais r&aacute;pidos.</p>
@@ -536,7 +547,7 @@
 
             <div class="card-grid compact-grid">
               <article class="card" data-product-id="drink-coca-cola-350">
-                <img src="img/coca.png" alt="Coca-Cola Comum 350ML" loading="lazy" decoding="async">
+                <img src="img/coca.webp" alt="Coca-Cola Comum 350ML" loading="lazy" decoding="async">
                 <div class="card-content">
                   <h3>Coca-Cola Comum 350ML</h3>
                   <p>Coca bem gelada para acompanhar qualquer burger da gal&aacute;xia.</p>
@@ -546,7 +557,7 @@
               </article>
 
               <article class="card" data-product-id="drink-coca-cola-zero-350">
-                <img src="img/cocazero.png" alt="Coca-Cola Zero 350 ml" loading="lazy" decoding="async">
+                <img src="img/cocazero.webp" alt="Coca-Cola Zero 350 ml" loading="lazy" decoding="async">
                 <div class="card-content">
                   <h3>Coca-Cola Zero 350 ml</h3>
                   <p>Vers&atilde;o zero para equilibrar a miss&atilde;o sem abrir m&atilde;o do cl&aacute;ssico.</p>
@@ -556,7 +567,7 @@
               </article>
 
               <article class="card" data-product-id="drink-pepsi-350">
-                <img src="img/pepsi.png" alt="Pepsi lata 350ml" loading="lazy" decoding="async">
+                <img src="img/pepsi.webp" alt="Pepsi lata 350ml" loading="lazy" decoding="async">
                 <div class="card-content">
                   <h3>Pepsi lata 350ml</h3>
                   <p>Pepsi em lata para pedidos solo, combos e pousos r&aacute;pidos.</p>
@@ -566,7 +577,7 @@
               </article>
 
               <article class="card" data-product-id="drink-pepsi-black-350">
-                <img src="img/pepsi zero.png" alt="Pepsi Black lata 350ml" loading="lazy" decoding="async">
+                <img src="img/pepsi zero.webp" alt="Pepsi Black lata 350ml" loading="lazy" decoding="async">
                 <div class="card-content">
                   <h3>Pepsi Black lata 350ml</h3>
                   <p>Escolha sem a&ccedil;&uacute;car para deixar a viagem mais leve.</p>
@@ -576,7 +587,7 @@
               </article>
 
               <article class="card" data-product-id="drink-fanta-laranja">
-                <img src="img/fantalaranja.png" alt="Fanta Laranja" loading="lazy" decoding="async">
+                <img src="img/fantalaranja.webp" alt="Fanta Laranja" loading="lazy" decoding="async">
                 <div class="card-content">
                   <h3>Fanta Laranja</h3>
                   <p>Toque citrus e gelado para quem curte uma &oacute;rbita mais doce.</p>
@@ -586,7 +597,7 @@
               </article>
 
               <article class="card" data-product-id="drink-guarana-350">
-                <img src="img/guarana.png" alt="Guaran&aacute; lata 350ml" loading="lazy" decoding="async">
+                <img src="img/guarana.webp" alt="Guaran&aacute; lata 350ml" loading="lazy" decoding="async">
                 <div class="card-content">
                   <h3>Guaran&aacute; lata 350ml</h3>
                   <p>Guaran&aacute; em lata para acompanhar burgers, por&ccedil;&otilde;es e combos da base.</p>
@@ -596,7 +607,7 @@
               </article>
 
               <article class="card" data-product-id="drink-sprite-350">
-                <img src="img/sprite.png" alt="Sprite lata 350ml" loading="lazy" decoding="async">
+                <img src="img/sprite.webp" alt="Sprite lata 350ml" loading="lazy" decoding="async">
                 <div class="card-content">
                   <h3>Sprite lata 350ml</h3>
                   <p>Leve, gelada e perfeita para equilibrar burgers mais intensos.</p>
@@ -606,7 +617,7 @@
               </article>
 
               <article class="card" data-product-id="drink-fanta-uva">
-                <img src="img/fantauva.png" alt="Fanta uva" loading="lazy" decoding="async">
+                <img src="img/fantauva.webp" alt="Fanta uva" loading="lazy" decoding="async">
                 <div class="card-content">
                   <h3>Fanta uva</h3>
                   <p>Op&ccedil;&atilde;o frutada para completar lanches e combos com outra vibe.</p>
@@ -616,7 +627,7 @@
               </article>
 
               <article class="card" data-product-id="drink-guaracamp-285">
-                <img src="img/guaracamp.png" alt="Guaracamp copo 285ml" loading="lazy" decoding="async">
+                <img src="img/guaracamp.webp" alt="Guaracamp copo 285ml" loading="lazy" decoding="async">
                 <div class="card-content">
                   <h3>Guaracamp copo 285ml</h3>
                   <p>A bebida mais econ&ocirc;mica da base para fechar o pedido sem pesar.</p>
@@ -777,7 +788,7 @@
   <footer id="contato" class="site-footer">
     <div class="footer-grid">
       <div class="footer-brand">
-        <img src="img/logotipo.png" alt="Galaxy Burger">
+        <img src="img/logotipo.webp" alt="Galaxy Burger">
         <p>Galaxy Burger em Campo Grande com identidade espacial, burgers artesanais e uma opera&ccedil;&atilde;o feita para entregar sabor, impacto visual e confian&ccedil;a do primeiro ao &uacute;ltimo clique.</p>
       </div>
 
@@ -808,8 +819,19 @@
       </div>
     </div>
 
+    <div class="footer-map">
+      <iframe
+        src="https://www.google.com/maps?q=Rua+Embaixador+Muniz+Gordilho,+199,+Campo+Grande,+Rio+de+Janeiro+-+RJ,+23070-010&output=embed"
+        title="Localiza&ccedil;&atilde;o da Galaxy Burger no mapa"
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade"
+        aria-label="Mapa com o endere&ccedil;o da Galaxy Burger"
+      ></iframe>
+    </div>
+
     <div class="footer-bottom">
       <p>&copy; 2026 Galaxy Burger. Burgers artesanais e entrega r&aacute;pida em Campo Grande.</p>
+      <p class="footer-privacy">Seus dados (nome, telefone e endere&ccedil;o) s&atilde;o usados apenas para preparar e entregar o seu pedido pelo WhatsApp oficial da loja &mdash; n&atilde;o s&atilde;o vendidos nem compartilhados com terceiros.</p>
     </div>
   </footer>
 

@@ -16,7 +16,7 @@
     store: Object.freeze({
       whatsapp: "5521995578652",
       iFoodUrl: "https://www.ifood.com.br/delivery/rio-de-janeiro-rj/galaxy-burger-199-campo-grande/fe3716f9-fab7-4b6b-9e7a-09f0ccff22d1",
-      publicOrderTicketBaseUrl: "https://galaxyburger.vercel.app/",
+      publicOrderTicketBaseUrl: "https://galaxyburger-meirellespedros-projects.vercel.app/",
       address: Object.freeze({
         street: "Rua Embaixador Muniz Gordilho",
         number: "199",
@@ -35,8 +35,8 @@
       timeZone: "America/Sao_Paulo",
       scheduleMode: "live",
       temporaryClosure: Object.freeze({
-        enabled: true,
-        reopenAt: "2026-05-23T19:00:00-03:00"
+        enabled: false,
+        reopenAt: null
       }),
       hours: Object.freeze({
         0: Object.freeze({ openMinutes: 19 * 60, closeMinutes: 23 * 60 + 59 }),

@@ -4,7 +4,8 @@
   "description": "Sistema de gerenciamento de hamburgueria",
   "private": true,
   "scripts": {
-    "deploy": "vercel"
+    "deploy": "vercel",
+    "test": "node --test tests/*.test.js"
   },
   "engines": {
     "node": "24.x"

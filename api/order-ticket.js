@@ -27,6 +27,8 @@ const {
   readSharedOrderTicket
 } = require("../lib/_order-ticket-store");
 const { parseJsonBody, sendJsonError } = require("../lib/_http-helpers");
+const { assertRateLimitNotExceeded } = require("../lib/_rate-limit");
+const { isKvStorageConfigured, kvGetJSON, kvSetJSON } = require("../lib/_kv-storage");
 
 const deliveryInternals = deliveryQuoteApi._internals || {};
 const {
@@ -43,6 +45,9 @@ const {
 const MAX_CART_ITEM_QUANTITY = 20;
 const ORDER_TICKET_TTL_MS = 48 * 60 * 60 * 1000;
 const ORDER_TICKET_TOKEN_VERSION = "v2";
+const ORDER_RATE_LIMIT_MAX_ATTEMPTS = 20;
+const ORDER_RATE_LIMIT_WINDOW_SECONDS = 10 * 60;
+const ORDER_IDEMPOTENCY_TTL_SECONDS = 90;
 const STORE_ADDRESS = Object.freeze(storeConfig.store?.address || {});
 const STORE_TIME_ZONE = normalizeText(storeConfig.checkout?.timeZone) || "America/Sao_Paulo";
 const MIN_ORDER_AMOUNT = Number(storeConfig.checkout?.minimumOrderAmount || 20);
@@ -94,6 +99,17 @@ module.exports = async function orderTicketHandler(req, res) {
     }
 
     if (req.method === "POST") {
+      await assertRateLimitNotExceeded(req, {
+        scope: "order-ticket",
+        maxAttempts: ORDER_RATE_LIMIT_MAX_ATTEMPTS,
+        windowSeconds: ORDER_RATE_LIMIT_WINDOW_SECONDS,
+        createError: () => createError(
+          "order_ticket_rate_limited",
+          "Muitas tentativas de pedido em pouco tempo. Aguarde um instante antes de tentar novamente.",
+          429
+        )
+      });
+
       const payload = await parseJsonBody(req);
       const preparedOrder = await prepareOrder(payload, req);
 
@@ -529,6 +545,23 @@ function buildWhatsAppOrderMessage(order, ticketUrl) {
   return lines.join("\n").trim();
 }
 
+function buildOrderIdempotencyKey({ customerName, customerPhone, notes, paymentMethod, cashChangeText, rawCart, payload }) {
+  const deliveryFingerprint = normalizeCompareText(payload.fulfillment) === "pickup"
+    ? "pickup"
+    : normalizeText(payload.delivery?.quoteToken);
+
+  const cartFingerprint = rawCart
+    .map(item => `${normalizeText(item?.id || item?.productId)}x${Number(item?.quantity) || 0}`)
+    .sort()
+    .join(",");
+
+  const fingerprint = createHash("sha256")
+    .update([customerName, customerPhone, notes, paymentMethod, cashChangeText, deliveryFingerprint, cartFingerprint].join("|"))
+    .digest("hex");
+
+  return `hamburgeria:order-idem:${fingerprint}`;
+}
+
 async function prepareOrder(payload = {}, req) {
   const customerName = normalizeText(payload.customer?.name || payload.name);
   const customerPhone = formatPhoneDigits(payload.customer?.phone || payload.customerPhone);
@@ -536,6 +569,23 @@ async function prepareOrder(payload = {}, req) {
   const paymentMethod = normalizeCompareText(payload.payment?.method || payload.paymentMethod);
   const cashChangeText = normalizeText(payload.payment?.cashChangeText || payload.cashChangeText);
   const rawCart = Array.isArray(payload.cart) ? payload.cart : [];
+
+  // Clique duplo ou reenvio por conexão instável não deve virar duas comandas:
+  // se o mesmo pedido (cliente + carrinho + entrega) já foi preparado há pouco,
+  // devolve o resultado anterior em vez de criar um novo.
+  const idempotencyKey = buildOrderIdempotencyKey({ customerName, customerPhone, notes, paymentMethod, cashChangeText, rawCart, payload });
+
+  if (isKvStorageConfigured()) {
+    try {
+      const cached = await kvGetJSON(idempotencyKey);
+      if (cached) {
+        return cached;
+      }
+    } catch {
+      // Falha na leitura não deve impedir o pedido de seguir normalmente.
+    }
+  }
+
   await assertStoreAcceptingOrders();
   const catalogContext = await createCatalogContext();
 
@@ -625,13 +675,23 @@ async function prepareOrder(payload = {}, req) {
 
   const whatsAppMessage = buildWhatsAppOrderMessage(order, sharedTicketUrl);
 
-  return {
+  const result = {
     order,
     ticketToken,
     sharedTicketRef,
     sharedTicketUrl,
     whatsAppMessage
   };
+
+  if (isKvStorageConfigured()) {
+    try {
+      await kvSetJSON(idempotencyKey, result, { expireInSeconds: ORDER_IDEMPOTENCY_TTL_SECONDS });
+    } catch {
+      // Não crítico: na pior hipótese, um duplo clique gera duas comandas.
+    }
+  }
+
+  return result;
 }
 
 async function assertStoreAcceptingOrders() {
