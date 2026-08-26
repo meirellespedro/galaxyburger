@@ -1,6 +1,15 @@
 # Galaxy Burger
 
-Site em HTML, CSS e JavaScript para a Galaxy Burger, com checkout via WhatsApp, validacao serverless da taxa de entrega por zonas locais e comanda segura de pedido, sem API paga.
+🔗 **[Ver site ao vivo](https://galaxyburger.vercel.app)**
+
+![Testes](https://github.com/meirellespedro/galaxyburger/actions/workflows/test.yml/badge.svg)
+<img src="https://skillicons.dev/icons?i=html,css,js,vercel,redis&theme=dark" alt="HTML5, CSS3, JavaScript, Vercel, Redis" />
+
+![Preview do site Galaxy Burger](img/preview.png)
+
+Sistema web de pedidos para uma hamburgueria real (Campo Grande, RJ): cardápio, checkout com cálculo automático de taxa de entrega por zona, comanda de pedido segura, painel administrativo para controle de estoque/horário de funcionamento, e persistência em produção via Redis — sem depender de nenhuma API paga.
+
+Não é uma landing page estática: tem suíte de testes automatizados (44 testes) rodando em CI a cada push, rate limiting contra pedidos duplicados/abuso, e hardening de sessão no painel admin — decisões de engenharia motivadas por bugs reais encontrados em produção (ex.: variável de ambiente do Redis quebrando silenciosamente por causa de aspas extras).
 
 ## Stack
 
@@ -8,6 +17,8 @@ Site em HTML, CSS e JavaScript para a Galaxy Burger, com checkout via WhatsApp, 
 - CSS
 - JavaScript vanilla
 - Deploy: Vercel
+- Persistência: Upstash Redis (produção)
+- Testes: suíte própria + GitHub Actions CI
 - APIs serverless: `api/delivery-quote.js`, `api/order-ticket.js`, `api/admin-login.js`, `api/admin-inventory.js`, `api/admin-store-status.js`, `api/inventory-status.js` e `api/store-status.js`
 
 ## Estrutura
