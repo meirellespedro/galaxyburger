@@ -48,7 +48,14 @@ const ADDRESS_GEOCODE_CACHE = createLookupCache({
 // <https://operations.osmfoundation.org/policies/nominatim/>
 const EXTERNAL_THROTTLE = createExternalThrottle();
 const NOMINATIM_MIN_INTERVAL_MS = 1100;
-const GEOCODER_USER_AGENT = "GalaxyBurgerDelivery/1.1 (+https://galaxyburger.vercel.app)";
+const GEOCODER_USER_AGENT_BASE = "GalaxyBurgerDelivery/1.1 (+https://galaxyburger.vercel.app";
+// Contato opcional (recomendado pela política do Nominatim para a OSMF avisar
+// antes de bloquear). Validado como e-mail para não injetar texto no cabeçalho.
+function buildExternalUserAgent(env = process.env) {
+  const contact = normalizeText(env?.GEOCODER_CONTACT_EMAIL);
+  const safeContact = /^[^\s@()]+@[^\s@()]+\.[^\s@()]+$/.test(contact) ? `; ${contact}` : "";
+  return `${GEOCODER_USER_AGENT_BASE}${safeContact})`;
+}
 const DELIVERY_MESSAGES = Object.freeze({
   active: "Entrega disponível para sua região. Taxa: {fee}.",
   blocked: "No momento não entregamos nessa região. Você pode escolher retirada no local.",
@@ -763,7 +770,7 @@ async function resolveAddressCoordinates(address) {
         response = await globalThis.fetch(provider.buildUrl(query), {
           headers: {
             Accept: "application/json",
-            "User-Agent": GEOCODER_USER_AGENT
+            "User-Agent": buildExternalUserAgent()
           },
           signal: AbortSignal.timeout(EXTERNAL_LOOKUP_TIMEOUT_MS)
         });
@@ -973,7 +980,8 @@ async function fetchCepAddress(cep) {
     try {
       response = await globalThis.fetch(provider.buildUrl(normalizedCep), {
         headers: {
-          Accept: "application/json"
+          Accept: "application/json",
+          "User-Agent": buildExternalUserAgent()
         },
         signal: AbortSignal.timeout(EXTERNAL_LOOKUP_TIMEOUT_MS)
       });
@@ -1254,6 +1262,7 @@ async function buildDeliveryQuote(payload) {
 
 module.exports._internals = {
   QUOTE_TTL_MS,
+  buildExternalUserAgent,
   INVALID_HOUSE_NUMBER_VALUES,
   assertCurrentDeliveryQuote,
   buildDeliveryAddressKey,

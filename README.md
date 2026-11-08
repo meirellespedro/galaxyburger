@@ -54,6 +54,7 @@ Este projeto nao precisa de build step.
 - `ADMIN_PANEL_PASSWORD`: obrigatoria para liberar o login do painel administrativo.
 - `ADMIN_PANEL_SECRET`: recomendada para assinar a sessao do painel administrativo.
 - `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`: necessarias em producao (Vercel) para o painel administrativo salvar de verdade (estoque, areas de entrega, status da loja). Veja a secao "Painel administrativo" abaixo.
+- `GEOCODER_CONTACT_EMAIL`: opcional, recomendada. E-mail de contato acrescentado ao `User-Agent` das consultas de CEP e geocodificacao (a politica do Nominatim recomenda um contato para a OSMF avisar antes de bloquear).
 
 ## Taxa de entrega
 

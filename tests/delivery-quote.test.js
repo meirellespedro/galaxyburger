@@ -660,3 +660,49 @@ test("invalida uma cotacao salva quando a rua validada fica bloqueada depois", a
   assert.equal(verified.body.ok, false);
   assert.equal(verified.body.code, "delivery_area_blocked");
 });
+
+test("User-Agent externo identifica a loja e aceita contato configurado", () => {
+  const { buildExternalUserAgent } = handler._internals;
+
+  assert.equal(buildExternalUserAgent({}), "GalaxyBurgerDelivery/1.1 (+https://galaxyburger.vercel.app)");
+  assert.equal(
+    buildExternalUserAgent({ GEOCODER_CONTACT_EMAIL: "contato@galaxyburger.com.br" }),
+    "GalaxyBurgerDelivery/1.1 (+https://galaxyburger.vercel.app; contato@galaxyburger.com.br)"
+  );
+  // Valor inválido não injeta texto arbitrário no cabeçalho.
+  assert.equal(
+    buildExternalUserAgent({ GEOCODER_CONTACT_EMAIL: "nao-e-email) X-Evil: 1" }),
+    "GalaxyBurgerDelivery/1.1 (+https://galaxyburger.vercel.app)"
+  );
+});
+
+test("consulta de CEP tambem envia o User-Agent identificavel", async () => {
+  process.env.DELIVERY_QUOTE_SECRET = "test-secret";
+  const { state } = configureDeliveryAreasState();
+  const area = findAreaByName(state, "Vila Nova");
+  const fixture = { ...DELIVERY_CEP_FIXTURES["vila nova"], cep: "23070998", street: "Rua Teste Agente Cep" };
+  const calls = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.__GB_TEST_ADDRESS_GEO_LOOKUP__ = async () => fixture.coordinates;
+
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), userAgent: options.headers?.["User-Agent"] });
+    return new Response(
+      JSON.stringify({ cep: fixture.cep, logradouro: fixture.street, bairro: fixture.neighborhood, localidade: fixture.city, uf: fixture.state }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  };
+
+  try {
+    const response = await invokeHandler({ body: buildAddress(area, { cep: fixture.cep, street: fixture.street }) });
+    assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+    assert.equal(response.body.fee, 5);
+    const cepCalls = calls.filter(call => /viacep|brasilapi/.test(call.url));
+    assert.ok(cepCalls.length >= 1, "deveria consultar o CEP");
+    for (const call of cepCalls) {
+      assert.match(call.userAgent || "", /^GalaxyBurgerDelivery\/1\.1 \(\+https:\/\/galaxyburger\.vercel\.app/);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
