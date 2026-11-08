@@ -9,6 +9,8 @@ const {
 } = require("../lib/_delivery-areas-store");
 const { parseJsonBody, sendJsonError } = require("../lib/_http-helpers");
 const { assertRateLimitNotExceeded } = require("../lib/_rate-limit");
+const { createLookupCache } = require("../lib/_lookup-cache");
+const { createExternalThrottle } = require("../lib/_external-throttle");
 
 const QUOTE_TTL_MS = 15 * 60 * 1000;
 const QUOTE_RATE_LIMIT_MAX_ATTEMPTS = 40;
@@ -36,18 +38,17 @@ const PRIORITY_ADDRESS_ZONES = Object.freeze(deliveryConfig.priorityAddressZones
 const DELIVERY_NORMALIZATION_ABBREVIATIONS = Object.freeze(
   Object.entries(deliveryConfig.normalization?.abbreviations || {})
 );
-function setBoundedCacheEntry(cache, key, value, maxEntries) {
-  if (cache.size >= maxEntries) {
-    const oldestKey = cache.keys().next().value;
-    if (oldestKey !== undefined) {
-      cache.delete(oldestKey);
-    }
-  }
-
-  cache.set(key, value);
-}
-
-const ADDRESS_GEOCODE_CACHE = new Map();
+const ADDRESS_GEOCODE_CACHE = createLookupCache({
+  namespace: "geocode",
+  maxEntries: GEOCODE_CACHE_MAX_ENTRIES,
+  hashKeys: true
+});
+// Política do Nominatim: no máximo 1 req/s somando todo o app, User-Agent que
+// identifique a aplicação e cache do nosso lado.
+// <https://operations.osmfoundation.org/policies/nominatim/>
+const EXTERNAL_THROTTLE = createExternalThrottle();
+const NOMINATIM_MIN_INTERVAL_MS = 1100;
+const GEOCODER_USER_AGENT = "GalaxyBurgerDelivery/1.1 (+https://galaxyburger.vercel.app)";
 const DELIVERY_MESSAGES = Object.freeze({
   active: "Entrega disponível para sua região. Taxa: {fee}.",
   blocked: "No momento não entregamos nessa região. Você pode escolher retirada no local.",
@@ -102,7 +103,7 @@ function formatDeliveryDisplayText(value) {
   return replacement ? replacement[1] : text;
 }
 const ADDRESS_TYPE_PREFIX_PATTERN = /^(rua|avenida|alameda|travessa|estrada|rodovia|praca|praia)\s+/;
-const cepLookupCache = new Map();
+const cepLookupCache = createLookupCache({ namespace: "cep", maxEntries: CEP_CACHE_MAX_ENTRIES });
 const ADDRESS_GEOCODE_PROVIDERS = Object.freeze([
   {
     name: "photon",
@@ -742,20 +743,27 @@ async function resolveAddressCoordinates(address) {
 
   for (const query of queryCandidates) {
     const cacheKey = normalizeAddressToken(query);
-    const cachedMatch = ADDRESS_GEOCODE_CACHE.get(cacheKey);
+    const cachedMatch = await ADDRESS_GEOCODE_CACHE.get(cacheKey);
 
     if (cachedMatch) {
       return cachedMatch;
     }
 
     for (const provider of ADDRESS_GEOCODE_PROVIDERS) {
+      if (provider.name === "nominatim"
+        && !(await EXTERNAL_THROTTLE.tryAcquire("nominatim", NOMINATIM_MIN_INTERVAL_MS))) {
+        // Sem vaga no limite global: trata como indisponibilidade temporária.
+        hadNetworkFailure = true;
+        continue;
+      }
+
       let response;
 
       try {
         response = await globalThis.fetch(provider.buildUrl(query), {
           headers: {
             Accept: "application/json",
-            "User-Agent": "GalaxyBurgerDelivery/1.0"
+            "User-Agent": GEOCODER_USER_AGENT
           },
           signal: AbortSignal.timeout(EXTERNAL_LOOKUP_TIMEOUT_MS)
         });
@@ -782,7 +790,7 @@ async function resolveAddressCoordinates(address) {
         continue;
       }
 
-      setBoundedCacheEntry(ADDRESS_GEOCODE_CACHE, cacheKey, parsedMatch, GEOCODE_CACHE_MAX_ENTRIES);
+      await ADDRESS_GEOCODE_CACHE.set(cacheKey, parsedMatch);
       return parsedMatch;
     }
   }
@@ -936,14 +944,15 @@ async function fetchCepAddress(cep) {
     throw createError("invalid_cep", "Informe um CEP valido para calcular a entrega.", 422);
   }
 
-  if (cepLookupCache.has(normalizedCep)) {
-    return cepLookupCache.get(normalizedCep);
+  const cachedCep = await cepLookupCache.get(normalizedCep);
+  if (cachedCep) {
+    return cachedCep;
   }
 
   if (typeof globalThis.__GB_TEST_VIACEP_LOOKUP__ === "function") {
     const mockedData = await globalThis.__GB_TEST_VIACEP_LOOKUP__(normalizedCep);
     if (mockedData && typeof mockedData === "object") {
-      cepLookupCache.set(normalizedCep, mockedData);
+      await cepLookupCache.set(normalizedCep, mockedData);
       return mockedData;
     }
   }
@@ -991,7 +1000,7 @@ async function fetchCepAddress(cep) {
       continue;
     }
 
-    setBoundedCacheEntry(cepLookupCache, normalizedCep, normalizedPayload, CEP_CACHE_MAX_ENTRIES);
+    await cepLookupCache.set(normalizedCep, normalizedPayload);
     return normalizedPayload;
   }
 
@@ -1249,6 +1258,7 @@ module.exports._internals = {
   assertCurrentDeliveryQuote,
   buildDeliveryAddressKey,
   buildDeliveryQuote,
+  resolveAddressCoordinates,
   createError,
   getQuoteSecret,
   normalizeAddress,
