@@ -1179,10 +1179,10 @@ body.ticket-view-active .order-ticket-modal-content {
   z-index: 2;
   padding: 6px 10px;
   border-radius: 999px;
-  font-size: 0.62rem;
+  font-size: 0.75rem; /* 12px: selo legível no celular (antes 9,9px) */
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -1291,7 +1291,8 @@ body.ticket-view-active .order-ticket-modal-content {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-top: 10px;
+  min-height: 44px; /* área de toque mínima; o visual continua o mesmo */
+  margin-top: 2px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -1366,7 +1367,7 @@ body.ticket-view-active .order-ticket-modal-content {
 
 .add-btn {
   width: 100%;
-  min-height: 42px;
+  min-height: 48px;
   margin-top: 12px;
   border: 1px solid var(--cta-red-border);
   border-radius: 12px;
@@ -3200,7 +3201,7 @@ body.ticket-view-active .order-ticket-modal-content {
   }
 
   .add-btn {
-    min-height: 40px;
+    min-height: 48px; /* botão principal de compra: alvo confortável para o polegar */
     margin-top: 10px;
     font-size: 0.88rem;
   }
@@ -3237,8 +3238,8 @@ body.ticket-view-active .order-ticket-modal-content {
   .combo-tag {
     top: 12px;
     left: 12px;
-    padding: 5px 8px;
-    font-size: 0.56rem;
+    padding: 5px 9px;
+    font-size: 0.75rem;
   }
 
   .cart-item {
